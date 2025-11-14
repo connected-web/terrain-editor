@@ -10,9 +10,23 @@ import './styles/global.css'
 // Import routes
 import { routes } from './routes.ts'
 
+const detectBasePath = () => {
+  const configuredBase = import.meta.env.BASE_URL
+  if (configuredBase && configuredBase !== '.' && configuredBase !== './') {
+    return configuredBase
+  }
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname
+    if (path.startsWith('/terrain-editor')) return '/terrain-editor/'
+  }
+  return '/'
+}
+
+const routerBase = detectBasePath()
+
 // Create router
 const router = createRouter({
-  history: createWebHistory('/'),
+  history: createWebHistory(routerBase),
   routes,
   scrollBehavior(to: RouteLocationNormalized, _from: RouteLocationNormalized, savedPosition: any) {
     if (to.hash) {
@@ -35,10 +49,16 @@ app.use(router)
 // For hydration, ensure router knows the current location
 if (typeof window !== 'undefined') {
   const current = router.currentRoute.value
-  const full = window.location.pathname + window.location.search + window.location.hash
+  const pathname = window.location.pathname
+  const baseWithoutTrailing = routerBase.endsWith('/')
+    ? routerBase.slice(0, -1)
+    : routerBase
+  const relativePath = pathname.startsWith(baseWithoutTrailing)
+    ? pathname.slice(baseWithoutTrailing.length) || '/'
+    : pathname
+  const full = relativePath + window.location.search + window.location.hash
   const currentFull = current.fullPath
 
-  // only replace if path truly mismatched (not just queries)
   if (currentFull !== full) {
     router.replace(full)
   }

@@ -7,29 +7,14 @@
       metadata, and validating Wyn archive workflows.
     </p>
     <div class="cta-row">
-      <a
-        class="button primary"
-        href="https://connected-web.github.io/terrain-editor/viewer-js/"
-        target="_blank"
-        rel="noreferrer"
-      >
+      <a class="button primary" href="./viewer-js/" target="_blank" rel="noreferrer">
         Launch Viewer (TS)
       </a>
-      <a
-        class="button primary"
-        href="https://connected-web.github.io/terrain-editor/viewer-vue3/"
-        target="_blank"
-        rel="noreferrer"
-      >
+      <a class="button primary" href="./viewer-vue3/" target="_blank" rel="noreferrer">
         Launch Viewer (Vue)
       </a>
       <RouterLink class="button secondary" to="/editor">Visit Editor Preview</RouterLink>
-      <a
-        class="button secondary"
-        href="https://connected-web.github.io/terrain-editor/editor-vue3/"
-        target="_blank"
-        rel="noreferrer"
-      >
+      <a class="button secondary" href="./editor-vue3/" target="_blank" rel="noreferrer">
         Open Editor Demo
       </a>
       <a
@@ -116,19 +101,19 @@ const demos: DemoCard[] = [
     title: 'Viewer (Vanilla TS)',
     description: 'SSG-hosted harness that loads Wyn archives asynchronously with JSZip.',
     available: true,
-    url: 'https://connected-web.github.io/terrain-editor/viewer-js/'
+    url: './viewer-js/'
   },
   {
     title: 'Viewer (Vue 3)',
     description: 'Vue 3 wrapper that binds viewer events to reactive UI controls.',
     available: true,
-    url: 'https://connected-web.github.io/terrain-editor/viewer-vue3/'
+    url: './viewer-vue3/'
   },
   {
     title: 'Editor (Vue 3)',
     description: 'Early editor playground for modifying metadata and locations.',
     available: true,
-    url: 'https://connected-web.github.io/terrain-editor/editor-vue3/'
+    url: './editor-vue3/'
   }
 ]
 
