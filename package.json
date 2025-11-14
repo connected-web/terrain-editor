@@ -5,6 +5,9 @@
   "main": "index.js",
   "scripts": {
     "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json",
+    "build": "node ./scripts/build-dist.mjs",
+    "build:viewer": "npm --prefix packages/viewer run build",
+    "dev:viewer": "npm --prefix packages/viewer run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,6 +24,7 @@
   "homepage": "https://github.com/connected-web/terrain-editor#readme",
   "dependencies": {
     "@types/three": "^0.181.0",
+    "jszip": "^3.10.1",
     "three": "^0.181.1"
   }
 }

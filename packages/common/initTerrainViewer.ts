@@ -1,9 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
-import heightMapUrl from '../../assets/maps/wynnal-heightmap-web.png'
-import topoMapUrl from '../../assets/maps/wynnal-topology-web.png'
-import legendData from '../../assets/maps/wynnal/legend.json'
 import {
   applyHeightField,
   buildRimMesh,
@@ -22,7 +19,7 @@ const BASE_WIDTH = TERRAIN_WIDTH + EDGE_RIM * 2
 const BASE_DEPTH = TERRAIN_DEPTH + EDGE_RIM * 2
 const BASE_THICKNESS = 0.65
 
-const SEA_LEVEL = 0.28
+const SEA_LEVEL_DEFAULT = 0.28
 const FLOOR_Y = -BASE_THICKNESS - 0.22
 const HEIGHT_SCALE_DEFAULT = 0.45
 const WATER_PERCENT_DEFAULT = 65
@@ -76,7 +73,7 @@ type TerrainInitOptions = {
   locations?: TerrainLocation[]
 }
 
-type TerrainHandle = {
+export type TerrainHandle = {
   destroy: () => void
   updateLayers: (state: LayerToggleState) => Promise<void>
   setInteractiveMode: (enabled: boolean) => void
@@ -94,40 +91,54 @@ type TerrainHandle = {
 
 export type Cleanup = () => void
 
-const legendAssetUrl = (file: string) =>
-  new URL(`../../assets/maps/wynnal/${file}`, import.meta.url).href
+type Resolvable<T> = T | Promise<T>
 
-const layerImageCache = new Map<string, HTMLImageElement>()
-const maskCanvasCache = new Map<string, HTMLCanvasElement>()
+export type LegendLayer = {
+  mask: string
+  rgb: [number, number, number]
+}
 
-const mapWidth = legendData.size[0] - 1
-const mapHeight = legendData.size[1] - 1
+export type TerrainLegend = {
+  size: [number, number]
+  sea_level?: number
+  heightmap: string
+  topology?: string
+  biomes: Record<string, LegendLayer>
+  overlays: Record<string, LegendLayer>
+}
 
-const pixelToUV = (pixel: { x: number; y: number }) => {
-  const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
-  const v = THREE.MathUtils.clamp(pixel.y, 0, mapHeight) / mapHeight
-  return { u, v }
+export type TerrainDataset = {
+  legend: TerrainLegend
+  getHeightMapUrl: () => Resolvable<string>
+  getTopologyMapUrl: () => Resolvable<string>
+  resolveAssetUrl: (path: string) => Resolvable<string>
+  cleanup?: () => void
 }
 
 const uvToWorld = (
   u: number,
   v: number,
   sampler: HeightSampler | null,
-  heightScale: number
+  heightScale: number,
+  seaLevel: number
 ) => {
   if (!sampler) return null
   const heightSample = sampleHeightValue(sampler, u, v)
   const x = (u - 0.5) * TERRAIN_WIDTH
   const z = (v - 0.5) * TERRAIN_DEPTH
-  const y = (heightSample - SEA_LEVEL) * heightScale
+  const y = (heightSample - seaLevel) * heightScale
   return new THREE.Vector3(x, y, z)
 }
 
 const easeInOut = (t: number) => t * t * (3 - 2 * t)
 
-const loadLegendImage = async (file: string) => {
-  if (layerImageCache.has(file)) return layerImageCache.get(file)!
-  const url = legendAssetUrl(file)
+const loadLegendImage = async (
+  file: string,
+  resolveAssetUrl: (path: string) => Resolvable<string>,
+  cache: Map<string, HTMLImageElement>
+) => {
+  if (cache.has(file)) return cache.get(file)!
+  const url = await Promise.resolve(resolveAssetUrl(file))
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
     img.decoding = 'async'
@@ -135,13 +146,18 @@ const loadLegendImage = async (file: string) => {
     img.onload = () => resolve(img)
     img.onerror = (event) => reject(new Error(`Failed to load ${file} (${url})`))
   })
-  layerImageCache.set(file, image)
+  cache.set(file, image)
   return image
 }
 
-const preprocessMask = async (file: string) => {
-  if (maskCanvasCache.has(file)) return maskCanvasCache.get(file)!
-  const img = await loadLegendImage(file)
+const preprocessMask = async (
+  file: string,
+  resolveAssetUrl: (path: string) => Resolvable<string>,
+  imageCache: Map<string, HTMLImageElement>,
+  maskCache: Map<string, HTMLCanvasElement>
+) => {
+  if (maskCache.has(file)) return maskCache.get(file)!
+  const img = await loadLegendImage(file, resolveAssetUrl, imageCache)
   const canvas = document.createElement('canvas')
   canvas.width = img.naturalWidth || img.width
   canvas.height = img.naturalHeight || img.height
@@ -161,14 +177,20 @@ const preprocessMask = async (file: string) => {
     data[i + 3] = alpha
   }
   ctx.putImageData(imageData, 0, 0)
-  maskCanvasCache.set(file, canvas)
+  maskCache.set(file, canvas)
   return canvas
 }
 
 const hexFromRgb = (rgb: [number, number, number]) =>
   `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
 
-const composeLegendTexture = async (layerState?: LayerToggleState) => {
+const composeLegendTexture = async (
+  legendData: TerrainLegend,
+  resolveAssetUrl: (path: string) => Resolvable<string>,
+  imageCache: Map<string, HTMLImageElement>,
+  maskCache: Map<string, HTMLCanvasElement>,
+  layerState?: LayerToggleState
+) => {
   if (typeof document === 'undefined') return null
 
   const [width, height] = legendData.size
@@ -194,7 +216,7 @@ const composeLegendTexture = async (layerState?: LayerToggleState) => {
   ) => {
     let maskImage: HTMLCanvasElement | HTMLImageElement | null = null
     try {
-      maskImage = await preprocessMask(maskFile)
+      maskImage = await preprocessMask(maskFile, resolveAssetUrl, imageCache, maskCache)
     } catch (err) {
       console.warn('[WynnalTerrain] Unable to load mask', maskFile, err)
       return
@@ -338,7 +360,8 @@ const createOceanMesh = (
   heightMap: THREE.Texture,
   sampler: HeightSampler,
   heightScale: number,
-  waterHeight: number
+  waterHeight: number,
+  seaLevel: number
 ) => {
   const oceanWidth = Math.max(0, TERRAIN_WIDTH - WATER_INSET)
   const oceanDepth = Math.max(0, TERRAIN_DEPTH - WATER_INSET)
@@ -348,7 +371,7 @@ const createOceanMesh = (
 
   const uniforms = {
     uHeightMap: { value: heightMap },
-    uSeaLevel: { value: SEA_LEVEL },
+    uSeaLevel: { value: seaLevel },
     uHeightScale: { value: heightScale },
     uWaterHeight: { value: waterHeight },
     uLowColor: { value: new THREE.Color('#1b3d4f') },
@@ -409,8 +432,9 @@ const createOceanMesh = (
   }
 }
 
-export const initWynnalTerrain = async (
+export const initTerrainViewer = async (
   container: HTMLElement,
+  dataset: TerrainDataset,
   options: TerrainInitOptions = {}
 ): Promise<TerrainHandle> => {
   if (typeof window === 'undefined') {
@@ -430,6 +454,19 @@ export const initWynnalTerrain = async (
   const width = container.clientWidth || 720
   const height = container.clientHeight || 405
   const disposables: Cleanup[] = []
+
+  const legend = dataset.legend
+  const seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
+  const mapWidth = Math.max(1, legend.size[0] - 1)
+  const mapHeight = Math.max(1, legend.size[1] - 1)
+  const layerImageCache = new Map<string, HTMLImageElement>()
+  const maskCanvasCache = new Map<string, HTMLCanvasElement>()
+
+  const pixelToUV = (pixel: { x: number; y: number }) => {
+    const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
+    const v = THREE.MathUtils.clamp(pixel.y, 0, mapHeight) / mapHeight
+    return { u, v }
+  }
 
   const heightScale = options.heightScale ?? HEIGHT_SCALE_DEFAULT
   let currentHeightScale = heightScale
@@ -600,7 +637,7 @@ export const initWynnalTerrain = async (
     if (!heightSampler || !locations.length) return
     locations.forEach((location) => {
       const { u, v } = pixelToUV(location.pixel)
-      const world = uvToWorld(u, v, heightSampler, currentHeightScale)
+      const world = uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel)
       if (!world) return
       locationWorldCache.set(location.id, world.clone())
       const glyph = formatMarkerGlyph(location)
@@ -638,13 +675,16 @@ export const initWynnalTerrain = async (
   }
 
   const loader = new THREE.TextureLoader()
-
+  const [heightMapSource, topoMapSource] = await Promise.all([
+    Promise.resolve(dataset.getHeightMapUrl()),
+    Promise.resolve(dataset.getTopologyMapUrl())
+  ])
   const [heightMap, topoTexture] = await Promise.all([
     new Promise<THREE.Texture>((resolve, reject) => {
-      loader.load(heightMapUrl, resolve, undefined, reject)
+      loader.load(heightMapSource, resolve, undefined, reject)
     }),
     new Promise<THREE.Texture>((resolve, reject) => {
-      loader.load(topoMapUrl, resolve, undefined, reject)
+      loader.load(topoMapSource, resolve, undefined, reject)
     })
   ])
 
@@ -653,14 +693,20 @@ export const initWynnalTerrain = async (
   topoTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8)
 
   const sampler = createHeightSampler(heightMap)
-  if (!sampler) throw new Error('Unable to read Wynnal heightmap data')
+  if (!sampler) throw new Error('Unable to read heightmap data')
   heightSampler = sampler
 
   const terrainGeometry = new THREE.PlaneGeometry(TERRAIN_WIDTH, TERRAIN_DEPTH, SEGMENTS_X, SEGMENTS_Z)
   terrainGeometry.rotateX(-Math.PI / 2)
-  applyHeightField(terrainGeometry, sampler, { seaLevel: SEA_LEVEL, heightScale })
+  applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
 
-  let legendTexture = await composeLegendTexture(options.layers)
+  let legendTexture = await composeLegendTexture(
+    legend,
+    dataset.resolveAssetUrl,
+    layerImageCache,
+    maskCanvasCache,
+    options.layers
+  )
 
   const terrainMaterial = new THREE.MeshStandardMaterial({
     map: legendTexture ?? topoTexture,
@@ -694,7 +740,7 @@ export const initWynnalTerrain = async (
   rimMesh.receiveShadow = true
   scene.add(rimMesh)
 
-  const ocean = createOceanMesh(heightMap, sampler, heightScale, waterHeight)
+  const ocean = createOceanMesh(heightMap, sampler, heightScale, waterHeight, seaLevel)
   scene.add(ocean.mesh)
 
   disposables.push(() => {
@@ -893,7 +939,13 @@ export const initWynnalTerrain = async (
 
   const updateLayers = async (state: LayerToggleState) => {
     try {
-      const newTexture = await composeLegendTexture(state)
+      const newTexture = await composeLegendTexture(
+        legend,
+        dataset.resolveAssetUrl,
+        layerImageCache,
+        maskCanvasCache,
+        state
+      )
       if (!newTexture) return
       legendTexture?.dispose()
       legendTexture = newTexture
@@ -924,7 +976,13 @@ export const initWynnalTerrain = async (
     let world =
       normalizeWorld(worldOverride) ||
       (locationId && locationWorldCache.get(locationId)?.clone()) ||
-      uvToWorld(pixelToUV(pixel).u, pixelToUV(pixel).v, heightSampler, currentHeightScale)
+      uvToWorld(
+        pixelToUV(pixel).u,
+        pixelToUV(pixel).v,
+        heightSampler,
+        currentHeightScale,
+        seaLevel
+      )
     if (!world) return
     const distance =
       view?.distance ?? Math.max(camera.position.distanceTo(controls.target), 0.1)
@@ -947,6 +1005,7 @@ export const initWynnalTerrain = async (
       resizeObserver.disconnect()
       controls.dispose()
       disposables.forEach((dispose) => dispose())
+      dataset.cleanup?.()
     },
     updateLayers,
     setInteractiveMode,

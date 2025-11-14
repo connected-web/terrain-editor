@@ -5,6 +5,7 @@
   ],
   "sea_level": 0.2758283931016922,
   "heightmap": "layers/heightmap.png",
+  "topology": "layers/wynnal-topology-web.png",
   "biomes": {
     "snow": {
       "mask": "layers/snow_mask.png",

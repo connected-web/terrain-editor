@@ -20,6 +20,12 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 - https://connected-web.github.io/terrain-editor/viewer-js/ ? (🚧 make this work)
 - https://connected-web.github.io/terrain-editor/viewer-vue3/ ? (🚧 make this work)
 
+### Vanilla viewer demo
+
+- `npm run dev:viewer` - Run the plain TypeScript + Vite harness locally.
+- `npm run build:viewer` - Build the harness into `packages/viewer/dist/`.
+- `npm run build` - Produce a combined `dist/` folder with `viewer-js/` and packaged `.wyn` maps ready for GitHub Pages.
+
 Example use case:
 
 ```typescript
@@ -79,4 +85,3 @@ Copyright 2025 Connected Web.
 - 🚧 Implement mask editing tools (brushes, noise, etc.)
 - 🚧 Implement heightmap editing tools (point files, falloff, rivers, etc.)
 - 🚧 Implement location editing tools (add pins, edit pins)
-
