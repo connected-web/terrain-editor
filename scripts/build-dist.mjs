@@ -12,13 +12,20 @@ const run = (command) => {
 }
 
 const distDir = join(repoRoot, 'dist')
-run('npm --prefix demos/viewer-ts run build')
+const demos = [
+  { dir: 'demos/viewer-ts', target: 'viewer-js' },
+  { dir: 'demos/viewer-vue3', target: 'viewer-vue3' }
+]
+
+demos.forEach((demo) => {
+  run(`npm --prefix ${demo.dir} run build`)
+})
 
 rmSync(distDir, { recursive: true, force: true })
 mkdirSync(distDir, { recursive: true })
 
-cpSync(join(repoRoot, 'demos/viewer-ts/dist'), join(distDir, 'viewer-js'), {
-  recursive: true
+demos.forEach((demo) => {
+  cpSync(join(repoRoot, demo.dir, 'dist'), join(distDir, demo.target), { recursive: true })
 })
 
 const mapsDir = join(distDir, 'maps')

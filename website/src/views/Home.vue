@@ -13,7 +13,15 @@
         target="_blank"
         rel="noreferrer"
       >
-        Launch Viewer Demo
+        Launch Viewer (TS)
+      </a>
+      <a
+        class="button primary"
+        href="https://connected-web.github.io/terrain-editor/viewer-vue3/"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Launch Viewer (Vue)
       </a>
       <RouterLink class="button secondary" to="/editor">Visit Editor Preview</RouterLink>
       <a
@@ -104,8 +112,9 @@ const demos: DemoCard[] = [
   },
   {
     title: 'Viewer (Vue 3)',
-    description: 'Upcoming wrapper that embeds the shared viewer inside a Vue 3 SPA.',
-    available: false
+    description: 'Vue 3 wrapper that binds viewer events to reactive UI controls.',
+    available: true,
+    url: 'https://connected-web.github.io/terrain-editor/viewer-vue3/'
   },
   {
     title: 'Editor (Vue 3)',
@@ -117,7 +126,7 @@ const demos: DemoCard[] = [
 const viewerRoadmap: RoadmapItem[] = [
   { label: 'Shared Three.js renderer', done: true },
   { label: 'Vanilla TS demo & loader', done: true },
-  { label: 'Vue 3 wrapper demo' },
+  { label: 'Vue 3 wrapper demo', done: true },
   { label: 'Location & layer UX polish' }
 ]
 

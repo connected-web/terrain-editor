@@ -37,6 +37,9 @@ jobs:
       - name: Install viewer demo dependencies
         run: npm install
         working-directory: demos/viewer-ts
+      - name: Install Vue viewer demo dependencies
+        run: npm install
+        working-directory: demos/viewer-vue3
 
       - name: Pack sample map
         run: npm run packmap

@@ -8,6 +8,8 @@
     "build": "node ./scripts/build-dist.mjs",
     "build:viewer": "npm --prefix demos/viewer-ts run build",
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
+    "build:viewer-vue": "npm --prefix demos/viewer-vue3 run build",
+    "dev:viewer-vue": "npm --prefix demos/viewer-vue3 run dev -- --host",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

@@ -20,11 +20,12 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 - https://connected-web.github.io/terrain-editor/viewer-js/ ? (🚧 make this work)
 - https://connected-web.github.io/terrain-editor/viewer-vue3/ ? (🚧 make this work)
 
-### Vanilla viewer demo
+### Viewer demos
 
 - `npm run dev:viewer` - Run the plain TypeScript + Vite harness locally.
-- `npm run build:viewer` - Build the harness into `demos/viewer-ts/dist/`.
-- `npm run build` - Produce a combined `dist/` folder with `viewer-js/` and packaged `.wyn` maps ready for GitHub Pages.
+- `npm run dev:viewer-vue` - Run the Vue 3 wrapper harness locally.
+- `npm run build:viewer` / `npm run build:viewer-vue` - Build the individual demos.
+- `npm run build` - Produce a combined `dist/` folder with `viewer-js/`, `viewer-vue3/`, and packaged `.wyn` maps ready for GitHub Pages.
 
 Example use case:
 
@@ -66,6 +67,7 @@ Copyright 2025 Connected Web.
 
 - `packages/common` – shared Three.js + Wyn loading utilities published to npm later.
 - `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
+- `demos/viewer-vue3` – Vue 3 wrapper harness validating reactive integration before landing in the editor.
 - `website` – Vue 3 SPA for marketing pages and the future editor shell.
 - `maps/` – Source assets used to build sample Wyn archives (e.g., `wynnal-terrain.wyn`).
 
@@ -78,7 +80,7 @@ Copyright 2025 Connected Web.
 
 - ✅ Create shared three.js logic for viewing maps
 - ✅ Create example viewer application (pure Vanilla TS)
-- 🚧 Create example viewer application (Vue 3 + TS)
+- ✅ Create example viewer application (Vue 3 + TS)
 - ✅ Create example `.wyn` file using local assets
 - ✅ Implement loading and unpacking of `.wyn` files
 
