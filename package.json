@@ -1,0 +1,26 @@
+{
+  "name": "@connected-web/terrain-editor",
+  "version": "1.0.0",
+  "description": "An interactive terrain editor and viewer designed for web using three.js.",
+  "main": "index.js",
+  "scripts": {
+    "packmap": "zip -r terrain.wyn legend.json layers/ thumbnails/ locations.json",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connected-web/terrain-editor.git"
+  },
+  "keywords": [],
+  "author": "Connected Web",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/connected-web/terrain-editor/issues"
+  },
+  "homepage": "https://github.com/connected-web/terrain-editor#readme",
+  "dependencies": {
+    "@types/three": "^0.181.0",
+    "three": "^0.181.1"
+  }
+}
