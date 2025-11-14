@@ -15,7 +15,8 @@ const layerControlsEl = document.getElementById('layer-controls') as HTMLElement
 const locationListEl = document.getElementById('location-list') as HTMLElement
 const interactionBtn = document.getElementById('toggle-interaction') as HTMLButtonElement
 
-const WYN_ARCHIVE_PATH = '/maps/wynnal-terrain.wyn'
+const resolveArchivePath = () =>
+  new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
 
 const setStatus = (message: string) => {
   if (statusBar) statusBar.textContent = message
@@ -81,7 +82,8 @@ let interactiveEnabled = false
 const bootstrap = async () => {
   setStatus('Downloading wynnal-terrain.wyn…')
   try {
-    const { dataset, legend, locations } = await loadWynArchive(WYN_ARCHIVE_PATH)
+    const archiveUrl = resolveArchivePath()
+    const { dataset, legend, locations } = await loadWynArchive(archiveUrl)
     layerState = createDefaultLayerState(legend)
     renderLayerControls(legend, layerState, () => {
       if (terrainHandle && layerState) {

@@ -69,11 +69,11 @@ Copyright 2025 Connected Web.
 
 ### Viewer
 
-- 🚧 Create shared three.js logic for viewing maps
-- 🚧 Create example viewer application (pure Vanilla TS)
+- ✅ Create shared three.js logic for viewing maps
+- ✅ Create example viewer application (pure Vanilla TS)
 - 🚧 Create example viewer application (Vue 3 + TS)
-- 🚧 Create example `.wyn` file using local assets
-- 🚧 Implement loading and unpacking of `.wyn` files
+- ✅ Create example `.wyn` file using local assets
+- ✅ Implement loading and unpacking of `.wyn` files
 
 ### Editor
 
