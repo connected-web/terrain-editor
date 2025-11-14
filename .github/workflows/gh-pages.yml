@@ -42,6 +42,14 @@ jobs:
         run: npm install
         working-directory: demos/viewer-vue3
 
+      - name: Install editor demo dependencies
+        run: npm install
+        working-directory: demos/editor-vue3
+
+      - name: Install website dependencies
+        run: npm install
+        working-directory: website
+
       - name: Pack sample map
         run: npm run packmap
         

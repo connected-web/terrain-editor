@@ -26,6 +26,14 @@
       <RouterLink class="button secondary" to="/editor">Visit Editor Preview</RouterLink>
       <a
         class="button secondary"
+        href="https://connected-web.github.io/terrain-editor/editor-vue3/"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open Editor Demo
+      </a>
+      <a
+        class="button secondary"
         href="https://github.com/connected-web/terrain-editor"
         target="_blank"
         rel="noreferrer"
@@ -118,8 +126,9 @@ const demos: DemoCard[] = [
   },
   {
     title: 'Editor (Vue 3)',
-    description: 'End-to-end Wyn construction experience with metadata + layer tools.',
-    available: false
+    description: 'Early editor playground for modifying metadata and locations.',
+    available: true,
+    url: 'https://connected-web.github.io/terrain-editor/editor-vue3/'
   }
 ]
 
@@ -131,7 +140,7 @@ const viewerRoadmap: RoadmapItem[] = [
 ]
 
 const editorRoadmap: RoadmapItem[] = [
-  { label: 'Editor SPA skeleton', done: false },
+  { label: 'Editor SPA skeleton', done: true },
   { label: 'Wyn import/export pipeline', done: false },
   { label: 'Layer + mask editing tools', done: false },
   { label: 'Height + location workflows', done: false }
