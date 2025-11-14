@@ -17,6 +17,9 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 
 - 🚧 TODO: Provide link to plain JS viwer demo, and Vue 3 viwer demo
 
+- https://connected-web.github.io/terrain-editor/viewer-js/ ? (🚧 make this work)
+- https://connected-web.github.io/terrain-editor/viewer-vue3/ ? (🚧 make this work)
+
 Example use case:
 
 ```typescript
@@ -40,6 +43,8 @@ setup()
 To make construction of the terrain easier, a Vue 3 based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
 
 - 🚧 TODO: Provide link to JS Editor demo, and Vue 3 editor demo
+- https://connected-web.github.io/terrain-editor/ ? (🚧 make this work as a redirect to /editor)
+- https://connected-web.github.io/terrain-editor/editor/ ? (🚧 make this work)
 
 ## License
 
