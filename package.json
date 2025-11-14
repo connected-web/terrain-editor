@@ -6,8 +6,8 @@
   "scripts": {
     "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json",
     "build": "node ./scripts/build-dist.mjs",
-    "build:viewer": "npm --prefix packages/viewer run build",
-    "dev:viewer": "npm --prefix packages/viewer run dev -- --host",
+    "build:viewer": "npm --prefix demos/viewer-ts run build",
+    "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

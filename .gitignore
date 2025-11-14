@@ -1,5 +1,5 @@
 node_modules
 dist
 website/dist
-packages/viewer/dist
-packages/viewer/public/maps
+demos/viewer-ts/dist
+demos/viewer-ts/public/maps

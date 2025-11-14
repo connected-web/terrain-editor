@@ -12,12 +12,12 @@ const run = (command) => {
 }
 
 const distDir = join(repoRoot, 'dist')
-run('npm --prefix packages/viewer run build')
+run('npm --prefix demos/viewer-ts run build')
 
 rmSync(distDir, { recursive: true, force: true })
 mkdirSync(distDir, { recursive: true })
 
-cpSync(join(repoRoot, 'packages/viewer/dist'), join(distDir, 'viewer-js'), {
+cpSync(join(repoRoot, 'demos/viewer-ts/dist'), join(distDir, 'viewer-js'), {
   recursive: true
 })
 
@@ -25,7 +25,7 @@ const mapsDir = join(distDir, 'maps')
 mkdirSync(mapsDir, { recursive: true })
 cpSync(join(repoRoot, 'maps/wynnal-terrain.wyn'), join(mapsDir, 'wynnal-terrain.wyn'))
 
-const landingHtml = `<!doctype html>
+const landingHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />

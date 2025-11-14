@@ -23,7 +23,7 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 ### Vanilla viewer demo
 
 - `npm run dev:viewer` - Run the plain TypeScript + Vite harness locally.
-- `npm run build:viewer` - Build the harness into `packages/viewer/dist/`.
+- `npm run build:viewer` - Build the harness into `demos/viewer-ts/dist/`.
 - `npm run build` - Produce a combined `dist/` folder with `viewer-js/` and packaged `.wyn` maps ready for GitHub Pages.
 
 Example use case:
@@ -61,6 +61,13 @@ ISC License. See [LICENSE](LICENSE.md) for details.
 Created and maintained by Connected Web.
 
 Copyright 2025 Connected Web.
+
+## Project structure
+
+- `packages/common` – shared Three.js + Wyn loading utilities published to npm later.
+- `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
+- `website` – Vue 3 SPA for marketing pages and the future editor shell.
+- `maps/` – Source assets used to build sample Wyn archives (e.g., `wynnal-terrain.wyn`).
 
 ## Development roadmap
 
