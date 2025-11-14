@@ -1,0 +1,44 @@
+[
+  {
+    "name": "River Delta",
+    "icon": "river",
+    "description": "The Scar",
+    "pixel": {
+      "x": 582,
+      "y": 930
+    },
+    "view": {
+      "distance": 1.8244294935149634,
+      "polar": 0.7982798235063444,
+      "azimuth": 1.314092845376746
+    }
+  },
+  {
+    "name": "Castle",
+    "icon": "castle",
+    "description": "Seat of power.",
+    "pixel": {
+      "x": 530,
+      "y": 747
+    },
+    "view": {
+      "distance": 1.8244294935149643,
+      "polar": 0.9613894084255546,
+      "azimuth": 1.871659867079187
+    }
+  },
+  {
+    "name": "Lake",
+    "icon": "lake",
+    "description": "Stuff",
+    "pixel": {
+      "x": 789,
+      "y": 185
+    },
+    "view": {
+      "distance": 1.0923533308033817,
+      "polar": 0.9613894089289944,
+      "azimuth": 2.6854057251396934
+    }
+  }
+]
