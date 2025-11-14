@@ -4,7 +4,7 @@
   "description": "An interactive terrain editor and viewer designed for web using three.js.",
   "main": "index.js",
   "scripts": {
-    "packmap": "zip -r terrain.wyn legend.json layers/ thumbnails/ locations.json",
+    "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
