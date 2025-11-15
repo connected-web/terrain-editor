@@ -20,8 +20,10 @@ const run = async () => {
       const title = file.replace(/\.(png|jpg|jpeg)$/i, '')
       const ext = path.extname(file).toLowerCase()
       const mime = ext === '.png' ? 'image/png' : 'image/jpeg'
-      content += `### ${title}\n\n` +
-        `![${title}](data:${mime};base64,${base64})\n\n`
+      content += [
+        `### ${title}`,
+        `<img src="data:${mime};base64,${base64}" alt="${title}" />`,
+      ].join('\n\n')
     }
     await fs.appendFile(summaryPath, content)
   } catch (err) {
