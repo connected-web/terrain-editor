@@ -1,0 +1,76 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/**'
+      - 'packages/**'
+      - 'demos/**'
+      - 'website/**'
+      - 'tests/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/pr-check.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install shared package dependencies
+        run: npm --prefix packages/terrain ci
+
+      - name: Install website dependencies
+        run: npm --prefix website ci
+
+      - name: Install demos dependencies
+        run: |
+          npm --prefix demos/viewer-ts ci
+          npm --prefix demos/viewer-vue3 ci
+          npm --prefix demos/editor-vue3 ci
+
+      - name: Determine Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p \"require('./package-lock.json').packages['node_modules/playwright'].version\")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: sudo npx playwright install-deps chromium
+
+      - name: Run Playwright end-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            dist/
+            playwright-report/
+            test-results/
+          retention-days: 7
