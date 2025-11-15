@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
+import { captureScreenshot } from './utils'
 
-test('editor demo loads and imports sample archive', async ({ page }) => {
+test('editor demo loads and imports sample archive', async ({ page }, testInfo) => {
   await page.goto('/editor-vue3/')
   await expect(
     page.getByRole('heading', {
@@ -22,4 +23,5 @@ test('editor demo loads and imports sample archive', async ({ page }) => {
       }
     }, { timeout: 15_000 })
     .toBe('layers/heightmap.png')
+  await captureScreenshot(page, testInfo, 'editor-demo')
 })
