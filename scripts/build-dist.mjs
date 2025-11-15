@@ -19,6 +19,8 @@ const demos = [
   { dir: 'demos/editor-vue3', target: 'editor-vue3' }
 ]
 
+run('npm run build:lib')
+
 demos.forEach((demo) => {
   run(`npm --prefix ${demo.dir} run build`)
 })

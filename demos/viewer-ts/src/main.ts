@@ -5,9 +5,9 @@ import {
   type LayerToggleState,
   type TerrainLegend,
   type TerrainLocation,
-  type TerrainHandle
-} from '../../../packages/common/initTerrainViewer'
-import { loadWynArchive } from '../../../packages/common/loadWynArchive'
+  type TerrainHandle,
+  loadWynArchive
+} from '@connected-web/terrain-editor'
 
 const viewerEl = document.getElementById('viewer-root') as HTMLElement
 const statusBar = document.getElementById('status-bar') as HTMLElement

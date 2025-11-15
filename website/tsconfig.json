@@ -19,6 +19,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
+    ,
+    "baseUrl": ".",
+    "paths": {
+      "@connected-web/terrain-editor": ["../packages/terrain/src/index.ts"],
+      "@connected-web/terrain-editor/*": ["../packages/terrain/src/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "references": [{ "path": "./tsconfig.node.json" }]

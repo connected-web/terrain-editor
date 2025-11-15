@@ -11,7 +11,12 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@connected-web/terrain-editor": ["../packages/terrain/src/index.ts"],
+      "@connected-web/terrain-editor/*": ["../packages/terrain/src/*"]
+    }
   },
   "include": ["src/**/*.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]

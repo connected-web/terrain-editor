@@ -1,5 +1,6 @@
 {
-  "name": "@connected-web/terrain-editor",
+  "name": "terrain-editor-monorepo",
+  "private": true,
   "version": "1.0.0",
   "description": "An interactive terrain editor and viewer designed for web using three.js.",
   "main": "index.js",
@@ -12,6 +13,8 @@
     "dev:viewer-vue": "npm --prefix demos/viewer-vue3 run dev -- --host",
     "build:editor-vue": "npm --prefix demos/editor-vue3 run build",
     "dev:editor-vue": "npm --prefix demos/editor-vue3 run dev -- --host",
+    "build:lib": "npm --prefix packages/terrain run build",
+    "test:smoke": "node ./scripts/smoke-tests.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -26,9 +29,9 @@
     "url": "https://github.com/connected-web/terrain-editor/issues"
   },
   "homepage": "https://github.com/connected-web/terrain-editor#readme",
-  "dependencies": {
-    "@types/three": "^0.181.0",
-    "jszip": "^3.10.1",
-    "three": "^0.181.1"
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   }
 }

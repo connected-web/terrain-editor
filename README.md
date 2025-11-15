@@ -23,7 +23,12 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 
 - `npm run dev:viewer` / `npm run dev:viewer-vue` / `npm run dev:editor-vue` – Run the TS viewer, Vue viewer, or Vue editor harnesses locally.
 - `npm run build:viewer` / `npm run build:viewer-vue` / `npm run build:editor-vue` – Build demos individually.
+- `npm run build:lib` – Build the shared `@connected-web/terrain-editor` package via tsup.
 - `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/viewer-vue3`, `/editor-vue3`, and hosted `.wyn` assets for GitHub Pages.
+
+### Testing
+
+- `npm run test:smoke` – Launches Vite preview servers for the website and each demo, performing a basic HTTP fetch to ensure they respond successfully.
 
 Example use case:
 
@@ -62,7 +67,7 @@ Copyright 2025 Connected Web.
 
 ## Project structure
 
-- `packages/common` – shared Three.js + Wyn loading utilities published to npm later.
+- `packages/terrain` – source for the `@connected-web/terrain-editor` package (viewer/editor utilities).
 - `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
 - `demos/viewer-vue3` – Vue 3 wrapper harness validating reactive integration before landing in the editor.
 - `demos/editor-vue3` – Early editor playground with metadata + location tooling.

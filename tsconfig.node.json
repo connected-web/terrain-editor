@@ -4,7 +4,12 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@connected-web/terrain-editor": ["packages/terrain/src/index.ts"],
+      "@connected-web/terrain-editor/*": ["packages/terrain/src/*"]
+    }
   },
   "include": ["packages/**/*"],
   "exclude": ["node_modules", "**/dist/**", "website/**"]

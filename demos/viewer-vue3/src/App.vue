@@ -83,12 +83,12 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   initTerrainViewer,
+  loadWynArchive,
   type LayerToggleState,
   type TerrainLegend,
   type TerrainLocation,
   type TerrainHandle
-} from '../../../packages/common/initTerrainViewer'
-import { loadWynArchive } from '../../../packages/common/loadWynArchive'
+} from '@connected-web/terrain-editor'
 
 type LayerGroup = keyof LayerToggleState
 

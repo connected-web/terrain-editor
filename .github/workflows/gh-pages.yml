@@ -34,6 +34,10 @@ jobs:
       - name: Install root dependencies
         run: npm install
 
+      - name: Install shared package dependencies
+        run: npm install
+        working-directory: packages/terrain
+
       - name: Install viewer demo dependencies
         run: npm install
         working-directory: demos/viewer-ts

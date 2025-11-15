@@ -64,13 +64,13 @@
 import { onBeforeUnmount, ref } from 'vue'
 import {
   initTerrainViewer,
+  loadWynArchive,
   type LayerToggleState,
   type TerrainDataset,
   type TerrainLegend,
   type TerrainLocation,
   type TerrainHandle
-} from '../../../packages/common/initTerrainViewer'
-import { loadWynArchive } from '../../../packages/common/loadWynArchive'
+} from '@connected-web/terrain-editor'
 
 const viewerRef = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
