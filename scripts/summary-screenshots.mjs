@@ -17,9 +17,11 @@ const run = async () => {
       const filePath = path.join(screenshotDir, file)
       const data = await fs.readFile(filePath)
       const base64 = data.toString('base64')
-      const title = file.replace(/\.png$/i, '')
+      const title = file.replace(/\.(png|jpg|jpeg)$/i, '')
+      const ext = path.extname(file).toLowerCase()
+      const mime = ext === '.png' ? 'image/png' : 'image/jpeg'
       content += `### ${title}\n\n` +
-        `![${title}](data:image/png;base64,${base64})\n\n`
+        `![${title}](data:${mime};base64,${base64})\n\n`
     }
     await fs.appendFile(summaryPath, content)
   } catch (err) {

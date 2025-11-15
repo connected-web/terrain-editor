@@ -11,11 +11,16 @@ const ensureScreenshotDir = () => {
 export const captureScreenshot = async (page: Page, testInfo: TestInfo, name: string) => {
   ensureScreenshotDir()
   await page.setViewportSize({ width: 800, height: 600 })
-  const filePath = path.join(screenshotDir, `${name}.png`)
-  await page.screenshot({ path: filePath, fullPage: true })
+  const filePath = path.join(screenshotDir, `${name}.jpg`)
+  await page.screenshot({
+    path: filePath,
+    fullPage: true,
+    type: 'jpeg',
+    quality: 65
+  })
   await testInfo.attach(name, {
     path: filePath,
-    contentType: 'image/png'
+    contentType: 'image/jpeg'
   })
   return filePath
 }
