@@ -22,7 +22,7 @@ const mimeTypes = {
   '.woff2': 'font/woff2'
 }
 
-const sendFile = async (filePath, res) => {
+async function sendFile(filePath, res) {
   try {
     const stat = await fs.stat(filePath)
     if (stat.isDirectory()) {

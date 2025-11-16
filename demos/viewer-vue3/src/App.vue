@@ -100,33 +100,36 @@ const layerState = ref<LayerToggleState | null>(null)
 const handle = ref<TerrainHandle | null>(null)
 const interactive = ref(false)
 
-const archiveUrl = () =>
-  new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+function archiveUrl() {
+  return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+}
 
-const createLayerState = (meta: TerrainLegend): LayerToggleState => ({
-  biomes: Object.fromEntries(Object.keys(meta.biomes).map((key) => [key, true])),
-  overlays: Object.fromEntries(Object.keys(meta.overlays).map((key) => [key, true]))
-})
+function createLayerState(meta: TerrainLegend): LayerToggleState {
+  return {
+    biomes: Object.fromEntries(Object.keys(meta.biomes).map((key) => [key, true])),
+    overlays: Object.fromEntries(Object.keys(meta.overlays).map((key) => [key, true]))
+  }
+}
 
-const applyLayerState = async () => {
+async function applyLayerState() {
   if (handle.value && layerState.value) {
     await handle.value.updateLayers(layerState.value)
   }
 }
 
-const toggleLayer = (group: LayerGroup, key: string) => {
+function toggleLayer(group: LayerGroup, key: string) {
   if (!layerState.value) return
   layerState.value[group][key] = !layerState.value[group][key]
   applyLayerState()
 }
 
-const resetLayers = () => {
+function resetLayers() {
   if (!legend.value) return
   layerState.value = createLayerState(legend.value)
   applyLayerState()
 }
 
-const focusLocation = (location: TerrainLocation) => {
+function focusLocation(location: TerrainLocation) {
   handle.value?.navigateTo({
     pixel: location.pixel,
     locationId: location.id,
@@ -134,12 +137,12 @@ const focusLocation = (location: TerrainLocation) => {
   })
 }
 
-const toggleInteraction = () => {
+function toggleInteraction() {
   interactive.value = !interactive.value
   handle.value?.setInteractiveMode(interactive.value)
 }
 
-const bootstrap = async () => {
+async function bootstrap() {
   if (!viewerRef.value) return
   status.value = 'Downloading wynnal-terrain.wyn…'
   try {

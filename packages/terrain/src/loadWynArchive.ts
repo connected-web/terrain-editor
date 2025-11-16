@@ -6,7 +6,7 @@ import type {
   TerrainLocation
 } from './initTerrainViewer'
 
-const ensureFile = (zip: JSZip, path: string) => {
+function ensureFile(zip: JSZip, path: string) {
   const file = zip.file(path)
   if (!file) {
     throw new Error(`Missing required file in WYN archive: ${path}`)
@@ -14,11 +14,11 @@ const ensureFile = (zip: JSZip, path: string) => {
   return file
 }
 
-const createObjectUrlResolver = (zip: JSZip) => {
+function createObjectUrlResolver(zip: JSZip) {
   const cache = new Map<string, Promise<string>>()
   const allocated = new Set<string>()
 
-  const getUrl = (path: string) => {
+  function getUrl(path: string) {
     if (cache.has(path)) return cache.get(path)!
     const file = zip.file(path)
     if (!file) {
@@ -33,7 +33,7 @@ const createObjectUrlResolver = (zip: JSZip) => {
     return promise
   }
 
-  const cleanup = () => {
+  function cleanup() {
     allocated.forEach((url) => URL.revokeObjectURL(url))
     allocated.clear()
     cache.clear()
@@ -48,7 +48,7 @@ export type LoadedWynFile = {
   locations?: TerrainLocation[]
 }
 
-export const loadWynArchive = async (url: string): Promise<LoadedWynFile> => {
+export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Failed to fetch WYN file (${response.status} ${response.statusText})`)
@@ -78,6 +78,5 @@ export const loadWynArchive = async (url: string): Promise<LoadedWynFile> => {
     resolveAssetUrl: (path: string) => getUrl(path),
     cleanup
   }
-
   return { dataset, legend, locations }
 }

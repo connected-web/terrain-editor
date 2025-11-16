@@ -115,13 +115,13 @@ export type TerrainDataset = {
   cleanup?: () => void
 }
 
-const uvToWorld = (
+function uvToWorld(
   u: number,
   v: number,
   sampler: HeightSampler | null,
   heightScale: number,
   seaLevel: number
-) => {
+) {
   if (!sampler) return null
   const heightSample = sampleHeightValue(sampler, u, v)
   const x = (u - 0.5) * TERRAIN_WIDTH
@@ -130,13 +130,15 @@ const uvToWorld = (
   return new THREE.Vector3(x, y, z)
 }
 
-const easeInOut = (t: number) => t * t * (3 - 2 * t)
+function easeInOut(t: number) {
+  return t * t * (3 - 2 * t)
+}
 
-const loadLegendImage = async (
+async function loadLegendImage(
   file: string,
   resolveAssetUrl: (path: string) => Resolvable<string>,
   cache: Map<string, HTMLImageElement>
-) => {
+) {
   if (cache.has(file)) return cache.get(file)!
   const url = await Promise.resolve(resolveAssetUrl(file))
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -150,12 +152,12 @@ const loadLegendImage = async (
   return image
 }
 
-const preprocessMask = async (
+async function preprocessMask(
   file: string,
   resolveAssetUrl: (path: string) => Resolvable<string>,
   imageCache: Map<string, HTMLImageElement>,
   maskCache: Map<string, HTMLCanvasElement>
-) => {
+) {
   if (maskCache.has(file)) return maskCache.get(file)!
   const img = await loadLegendImage(file, resolveAssetUrl, imageCache)
   const canvas = document.createElement('canvas')
@@ -181,16 +183,17 @@ const preprocessMask = async (
   return canvas
 }
 
-const hexFromRgb = (rgb: [number, number, number]) =>
-  `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+function hexFromRgb(rgb: [number, number, number]) {
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+}
 
-const composeLegendTexture = async (
+async function composeLegendTexture(
   legendData: TerrainLegend,
   resolveAssetUrl: (path: string) => Resolvable<string>,
   imageCache: Map<string, HTMLImageElement>,
   maskCache: Map<string, HTMLCanvasElement>,
   layerState?: LayerToggleState
-) => {
+) {
   if (typeof document === 'undefined') return null
 
   const [width, height] = legendData.size
@@ -209,11 +212,11 @@ const composeLegendTexture = async (
   const tempCtx = temp.getContext('2d')
   if (!tempCtx) return null
 
-  const drawLayer = async (
+  async function drawLayer(
     maskFile: string,
     color: [number, number, number],
     alpha = 1
-  ) => {
+  ) {
     let maskImage: HTMLCanvasElement | HTMLImageElement | null = null
     try {
       maskImage = await preprocessMask(maskFile, resolveAssetUrl, imageCache, maskCache)
@@ -252,14 +255,14 @@ const composeLegendTexture = async (
   return texture
 }
 
-const drawRoundedRect = (
+function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   width: number,
   height: number,
   radius: number
-) => {
+) {
   ctx.beginPath()
   ctx.moveTo(x + radius, y)
   ctx.lineTo(x + width - radius, y)
@@ -273,7 +276,7 @@ const drawRoundedRect = (
   ctx.closePath()
 }
 
-const createMarkerMaterial = (label: string) => {
+function createMarkerMaterial(label: string) {
   const text = (label || '?').trim().slice(0, 14)
   const canvas = document.createElement('canvas')
   canvas.width = 256
@@ -316,7 +319,7 @@ const createMarkerMaterial = (label: string) => {
   return { material, texture }
 }
 
-const createGradientTexture = (renderer: THREE.WebGLRenderer) => {
+function createGradientTexture(renderer: THREE.WebGLRenderer) {
   if (typeof window === 'undefined') return null
   const canvas = document.createElement('canvas')
   canvas.width = 2
@@ -337,7 +340,7 @@ const createGradientTexture = (renderer: THREE.WebGLRenderer) => {
   return { background: texture, environment: envRenderTarget }
 }
 
-const createBaseSlice = () => {
+function createBaseSlice() {
   const geometry = new THREE.BoxGeometry(BASE_WIDTH, BASE_THICKNESS, BASE_DEPTH)
   const material = new THREE.MeshStandardMaterial({
     color: 0x0f0f18,
@@ -356,13 +359,13 @@ const createBaseSlice = () => {
   }
 }
 
-const createOceanMesh = (
+function createOceanMesh(
   heightMap: THREE.Texture,
   sampler: HeightSampler,
   heightScale: number,
   waterHeight: number,
   seaLevel: number
-) => {
+) {
   const oceanWidth = Math.max(0, TERRAIN_WIDTH - WATER_INSET)
   const oceanDepth = Math.max(0, TERRAIN_DEPTH - WATER_INSET)
   const geometry = new THREE.PlaneGeometry(oceanWidth, oceanDepth, 1, 1)
@@ -432,13 +435,13 @@ const createOceanMesh = (
   }
 }
 
-export const initTerrainViewer = async (
+export async function initTerrainViewer(
   container: HTMLElement,
   dataset: TerrainDataset,
   options: TerrainInitOptions = {}
-): Promise<TerrainHandle> => {
+): Promise<TerrainHandle> {
   if (typeof window === 'undefined') {
-    const noop = () => {}
+    function noop() {}
     return {
       destroy: noop,
       updateLayers: async () => {},
@@ -462,7 +465,7 @@ export const initTerrainViewer = async (
   const layerImageCache = new Map<string, HTMLImageElement>()
   const maskCanvasCache = new Map<string, HTMLCanvasElement>()
 
-  const pixelToUV = (pixel: { x: number; y: number }) => {
+  function pixelToUV(pixel: { x: number; y: number }) {
     const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
     const v = THREE.MathUtils.clamp(pixel.y, 0, mapHeight) / mapHeight
     return { u, v }
@@ -569,7 +572,7 @@ export const initTerrainViewer = async (
     duration: number
   } | null = null
   let terrain: THREE.Mesh | null = null
-  const startCameraTween = (endPos: THREE.Vector3, endTarget: THREE.Vector3) => {
+  function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3) {
     cameraTween = {
       startPos: camera.position.clone(),
       endPos,
@@ -596,7 +599,7 @@ export const initTerrainViewer = async (
     ;(placementIndicator.material as THREE.Material).dispose()
   })
 
-  const clearMarkerResources = () => {
+  function clearMarkerResources() {
     markerResources.splice(0).forEach(({ material, texture, stemMaterial, stemGeometry }) => {
       material.dispose()
       texture.dispose()
@@ -609,14 +612,14 @@ export const initTerrainViewer = async (
     markerInteractiveTargets.length = 0
   }
 
-  const formatMarkerGlyph = (location: TerrainLocation) => {
+  function formatMarkerGlyph(location: TerrainLocation) {
     const raw = (location.icon || location.name || '?').trim()
     if (!raw) return '?'
     const first = raw[0]
     return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
   }
 
-  const updateMarkerVisuals = () => {
+  function updateMarkerVisuals() {
     markerMap.forEach(({ sprite, stem }, id) => {
       const baseScale = 0.36
       const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
@@ -627,7 +630,7 @@ export const initTerrainViewer = async (
     })
   }
 
-  const setLocationMarkers = (locations: TerrainLocation[], focusedId?: string) => {
+  function setLocationMarkers(locations: TerrainLocation[], focusedId?: string) {
     currentLocations = locations
     currentFocusId = focusedId
     clearMarkerResources()
@@ -756,7 +759,7 @@ export const initTerrainViewer = async (
     legendTexture?.dispose()
   })
 
-  const applyViewOffset = () => {
+  function applyViewOffset() {
     if (Math.abs(viewOffsetPixels) < 0.5) {
       if (camera.view?.enabled) {
         camera.clearViewOffset()
@@ -777,7 +780,7 @@ export const initTerrainViewer = async (
   }
 
   let animationFrame = 0
-  const animate = () => {
+  function animate() {
     const now = performance.now()
     const delta = Math.min((now - lastTime) / 1000, 0.15)
     lastTime = now
@@ -824,7 +827,7 @@ export const initTerrainViewer = async (
   })
   resizeObserver.observe(container)
 
-  const setPointerFromEvent = (event: PointerEvent | MouseEvent) => {
+  function setPointerFromEvent(event: PointerEvent | MouseEvent) {
     const rect = renderer.domElement.getBoundingClientRect()
     const x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     const y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -832,20 +835,20 @@ export const initTerrainViewer = async (
     raycaster.setFromCamera(pointer, camera)
   }
 
-  const intersectTerrain = () => {
+  function intersectTerrain() {
     if (!terrain) return null
     const intersections = raycaster.intersectObject(terrain, true)
     return intersections[0] ?? null
   }
 
-  const pickMarkerId = () => {
+  function pickMarkerId() {
     if (!markerInteractiveTargets.length) return null
     const intersections = raycaster.intersectObjects(markerInteractiveTargets, true)
     const hit = intersections.find((entry) => entry.object.userData.locationId)
     return (hit?.object.userData.locationId as string) || null
   }
 
-  const updateHoverState = () => {
+  function updateHoverState() {
     const markerId = pickMarkerId()
     if (markerId !== hoveredLocationId) {
       hoveredLocationId = markerId
@@ -854,7 +857,7 @@ export const initTerrainViewer = async (
     }
   }
 
-  const updatePlacementIndicator = () => {
+  function updatePlacementIndicator() {
     if (!interactiveEnabled) {
       placementIndicator.visible = false
       return
@@ -868,13 +871,13 @@ export const initTerrainViewer = async (
     placementIndicator.position.copy(hit.point).setY(hit.point.y + 0.2)
   }
 
-  const handlePointerMove = (event: PointerEvent) => {
+  function handlePointerMove(event: PointerEvent) {
     setPointerFromEvent(event)
     updateHoverState()
     updatePlacementIndicator()
   }
 
-  const handlePointerDown = (event: PointerEvent) => {
+  function handlePointerDown(event: PointerEvent) {
     if (event.button !== 0) return
     setPointerFromEvent(event)
     if (interactiveEnabled && options.onLocationPick) {
@@ -900,7 +903,7 @@ export const initTerrainViewer = async (
   renderer.domElement.addEventListener('pointermove', handlePointerMove)
   renderer.domElement.addEventListener('pointerdown', handlePointerDown)
 
-  const handleDoubleClick = (event: MouseEvent) => {
+  function handleDoubleClick(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
     setPointerFromEvent(event)
@@ -926,7 +929,7 @@ export const initTerrainViewer = async (
     renderer.domElement.removeEventListener('dblclick', handleDoubleClick)
   )
 
-  const setInteractiveMode = (enabled: boolean) => {
+  function setInteractiveMode(enabled: boolean) {
     interactiveEnabled = enabled
     if (enabled) {
       renderer.domElement.classList.add('terrain-pointer-active')
@@ -936,7 +939,7 @@ export const initTerrainViewer = async (
     }
   }
 
-  const updateLayers = async (state: LayerToggleState) => {
+  async function updateLayers(state: LayerToggleState) {
     try {
       const newTexture = await composeLegendTexture(
         legend,
@@ -959,18 +962,18 @@ export const initTerrainViewer = async (
   if (options.locations?.length) setLocationMarkers(options.locations)
   if (interactiveEnabled) setInteractiveMode(true)
 
-  const normalizeWorld = (value?: THREE.Vector3 | { x: number; y: number; z: number }) => {
+  function normalizeWorld(value?: THREE.Vector3 | { x: number; y: number; z: number }) {
     if (!value) return null
     if (value instanceof THREE.Vector3) return value.clone()
     return new THREE.Vector3(value.x, value.y, value.z)
   }
 
-  const navigateToLocation = (payload: {
+  function navigateToLocation(payload: {
     pixel: { x: number; y: number }
     locationId?: string
     world?: THREE.Vector3 | { x: number; y: number; z: number }
     view?: LocationViewState
-  }) => {
+  }) {
     const { pixel, locationId, world: worldOverride, view } = payload
     let world =
       normalizeWorld(worldOverride) ||

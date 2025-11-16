@@ -4,11 +4,11 @@ import type { Page, TestInfo } from '@playwright/test'
 
 const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
 
-const ensureScreenshotDir = () => {
+function ensureScreenshotDir() {
   mkdirSync(screenshotDir, { recursive: true })
 }
 
-export const captureScreenshot = async (page: Page, testInfo: TestInfo, name: string) => {
+export async function captureScreenshot(page: Page, testInfo: TestInfo, name: string) {
   ensureScreenshotDir()
   await page.setViewportSize({ width: 1024, height: 768 })
   const filePath = path.join(screenshotDir, `${name}.jpg`)

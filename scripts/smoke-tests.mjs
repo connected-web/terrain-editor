@@ -24,14 +24,14 @@ const mimeTypes = {
   '.ico': 'image/x-icon'
 }
 
-const serveFile = async (filePath) => {
+async function serveFile(filePath) {
   const data = await fs.readFile(filePath)
   const ext = path.extname(filePath)
   const type = mimeTypes[ext] || 'application/octet-stream'
   return { data, type }
 }
 
-const startServer = async () => {
+async function startServer() {
   const server = createServer(async (req, res) => {
     if (!req.url) {
       res.statusCode = 400
@@ -61,16 +61,17 @@ const startServer = async () => {
   return { server, port: address.port }
 }
 
-const runCommand = (command, args) =>
-  new Promise((resolve, reject) => {
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: repoRoot, stdio: 'inherit' })
     child.on('exit', (code) => {
       if (code === 0) resolve()
       else reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`))
     })
   })
+}
 
-const fetchWithRetry = async (url, retries = 5) => {
+async function fetchWithRetry(url, retries = 5) {
   let attempt = 0
   while (attempt < retries) {
     try {
@@ -85,7 +86,7 @@ const fetchWithRetry = async (url, retries = 5) => {
   }
 }
 
-const run = async () => {
+async function run() {
   await runCommand('npm', ['run', 'build'])
   const { server, port } = await startServer()
 

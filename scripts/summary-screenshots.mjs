@@ -15,10 +15,15 @@ const ftpPassword = process.env.CWEB_IMAGES_FTP_PASSWORD
 const ftpBaseDir = '' // defaults to: /www/images/github
 const baseUrl = 'https://images.connected-web.net/github'
 
-const log = (...args) => console.log('[summary-screenshots]', ...args)
-const warn = (...args) => console.warn('[summary-screenshots]', ...args)
+function log(...args) {
+  return console.log('[summary-screenshots]', ...args)
+}
 
-const readPullRequestNumber = async () => {
+function warn(...args) {
+  return console.warn('[summary-screenshots]', ...args)
+}
+
+async function readPullRequestNumber() {
   if (!eventPath) return null
   try {
     const raw = await fs.readFile(eventPath, 'utf8')
@@ -30,7 +35,7 @@ const readPullRequestNumber = async () => {
   }
 }
 
-const loadScreenshots = async () => {
+async function loadScreenshots() {
   const files = await fs.readdir(screenshotDir)
   const screenshots = []
   for (const file of files.sort()) {
@@ -52,7 +57,7 @@ const loadScreenshots = async () => {
   return screenshots
 }
 
-const buildSummary = (screenshots) => {
+function buildSummary(screenshots) {
   if (!screenshots.length) return null
 
   let content = `${marker}\n\n## Playwright Screenshots\n\n`
@@ -71,11 +76,10 @@ const buildSummary = (screenshots) => {
     }
     content += '\n\n'
   }
-
   return content.trimEnd() + '\n'
 }
 
-const appendStepSummary = async (content) => {
+async function appendStepSummary(content) {
   if (!summaryPath || !content) return
   const stats = await fs.stat(summaryPath).catch(() => null)
   const prefix = stats && stats.size > 0 ? '\n' : ''
@@ -83,7 +87,7 @@ const appendStepSummary = async (content) => {
   log('Appended Playwright screenshots to step summary.')
 }
 
-const uploadScreenshotsToFtp = async (screenshots) => {
+async function uploadScreenshotsToFtp(screenshots) {
   if (!ftpUser || !ftpPassword) {
     warn('FTP credentials not available; skipping FTP upload.')
     return []
@@ -129,7 +133,7 @@ const uploadScreenshotsToFtp = async (screenshots) => {
   }
 }
 
-const uploadWithClient = async (client, screenshots) => {
+async function uploadWithClient(client, screenshots) {
   try {
     const date = new Date().toISOString().split('T')[0]
     const uploadDir = `${ftpBaseDir}/${date}`
@@ -166,7 +170,7 @@ const uploadWithClient = async (client, screenshots) => {
   }
 }
 
-const githubRequest = async (url, init) => {
+async function githubRequest(url, init) {
   const response = await fetch(url, {
     ...init,
     headers: {
@@ -181,11 +185,10 @@ const githubRequest = async (url, init) => {
     const errorText = await response.text()
     throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${errorText}`)
   }
-
   return response
 }
 
-const findExistingComment = async (owner, repo, prNumber) => {
+async function findExistingComment(owner, repo, prNumber) {
   let page = 1
   while (true) {
     const url = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`
@@ -202,7 +205,7 @@ const findExistingComment = async (owner, repo, prNumber) => {
   }
 }
 
-const buildCommentBody = (screenshots) => {
+function buildCommentBody(screenshots) {
   if (!screenshots.length) return null
 
   let content = `${marker}\n\n## Playwright Screenshots\n\n`
@@ -213,11 +216,10 @@ const buildCommentBody = (screenshots) => {
     ].join('\n\n')
     content += '\n\n'
   }
-
   return content.trimEnd() + '\n'
 }
 
-const upsertPullRequestComment = async (screenshots) => {
+async function upsertPullRequestComment(screenshots) {
   if (!githubToken) {
     warn('GITHUB_TOKEN not available; skipping PR comment update.')
     return
@@ -276,7 +278,7 @@ const upsertPullRequestComment = async (screenshots) => {
   }
 }
 
-const run = async () => {
+async function run() {
   try {
     const screenshots = await loadScreenshots()
     if (!screenshots.length) return
