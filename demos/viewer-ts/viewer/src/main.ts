@@ -78,6 +78,14 @@ function renderLocations(locations: TerrainLocation[] = [], navigate: (loc: Terr
   })
 }
 
+function navigateToLocation(location: TerrainLocation) {
+  terrainHandle?.navigateTo({
+    pixel: location.pixel,
+    locationId: location.id,
+    view: location.view
+  })
+}
+
 let terrainHandle: TerrainHandle | null = null
 let layerState: LayerToggleState | null = null
 let interactiveEnabled = false
@@ -94,11 +102,7 @@ async function bootstrap() {
       }
     })
     renderLocations(locations ?? [], (location) => {
-      terrainHandle?.navigateTo({
-        pixel: location.pixel,
-        locationId: location.id,
-        view: location.view
-      })
+      navigateToLocation(location)
     })
 
     terrainHandle = await initTerrainViewer(viewerEl, dataset, {
@@ -121,7 +125,7 @@ async function bootstrap() {
       onLocationClick: (id: any) => {
         const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
         if (location) {
-          setStatus(`Focused location: '${location.name ?? location.id}'`)
+          navigateToLocation(location)
         }
       }
     })
