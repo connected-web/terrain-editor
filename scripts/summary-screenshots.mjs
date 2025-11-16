@@ -109,7 +109,9 @@ const buildMultipartBody = (screenshot) => {
   const header = Buffer.from(
     `--${boundary}${newline}` +
       `Content-Disposition: form-data; name="file"; filename="${screenshot.file}"${newline}` +
-      `Content-Type: ${screenshot.mime}${newline}${newline}`,
+      `Content-Type: ${screenshot.mime}${newline}` +
+      `Content-Length: ${screenshot.data.length}${newline}` +
+      `Content-Transfer-Encoding: binary${newline}${newline}`,
     'utf8',
   )
   const footer = Buffer.from(`${newline}--${boundary}--${newline}`, 'utf8')
