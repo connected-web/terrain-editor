@@ -105,23 +105,23 @@ async function bootstrap() {
       interactive: interactiveEnabled,
       layers: layerState,
       locations,
-      onLocationPick: (payload) => {
+      onLocationPick: (payload: { pixel: { x: any; y: any }; uv: { u: number; v: number } }) => {
         setStatus(
           `Picked pixel (${payload.pixel.x}, ${payload.pixel.y}) – uv (${payload.uv.u.toFixed(2)}, ${payload.uv.v.toFixed(2)})`
         )
       },
-      onLocationHover: (id) => {
+      onLocationHover: (id: any) => {
         if (!id) {
           setStatus('Hovering terrain')
           return
         }
-        const location = locations?.find((entry) => entry.id === id)
-        setStatus(location ? `Hovering ${location.name ?? location.id}` : `Hovering ${id}`)
+        const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
+        setStatus(location ? `Hovering location: '${location.name ?? location.id}'` : `Hovering ${id}`)
       },
-      onLocationClick: (id) => {
-        const location = locations?.find((entry) => entry.id === id)
+      onLocationClick: (id: any) => {
+        const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
         if (location) {
-          setStatus(`Focused ${location.name ?? location.id}`)
+          setStatus(`Focused location: '${location.name ?? location.id}'`)
         }
       }
     })

@@ -281,8 +281,8 @@ function drawRoundedRect(
 function createMarkerMaterial(label: string) {
   const text = (label || '?').trim().slice(0, 14)
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 128
+  canvas.width = 240
+  canvas.height = 160
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -296,8 +296,8 @@ function createMarkerMaterial(label: string) {
       ctx.font = `${fontSize}px "DM Sans", sans-serif`
       metrics = ctx.measureText(text)
     }
-    const paddingX = 24
-    const paddingY = 14
+    const paddingX = 20
+    const paddingY = 10
     const boxWidth = Math.min(canvas.width - 12, metrics.width + paddingX * 2)
     const boxHeight = fontSize + paddingY * 2
     const boxX = (canvas.width - boxWidth) / 2
@@ -623,9 +623,9 @@ export async function initTerrainViewer(
 
   function updateMarkerVisuals() {
     markerMap.forEach(({ sprite, stem }, id) => {
-      const baseScale = 0.36
+      const baseScale = 0.5
       const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
-      sprite.scale.set(baseScale * emphasis, baseScale * 0.55 * emphasis, 1)
+      sprite.scale.set(baseScale, baseScale, baseScale).multiplyScalar(emphasis)
       sprite.material.opacity = currentFocusId === id ? 1 : hoveredLocationId === id ? 0.9 : 0.6
       const stemMat = stem.material as THREE.MeshStandardMaterial
       stemMat.opacity = currentFocusId === id ? 0.8 : hoveredLocationId === id ? 0.95 : 0.75
@@ -639,15 +639,16 @@ export async function initTerrainViewer(
     markerMap.clear()
     markerInteractiveTargets.length = 0
     if (!heightSampler || !locations.length) return
-    locations.forEach((location) => {
+    locations.forEach((location, i) => {
+      const id = location.id ?? `${location.name ?? 'loc'}-${i}`
+      location.id = id
       const { u, v } = pixelToUV(location.pixel)
       const world = uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel)
       if (!world) return
-      locationWorldCache.set(location.id, world.clone())
+      locationWorldCache.set(id, world.clone())
       const glyph = formatMarkerGlyph(location)
       const { material, texture } = createMarkerMaterial(glyph)
-      const sprite = new THREE.Sprite(material)
-      sprite.position.set(0, 0.32, 0)
+      const sprite = new THREE.Sprite(material.clone())
       sprite.userData.locationId = location.id
       const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
       const stem = new THREE.Mesh(
@@ -659,6 +660,7 @@ export async function initTerrainViewer(
         })
       )
       stem.position.y = -(stemHeight / 4)
+      sprite.position.set(0, 0.1 + (stemHeight / 4), 0)
       stem.userData.locationId = location.id
       const container = new THREE.Group()
       container.position.copy(world)

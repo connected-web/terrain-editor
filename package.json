@@ -27,6 +27,11 @@
   "author": "Connected Web",
   "license": "ISC",
   "type": "commonjs",
+  "workspaces": [
+    "packages/*",
+    "demos/*",
+    "website"
+  ],
   "bugs": {
     "url": "https://github.com/connected-web/terrain-editor/issues"
   },

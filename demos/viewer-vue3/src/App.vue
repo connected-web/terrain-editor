@@ -154,15 +154,15 @@ async function bootstrap() {
       layers: layerState.value,
       locations: locations.value,
       interactive: interactive.value,
-      onLocationHover: (id) => {
+      onLocationHover: (id: any) => {
         if (!id) {
           status.value = 'Hovering terrain'
           return
         }
-        const entry = locations.value.find((loc) => loc.id === id)
-        status.value = entry ? `Hovering ${entry.name ?? entry.id}` : `Hovering ${id}`
+        const entry = locations.value.find((loc: { id: TerrainLocation['id'] }) => loc.id === id)
+        status.value = entry ? `Hovering location: '${entry.name ?? entry.id}'` : `Hovering ${id}`
       },
-      onLocationPick: (payload) => {
+      onLocationPick: (payload: { pixel: { x: any; y: any } }) => {
         status.value = `Placement: (${payload.pixel.x}, ${payload.pixel.y})`
       }
     })
