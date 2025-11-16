@@ -109,10 +109,8 @@ const buildMultipartBody = (screenshot) => {
   const header = Buffer.from(
     `--${boundary}${newline}` +
       `Content-Disposition: form-data; name="file"; filename="${screenshot.file}"${newline}` +
-      `Content-Type: ${screenshot.mime}${newline}` +
-      `Content-Length: ${screenshot.data.length}${newline}` +
-      `Content-Transfer-Encoding: binary${newline}${newline}`,
-    'utf8',
+      `Content-Type: ${screenshot.mime}${newline}${newline}`,
+    'utf8'
   )
   const footer = Buffer.from(`${newline}--${boundary}--${newline}`, 'utf8')
   return {
@@ -123,14 +121,12 @@ const buildMultipartBody = (screenshot) => {
 
 const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
   const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments/assets?name=${encodeURIComponent(screenshot.file)}`
-
   const { body, boundary } = buildMultipartBody(screenshot)
 
   const response = await githubRequest(url, {
     method: 'POST',
     headers: {
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': String(body.length),
     },
     body,
   })
@@ -184,12 +180,22 @@ const upsertPullRequestComment = async (screenshots) => {
   try {
     const uploadedScreenshots = []
     for (const screenshot of screenshots) {
-      const uploaded = await uploadScreenshotAsset(owner, repo, prNumber, screenshot)
-      uploadedScreenshots.push(uploaded)
+      try {
+        if (screenshot.data.length > 9_000_000) {
+          warn(`${screenshot.file} too large (${screenshot.data.length} bytes) – skipping upload.`)
+        } else {
+          const uploaded = await uploadScreenshotAsset(owner, repo, prNumber, screenshot)
+          uploadedScreenshots.push(uploaded)
+        }
+      } catch (err) {
+        warn(`Failed to upload screenshot asset for ${screenshot.file}.`, err)
+      }
     }
 
     const content = buildCommentBody(uploadedScreenshots)
-    if (!content) return
+    if (!content) {
+      return
+    }
 
     const existing = await findExistingComment(owner, repo, prNumber)
     if (existing) {
