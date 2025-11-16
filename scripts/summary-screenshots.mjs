@@ -104,15 +104,33 @@ const findExistingComment = async (owner, repo, prNumber) => {
 }
 
 const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
-  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/assets?name=${encodeURIComponent(screenshot.file)}`
+  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/assets`
+
+  // Create proper multipart form data
+  const boundary = `----FormBoundary${Math.random().toString(36).substring(2)}`
+  const parts = []
+  
+  // Add the name field
+  parts.push(`--${boundary}\r\n`)
+  parts.push(`Content-Disposition: form-data; name="name"\r\n\r\n`)
+  parts.push(`${screenshot.file}\r\n`)
+  
+  // Add the file field
+  parts.push(`--${boundary}\r\n`)
+  parts.push(`Content-Disposition: form-data; name="file"; filename="${screenshot.file}"\r\n`)
+  parts.push(`Content-Type: ${screenshot.mime}\r\n\r\n`)
+  
+  const header = Buffer.from(parts.join(''))
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
+  const body = Buffer.concat([header, screenshot.data, footer])
 
   const response = await githubRequest(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': screenshot.data.length.toString(),
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': body.length.toString(),
     },
-    body: screenshot.data,
+    body: body,
   })
 
   const asset = await response.json()
