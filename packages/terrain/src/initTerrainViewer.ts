@@ -565,6 +565,15 @@ export async function initTerrainViewer(
   const markerInteractiveTargets: THREE.Object3D[] = []
   let hoveredLocationId: string | null = null
   const cameraOffset = { target: 0, current: 0 }
+  const MARKER_BASE_WORLD_WIDTH = 0.36
+  const MARKER_HEIGHT_RATIO = 0.55
+  const baseMarkerWorldHeight = MARKER_BASE_WORLD_WIDTH * MARKER_HEIGHT_RATIO
+  const baseCameraDistance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+  const baseMarkerScreenHeightRatio =
+    baseMarkerWorldHeight /
+    (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * baseCameraDistance)
+  const markerWorldPosition = new THREE.Vector3()
+  const markerViewPosition = new THREE.Vector3()
   let cameraTween: {
     startPos: THREE.Vector3
     endPos: THREE.Vector3
@@ -622,10 +631,24 @@ export async function initTerrainViewer(
   }
 
   function updateMarkerVisuals() {
+    if (!viewportHeight) return
+    camera.updateMatrixWorld()
+    const vFov = THREE.MathUtils.degToRad(camera.fov)
     markerMap.forEach(({ sprite, stem }, id) => {
-      const baseScale = 0.36
       const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
-      sprite.scale.set(baseScale * emphasis, baseScale * 0.55 * emphasis, 1)
+      sprite.getWorldPosition(markerWorldPosition)
+      markerViewPosition.copy(markerWorldPosition).applyMatrix4(camera.matrixWorldInverse)
+      const depth = Math.max(0.001, Math.abs(markerViewPosition.z))
+      const viewHeightAtDepth = 2 * Math.tan(vFov / 2) * depth
+      const normalizedScreenHeight = baseMarkerScreenHeightRatio * emphasis
+      // Convert the desired screen-space height for this sprite back into world units
+      // at the sprite's current depth. In a perspective projection the visible frustum
+      // height grows linearly with distance, so the ratio between screen height and the
+      // frustum height (viewHeightAtDepth) keeps the sprite the same number of pixels
+      // tall regardless of camera distance.
+      const worldHeight = normalizedScreenHeight * viewHeightAtDepth
+      const worldWidth = worldHeight / MARKER_HEIGHT_RATIO
+      sprite.scale.set(worldWidth, worldHeight, 1)
       sprite.material.opacity = currentFocusId === id ? 1 : hoveredLocationId === id ? 0.9 : 0.6
       const stemMat = stem.material as THREE.MeshStandardMaterial
       stemMat.opacity = currentFocusId === id ? 0.8 : hoveredLocationId === id ? 0.95 : 0.75
