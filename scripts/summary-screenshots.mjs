@@ -57,10 +57,18 @@ const buildSummary = (screenshots) => {
 
   let content = `${marker}\n\n## Playwright Screenshots\n\n`
   for (const screenshot of screenshots) {
-    content += [
-      `### ${screenshot.title}`,
-      `<img src="data:${screenshot.mime};base64,${screenshot.base64}" alt="${screenshot.title}" />`,
-    ].join('\n\n')
+    // Use FTP URL if available, otherwise fall back to base64
+    if (screenshot.url) {
+      content += [
+        `### ${screenshot.title}`,
+        `[![${screenshot.title}](${screenshot.url})](${screenshot.url})`,
+      ].join('\n\n')
+    } else {
+      content += [
+        `### ${screenshot.title}`,
+        `<img src="data:${screenshot.mime};base64,${screenshot.base64}" alt="${screenshot.title}" />`,
+      ].join('\n\n')
+    }
     content += '\n\n'
   }
 
@@ -273,14 +281,20 @@ const run = async () => {
     const screenshots = await loadScreenshots()
     if (!screenshots.length) return
     
-    // Append base64 images to step summary
-    const summary = buildSummary(screenshots)
+    // Upload to FTP first to get URLs
+    const uploadedScreenshots = await uploadScreenshotsToFtp(screenshots)
+    
+    // Build summary with FTP links if available
+    const screenshotsForSummary = uploadedScreenshots.length > 0 
+      ? uploadedScreenshots 
+      : screenshots
+    
+    const summary = buildSummary(screenshotsForSummary)
     if (summary) {
       await appendStepSummary(summary)
     }
     
-    // Upload to FTP and create/update PR comment with links
-    const uploadedScreenshots = await uploadScreenshotsToFtp(screenshots)
+    // Create/update PR comment with FTP links
     if (uploadedScreenshots.length > 0) {
       await upsertPullRequestComment(uploadedScreenshots)
     }
