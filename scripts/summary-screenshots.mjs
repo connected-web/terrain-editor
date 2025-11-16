@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { Client } from 'basic-ftp'
 
 const marker = '<!-- pr-check-step-summary -->'
 const summaryPath = process.env.GITHUB_STEP_SUMMARY
@@ -7,6 +8,12 @@ const githubToken = process.env.GITHUB_TOKEN
 const githubRepo = process.env.GITHUB_REPOSITORY
 const eventPath = process.env.GITHUB_EVENT_PATH
 const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
+
+const ftpHost = 'images.connected-web.net'
+const ftpUser = process.env.CWEB_IMAGES_FTP_USER
+const ftpPassword = process.env.CWEB_IMAGES_FTP_PASSWORD
+const ftpBaseDir = '/www/images/github'
+const baseUrl = 'https://images.connected-web.net/github'
 
 const log = (...args) => console.log('[summary-screenshots]', ...args)
 const warn = (...args) => console.warn('[summary-screenshots]', ...args)
@@ -38,6 +45,7 @@ const loadScreenshots = async () => {
       mime,
       data,
       base64: data.toString('base64'),
+      filePath,
     })
   }
 
@@ -65,6 +73,61 @@ const appendStepSummary = async (content) => {
   const prefix = stats && stats.size > 0 ? '\n' : ''
   await fs.appendFile(summaryPath, `${prefix}${content}`)
   log('Appended Playwright screenshots to step summary.')
+}
+
+const uploadScreenshotsToFtp = async (screenshots) => {
+  if (!ftpUser || !ftpPassword) {
+    warn('FTP credentials not available; skipping FTP upload.')
+    return []
+  }
+
+  const client = new Client()
+  client.ftp.verbose = false
+  
+  try {
+    await client.access({
+      host: ftpHost,
+      user: ftpUser,
+      password: ftpPassword,
+      secure: false,
+    })
+    
+    log(`Connected to FTP server: ${ftpHost}`)
+    
+    // Get current date in YYYY-MM-DD format
+    const date = new Date().toISOString().split('T')[0]
+    const uploadDir = `${ftpBaseDir}/${date}`
+    
+    // Ensure the date directory exists
+    await client.ensureDir(uploadDir)
+    log(`Ensured directory exists: ${uploadDir}`)
+    
+    const uploadedScreenshots = []
+    
+    for (const screenshot of screenshots) {
+      try {
+        const remotePath = `${uploadDir}/${screenshot.file}`
+        await client.uploadFrom(screenshot.filePath, remotePath)
+        
+        const publicUrl = `${baseUrl}/${date}/${screenshot.file}`
+        uploadedScreenshots.push({
+          ...screenshot,
+          url: publicUrl,
+        })
+        
+        log(`Uploaded: ${screenshot.file} -> ${publicUrl}`)
+      } catch (err) {
+        warn(`Failed to upload ${screenshot.file}:`, err)
+      }
+    }
+    
+    return uploadedScreenshots
+  } catch (err) {
+    warn('FTP upload failed:', err)
+    return []
+  } finally {
+    client.close()
+  }
 }
 
 const githubRequest = async (url, init) => {
@@ -103,42 +166,6 @@ const findExistingComment = async (owner, repo, prNumber) => {
   }
 }
 
-const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
-  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/assets`
-
-  // Create proper multipart form data
-  const boundary = `----FormBoundary${Math.random().toString(36).substring(2)}`
-  const parts = []
-  
-  // Add the name field
-  parts.push(`--${boundary}\r\n`)
-  parts.push(`Content-Disposition: form-data; name="name"\r\n\r\n`)
-  parts.push(`${screenshot.file}\r\n`)
-  
-  // Add the file field
-  parts.push(`--${boundary}\r\n`)
-  parts.push(`Content-Disposition: form-data; name="file"; filename="${screenshot.file}"\r\n`)
-  parts.push(`Content-Type: ${screenshot.mime}\r\n\r\n`)
-  
-  const header = Buffer.from(parts.join(''))
-  const footer = Buffer.from(`\r\n--${boundary}--\r\n`)
-  const body = Buffer.concat([header, screenshot.data, footer])
-
-  const response = await githubRequest(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': body.length.toString(),
-    },
-    body: body,
-  })
-
-  const asset = await response.json()
-  const downloadUrl = asset?.url
-  if (!downloadUrl) throw new Error(`Unable to determine download URL for ${screenshot.file}`)
-  return { ...screenshot, downloadUrl }
-}
-
 const buildCommentBody = (screenshots) => {
   if (!screenshots.length) return null
 
@@ -146,7 +173,7 @@ const buildCommentBody = (screenshots) => {
   for (const screenshot of screenshots) {
     content += [
       `### ${screenshot.title}`,
-      `![${screenshot.title}](${screenshot.downloadUrl})`,
+      `![${screenshot.title}](${screenshot.url})`,
     ].join('\n\n')
     content += '\n\n'
   }
@@ -177,21 +204,7 @@ const upsertPullRequestComment = async (screenshots) => {
   }
 
   try {
-    const uploadedScreenshots = []
-    for (const screenshot of screenshots) {
-      try {
-        if (screenshot.data.length > 9_000_000) {
-          warn(`${screenshot.file} too large (${screenshot.data.length} bytes) – skipping upload.`)
-        } else {
-          const uploaded = await uploadScreenshotAsset(owner, repo, prNumber, screenshot)
-          uploadedScreenshots.push(uploaded)
-        }
-      } catch (err) {
-        warn(`Failed to upload screenshot asset for ${screenshot.file}.`, err)
-      }
-    }
-
-    const content = buildCommentBody(uploadedScreenshots)
+    const content = buildCommentBody(screenshots)
     if (!content) {
       return
     }
@@ -231,11 +244,18 @@ const run = async () => {
   try {
     const screenshots = await loadScreenshots()
     if (!screenshots.length) return
+    
+    // Append base64 images to step summary
     const summary = buildSummary(screenshots)
     if (summary) {
       await appendStepSummary(summary)
     }
-    await upsertPullRequestComment(screenshots)
+    
+    // Upload to FTP and create/update PR comment with links
+    const uploadedScreenshots = await uploadScreenshotsToFtp(screenshots)
+    if (uploadedScreenshots.length > 0) {
+      await upsertPullRequestComment(uploadedScreenshots)
+    }
   } catch (err) {
     if (err.code === 'ENOENT') return
     throw err
