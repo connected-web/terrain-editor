@@ -104,19 +104,19 @@ const findExistingComment = async (owner, repo, prNumber) => {
 }
 
 const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
-  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments/assets?name=${encodeURIComponent(screenshot.file)}`
-
-  // Use FormData to handle multipart encoding correctly
-  const form = new FormData()
-  form.append('file', new Blob([screenshot.data], { type: screenshot.mime }), screenshot.file)
+  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/assets?name=${encodeURIComponent(screenshot.file)}`
 
   const response = await githubRequest(url, {
     method: 'POST',
-    body: form,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': screenshot.data.length.toString(),
+    },
+    body: screenshot.data,
   })
 
   const asset = await response.json()
-  const downloadUrl = asset?.download_url ?? asset?.browser_download_url ?? asset?.url
+  const downloadUrl = asset?.url
   if (!downloadUrl) throw new Error(`Unable to determine download URL for ${screenshot.file}`)
   return { ...screenshot, downloadUrl }
 }
@@ -184,6 +184,9 @@ const upsertPullRequestComment = async (screenshots) => {
         `https://api.github.com/repos/${owner}/${repo}/issues/comments/${existing.id}`,
         {
           method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ body: content }),
         },
       )
@@ -193,6 +196,9 @@ const upsertPullRequestComment = async (screenshots) => {
         `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`,
         {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ body: content }),
         },
       )
