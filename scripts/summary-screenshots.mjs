@@ -1,31 +1,127 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+const marker = '<!-- pr-check-step-summary -->'
 const summaryPath = process.env.GITHUB_STEP_SUMMARY
-if (!summaryPath) {
-  process.exit(0)
+const githubToken = process.env.GITHUB_TOKEN
+const githubRepo = process.env.GITHUB_REPOSITORY
+const eventPath = process.env.GITHUB_EVENT_PATH
+const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
+
+const readPullRequestNumber = async () => {
+  if (!eventPath) return null
+  try {
+    const raw = await fs.readFile(eventPath, 'utf8')
+    const event = JSON.parse(raw)
+    return event?.pull_request?.number ?? null
+  } catch (err) {
+    console.warn('Unable to read pull request number from event payload.', err)
+    return null
+  }
 }
 
-const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
+const buildSummary = async () => {
+  const files = await fs.readdir(screenshotDir)
+  if (!files.length) return null
+
+  let content = `${marker}\n\n## Playwright Screenshots\n\n`
+  for (const file of files.sort()) {
+    const filePath = path.join(screenshotDir, file)
+    const data = await fs.readFile(filePath)
+    const base64 = data.toString('base64')
+    const title = file.replace(/\.(png|jpg|jpeg)$/i, '')
+    const ext = path.extname(file).toLowerCase()
+    const mime = ext === '.png' ? 'image/png' : 'image/jpeg'
+    content += [
+      `### ${title}`,
+      `<img src="data:${mime};base64,${base64}" alt="${title}" />`,
+    ].join('\n\n')
+    content += '\n\n'
+  }
+
+  return content.trimEnd() + '\n'
+}
+
+const appendStepSummary = async (content) => {
+  if (!summaryPath || !content) return
+  await fs.appendFile(summaryPath, `\n${content}`)
+}
+
+const githubRequest = async (url, init) => {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'terrain-editor-playwright-summary',
+      ...(init?.headers ?? {}),
+      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+    },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}\n${errorText}`)
+  }
+
+  return response
+}
+
+const findExistingComment = async (owner, repo, prNumber) => {
+  let page = 1
+  while (true) {
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`
+    const response = await githubRequest(url)
+    const comments = await response.json()
+    const match = comments.find((comment) => {
+      const body = comment?.body ?? ''
+      const login = comment?.user?.login
+      return body.includes(marker) && login === 'github-actions[bot]'
+    })
+    if (match) return match
+    if (comments.length < 100) return null
+    page += 1
+  }
+}
+
+const upsertPullRequestComment = async (content) => {
+  if (!githubToken || !githubRepo) return
+  const prNumber = await readPullRequestNumber()
+  if (!prNumber) return
+  const [owner, repo] = githubRepo.split('/')
+  if (!owner || !repo) return
+
+  try {
+    const existing = await findExistingComment(owner, repo, prNumber)
+    if (existing) {
+      await githubRequest(
+        `https://api.github.com/repos/${owner}/${repo}/issues/comments/${existing.id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ body: content }),
+        },
+      )
+      console.log('Updated existing Playwright screenshots comment.')
+    } else {
+      await githubRequest(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ body: content }),
+        },
+      )
+      console.log('Created Playwright screenshots comment.')
+    }
+  } catch (err) {
+    console.warn('Unable to update GitHub pull request comment.', err)
+  }
+}
 
 const run = async () => {
   try {
-    const files = await fs.readdir(screenshotDir)
-    if (!files.length) return
-    let content = '## Playwright Screenshots\n\n'
-    for (const file of files.sort()) {
-      const filePath = path.join(screenshotDir, file)
-      const data = await fs.readFile(filePath)
-      const base64 = data.toString('base64')
-      const title = file.replace(/\.(png|jpg|jpeg)$/i, '')
-      const ext = path.extname(file).toLowerCase()
-      const mime = ext === '.png' ? 'image/png' : 'image/jpeg'
-      content += [
-        `### ${title}`,
-        `<img src="data:${mime};base64,${base64}" alt="${title}" />`,
-      ].join('\n\n')
-    }
-    await fs.appendFile(summaryPath, content)
+    const content = await buildSummary()
+    if (!content) return
+    await appendStepSummary(content)
+    await upsertPullRequestComment(content)
   } catch (err) {
     if (err.code === 'ENOENT') return
     throw err

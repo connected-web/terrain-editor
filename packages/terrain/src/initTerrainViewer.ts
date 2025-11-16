@@ -617,9 +617,8 @@ export const initTerrainViewer = async (
   }
 
   const updateMarkerVisuals = () => {
-    markerMap.forEach(({ container, sprite, stem }, id) => {
-      const distance = camera.position.distanceTo(container.position)
-      const baseScale = THREE.MathUtils.clamp(distance / 5, 0.3, 1.2) * 0.35
+    markerMap.forEach(({ sprite, stem }, id) => {
+      const baseScale = 0.36
       const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
       sprite.scale.set(baseScale * emphasis, baseScale * 0.55 * emphasis, 1)
       sprite.material.opacity = currentFocusId === id ? 1 : hoveredLocationId === id ? 0.9 : 0.6
