@@ -8,6 +8,9 @@ const githubRepo = process.env.GITHUB_REPOSITORY
 const eventPath = process.env.GITHUB_EVENT_PATH
 const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
 
+const log = (...args) => console.log('[summary-screenshots]', ...args)
+const warn = (...args) => console.warn('[summary-screenshots]', ...args)
+
 const readPullRequestNumber = async () => {
   if (!eventPath) return null
   try {
@@ -15,7 +18,7 @@ const readPullRequestNumber = async () => {
     const event = JSON.parse(raw)
     return event?.pull_request?.number ?? null
   } catch (err) {
-    console.warn('Unable to read pull request number from event payload.', err)
+    warn('Unable to read pull request number from event payload.', err)
     return null
   }
 }
@@ -44,7 +47,10 @@ const buildSummary = async () => {
 
 const appendStepSummary = async (content) => {
   if (!summaryPath || !content) return
-  await fs.appendFile(summaryPath, `\n${content}`)
+  const stats = await fs.stat(summaryPath).catch(() => null)
+  const prefix = stats && stats.size > 0 ? '\n' : ''
+  await fs.appendFile(summaryPath, `${prefix}${content}`)
+  log('Appended Playwright screenshots to step summary.')
 }
 
 const githubRequest = async (url, init) => {
@@ -84,11 +90,26 @@ const findExistingComment = async (owner, repo, prNumber) => {
 }
 
 const upsertPullRequestComment = async (content) => {
-  if (!githubToken || !githubRepo) return
+  if (!githubToken) {
+    warn('GITHUB_TOKEN not available; skipping PR comment update.')
+    return
+  }
+  if (!githubRepo) {
+    warn('GITHUB_REPOSITORY not available; skipping PR comment update.')
+    return
+  }
+
   const prNumber = await readPullRequestNumber()
-  if (!prNumber) return
+  if (!prNumber) {
+    warn('Pull request number missing from event payload; skipping PR comment update.')
+    return
+  }
+
   const [owner, repo] = githubRepo.split('/')
-  if (!owner || !repo) return
+  if (!owner || !repo) {
+    warn('Could not determine owner/repo from GITHUB_REPOSITORY; skipping PR comment update.')
+    return
+  }
 
   try {
     const existing = await findExistingComment(owner, repo, prNumber)
@@ -100,7 +121,7 @@ const upsertPullRequestComment = async (content) => {
           body: JSON.stringify({ body: content }),
         },
       )
-      console.log('Updated existing Playwright screenshots comment.')
+      log('Updated existing Playwright screenshots comment.')
     } else {
       await githubRequest(
         `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`,
@@ -109,10 +130,10 @@ const upsertPullRequestComment = async (content) => {
           body: JSON.stringify({ body: content }),
         },
       )
-      console.log('Created Playwright screenshots comment.')
+      log('Created Playwright screenshots comment.')
     }
   } catch (err) {
-    console.warn('Unable to update GitHub pull request comment.', err)
+    warn('Unable to update GitHub pull request comment.', err)
   }
 }
 
