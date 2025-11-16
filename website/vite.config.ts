@@ -24,5 +24,8 @@ export default defineConfig({
       )
     }
   },
-  assetsInclude: ['**/*.svg']
+  assetsInclude: ['**/*.svg'],
+  build: {
+    chunkSizeWarningLimit: 2048
+  }
 })

@@ -10,5 +10,8 @@ export default defineConfig({
         '../../packages/terrain/src/index.ts'
       )
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 2048
   }
 })

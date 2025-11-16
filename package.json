@@ -14,7 +14,9 @@
     "build:editor-vue": "npm --prefix demos/editor-vue3 run build",
     "dev:editor-vue": "npm --prefix demos/editor-vue3 run dev -- --host",
     "build:lib": "npm --prefix packages/terrain run build",
+    "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test:smoke": "node ./scripts/smoke-tests.mjs",
+    "test:e2e": "playwright test",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -30,7 +32,9 @@
   },
   "homepage": "https://github.com/connected-web/terrain-editor#readme",
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "http-server": "^14.1.1",
+    "playwright": "^1.56.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }

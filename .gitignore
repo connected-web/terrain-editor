@@ -8,3 +8,4 @@ demos/viewer-vue3/public/maps
 demos/editor-vue3/dist
 demos/editor-vue3/public/maps
 packages/terrain/dist
+test-results

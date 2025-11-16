@@ -76,7 +76,6 @@ Copyright 2025 Connected Web.
 
 ## Development roadmap
 
-- ✅ Port project settings over from jmarkavian.com website
 - ✅ Setup basic website hosting through github pages
 - 🚧 Publish reusable packages to npm as `@connected-web/terrain-editor`
 
