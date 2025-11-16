@@ -105,13 +105,26 @@ const findExistingComment = async (owner, repo, prNumber) => {
 
 const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
   const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments/assets?name=${encodeURIComponent(screenshot.file)}`
+
+  // Uploads to the comments/assets endpoint must be multipart/form-data even when
+  // sending a single file. Build the payload manually so that we can include the
+  // screenshot binary without depending on any additional libraries.
+  const boundary = `----terrain-editor-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`
+  const preamble = Buffer.from(
+    `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${screenshot.file}"\r\n` +
+      `Content-Type: ${screenshot.mime}\r\n\r\n`,
+  )
+  const closing = Buffer.from(`\r\n--${boundary}--\r\n`)
+  const body = Buffer.concat([preamble, screenshot.data, closing])
+
   const response = await githubRequest(url, {
     method: 'POST',
     headers: {
-      'Content-Type': screenshot.mime,
-      'Content-Length': String(screenshot.data.length),
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length),
     },
-    body: screenshot.data,
+    body,
   })
 
   const asset = await response.json()
