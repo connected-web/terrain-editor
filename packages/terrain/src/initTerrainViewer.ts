@@ -200,8 +200,9 @@ async function composeLegendTexture(
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return null
+  const ctxRaw = canvas.getContext('2d')
+  if (!ctxRaw) return null
+  const ctx = ctxRaw
 
   ctx.fillStyle = BASE_FILL_COLOR
   ctx.fillRect(0, 0, width, height)
@@ -209,8 +210,9 @@ async function composeLegendTexture(
   const temp = document.createElement('canvas')
   temp.width = width
   temp.height = height
-  const tempCtx = temp.getContext('2d')
-  if (!tempCtx) return null
+  const tempCtxRaw = temp.getContext('2d')
+  if (!tempCtxRaw) return null
+  const tempCtx = tempCtxRaw
 
   async function drawLayer(
     maskFile: string,
