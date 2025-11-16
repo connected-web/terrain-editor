@@ -12,7 +12,7 @@ const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
 const ftpHost = 'ftp.connected-web.net'
 const ftpUser = process.env.CWEB_IMAGES_FTP_USER
 const ftpPassword = process.env.CWEB_IMAGES_FTP_PASSWORD
-const ftpBaseDir = '/www/images/github'
+const ftpBaseDir = '' // defaults to: /www/images/github
 const baseUrl = 'https://images.connected-web.net/github'
 
 const log = (...args) => console.log('[summary-screenshots]', ...args)
