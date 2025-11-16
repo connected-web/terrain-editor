@@ -6,7 +6,7 @@ export type HeightSampler = {
   data: Float32Array
 }
 
-const getImageSize = (img: HTMLImageElement | ImageBitmap) => {
+function getImageSize(img: HTMLImageElement | ImageBitmap) {
   if ('naturalWidth' in img) {
     return {
       width: img.naturalWidth || img.width,
@@ -19,7 +19,7 @@ const getImageSize = (img: HTMLImageElement | ImageBitmap) => {
   }
 }
 
-export const createHeightSampler = (texture: THREE.Texture): HeightSampler | null => {
+export function createHeightSampler(texture: THREE.Texture): HeightSampler | null {
   if (typeof document === 'undefined') return null
   const image = texture.image as HTMLImageElement | ImageBitmap | undefined
   if (!image) return null
@@ -41,7 +41,7 @@ export const createHeightSampler = (texture: THREE.Texture): HeightSampler | nul
   return { width, height, data }
 }
 
-export const sampleHeightValue = (sampler: HeightSampler, u: number, v: number) => {
+export function sampleHeightValue(sampler: HeightSampler, u: number, v: number) {
   const x = THREE.MathUtils.clamp(u, 0, 1) * (sampler.width - 1)
   const y = (1 - THREE.MathUtils.clamp(v, 0, 1)) * (sampler.height - 1)
   const x0 = Math.floor(x)
@@ -50,7 +50,9 @@ export const sampleHeightValue = (sampler: HeightSampler, u: number, v: number) 
   const y1 = Math.min(sampler.height - 1, Math.ceil(y))
   const tx = x - x0
   const ty = y - y0
-  const idx = (ix: number, iy: number) => sampler.data[iy * sampler.width + ix]
+  function idx(ix: number, iy: number) {
+    return sampler.data[iy * sampler.width + ix]
+  }
   const a = idx(x0, y0)
   const b = idx(x1, y0)
   const c = idx(x0, y1)
@@ -60,11 +62,11 @@ export const sampleHeightValue = (sampler: HeightSampler, u: number, v: number) 
   return ab + (cd - ab) * ty
 }
 
-export const applyHeightField = (
+export function applyHeightField(
   geometry: THREE.PlaneGeometry,
   sampler: HeightSampler,
   options: { seaLevel: number; heightScale: number }
-) => {
+) {
   const { seaLevel, heightScale } = options
   const positions = geometry.attributes.position as THREE.BufferAttribute
   const uvs = geometry.attributes.uv as THREE.BufferAttribute
@@ -86,7 +88,7 @@ export const applyHeightField = (
   return { minY, maxY }
 }
 
-const collectBoundaryIndices = (cols: number, rows: number) => {
+function collectBoundaryIndices(cols: number, rows: number) {
   const indices: number[] = []
   // north edge (positive z)
   for (let col = 0; col < cols; col += 1) indices.push((rows - 1) * cols + col)
@@ -99,11 +101,11 @@ const collectBoundaryIndices = (cols: number, rows: number) => {
   return indices
 }
 
-export const buildRimMesh = (
+export function buildRimMesh(
   geometry: THREE.PlaneGeometry,
   floorY: number,
   material?: THREE.Material
-) => {
+) {
   const positions = geometry.attributes.position as THREE.BufferAttribute
   const cols = geometry.parameters.widthSegments + 1
   const rows = geometry.parameters.heightSegments + 1
@@ -113,8 +115,9 @@ export const buildRimMesh = (
   const rimNormals: number[] = []
   const rimIndices: number[] = []
 
-  const getVertex = (idx: number) =>
-    new THREE.Vector3(positions.getX(idx), positions.getY(idx), positions.getZ(idx))
+  function getVertex(idx: number) {
+    return new THREE.Vector3(positions.getX(idx), positions.getY(idx), positions.getZ(idx))
+  }
 
   for (let i = 0; i < ring.length; i += 1) {
     const current = getVertex(ring[i])

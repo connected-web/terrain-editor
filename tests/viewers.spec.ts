@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
-const waitForStatus = async (page, text) => {
+async function waitForStatus(page, text) {
   await expect(page.getByText(text, { exact: false })).toBeVisible({ timeout: 30_000 })
 }
 

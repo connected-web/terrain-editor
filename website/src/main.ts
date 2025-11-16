@@ -10,7 +10,7 @@ import './styles/global.css'
 // Import routes
 import { routes } from './routes.ts'
 
-const detectBasePath = () => {
+function detectBasePath() {
   const configuredBase = import.meta.env.BASE_URL
   if (configuredBase && configuredBase !== '.' && configuredBase !== './') {
     return configuredBase

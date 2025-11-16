@@ -85,24 +85,28 @@ const datasetRef = ref<TerrainDataset | null>(null)
 const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
 
-const archiveUrl = () => new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+function archiveUrl() {
+  return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+}
 
-const disposeViewer = () => {
+function disposeViewer() {
   handle.value?.destroy()
   handle.value = null
 }
 
-const cleanupDataset = () => {
+function cleanupDataset() {
   datasetRef.value?.cleanup?.()
   datasetRef.value = null
 }
 
-const createLayerState = (legend: TerrainLegend): LayerToggleState => ({
-  biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
-  overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
-})
+function createLayerState(legend: TerrainLegend): LayerToggleState {
+  return {
+    biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
+    overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
+  }
+}
 
-const mountViewer = async () => {
+async function mountViewer() {
   if (!viewerRef.value || !datasetRef.value || !layerState.value) return
   disposeViewer()
   handle.value = await initTerrainViewer(viewerRef.value, datasetRef.value, {
@@ -115,7 +119,7 @@ const mountViewer = async () => {
   })
 }
 
-const loadArchive = async (url: string, label: string) => {
+async function loadArchive(url: string, label: string) {
   busy.value = true
   status.value = `Loading ${label}…`
   disposeViewer()
@@ -137,11 +141,11 @@ const loadArchive = async (url: string, label: string) => {
   }
 }
 
-const loadSample = async () => {
+async function loadSample() {
   await loadArchive(archiveUrl(), 'sample archive')
 }
 
-const onFileSelected = async (event: Event) => {
+async function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
   const file = input.files[0]
@@ -151,7 +155,7 @@ const onFileSelected = async (event: Event) => {
   input.value = ''
 }
 
-const applyLegend = async () => {
+async function applyLegend() {
   if (!datasetRef.value || !legendJson.value) return
   try {
     const parsed = JSON.parse(legendJson.value) as TerrainLegend
@@ -165,7 +169,7 @@ const applyLegend = async () => {
   }
 }
 
-const applyLocations = () => {
+function applyLocations() {
   if (!handle.value || !locationsJson.value) return
   try {
     const parsed = JSON.parse(locationsJson.value) as TerrainLocation[]
@@ -178,7 +182,7 @@ const applyLocations = () => {
   }
 }
 
-const downloadText = (filename: string, contents: string) => {
+function downloadText(filename: string, contents: string) {
   const blob = new Blob([contents], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -188,17 +192,17 @@ const downloadText = (filename: string, contents: string) => {
   URL.revokeObjectURL(url)
 }
 
-const exportLegend = () => {
+function exportLegend() {
   if (!legendJson.value) return
   downloadText('legend.json', legendJson.value)
 }
 
-const exportLocations = () => {
+function exportLocations() {
   if (!locationsJson.value) return
   downloadText('locations.json', locationsJson.value)
 }
 
-const toggleInteraction = () => {
+function toggleInteraction() {
   interactive.value = !interactive.value
   handle.value?.setInteractiveMode(interactive.value)
 }

@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = join(__dirname, '..')
 
-const run = (command) => {
+function run(command) {
   execSync(command, { stdio: 'inherit', cwd: repoRoot })
 }
 

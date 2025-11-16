@@ -15,25 +15,28 @@ const layerControlsEl = document.getElementById('layer-controls') as HTMLElement
 const locationListEl = document.getElementById('location-list') as HTMLElement
 const interactionBtn = document.getElementById('toggle-interaction') as HTMLButtonElement
 
-const resolveArchivePath = () =>
-  new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+function resolveArchivePath() {
+  return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+}
 
-const setStatus = (message: string) => {
+function setStatus(message: string) {
   if (statusBar) statusBar.textContent = message
 }
 
-const createDefaultLayerState = (legend: TerrainLegend): LayerToggleState => ({
-  biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
-  overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
-})
+function createDefaultLayerState(legend: TerrainLegend): LayerToggleState {
+  return {
+    biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
+    overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
+  }
+}
 
-const renderLayerControls = (
+function renderLayerControls(
   legend: TerrainLegend,
   state: LayerToggleState,
   onChange: () => void
-) => {
+) {
   layerControlsEl.innerHTML = ''
-  const makeCheckbox = (group: 'biomes' | 'overlays', id: string, label: string) => {
+  function makeCheckbox(group: 'biomes' | 'overlays', id: string, label: string) {
     const wrapper = document.createElement('label')
     const input = document.createElement('input')
     input.type = 'checkbox'
@@ -57,7 +60,7 @@ const renderLayerControls = (
   })
 }
 
-const renderLocations = (locations: TerrainLocation[] = [], navigate: (loc: TerrainLocation) => void) => {
+function renderLocations(locations: TerrainLocation[] = [], navigate: (loc: TerrainLocation) => void) {
   locationListEl.innerHTML = ''
   if (!locations.length) {
     const empty = document.createElement('p')
@@ -79,7 +82,7 @@ let terrainHandle: TerrainHandle | null = null
 let layerState: LayerToggleState | null = null
 let interactiveEnabled = false
 
-const bootstrap = async () => {
+async function bootstrap() {
   setStatus('Downloading wynnal-terrain.wyn…')
   try {
     const archiveUrl = resolveArchivePath()
