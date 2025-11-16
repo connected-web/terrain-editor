@@ -82,19 +82,47 @@ const uploadScreenshotsToFtp = async (screenshots) => {
   }
 
   const client = new Client()
-  client.ftp.verbose = false
+  client.ftp.verbose = true // Enable verbose logging for debugging
   
   try {
-    await client.access({
-      host: ftpHost,
-      user: ftpUser,
-      password: ftpPassword,
-      secure: false,
-    })
+    log(`Attempting FTP connection to ${ftpHost} with user: ${ftpUser}`)
+    
+    // Try standard FTP first
+    try {
+      await client.access({
+        host: ftpHost,
+        user: ftpUser,
+        password: ftpPassword,
+        secure: false,
+        port: 21,
+      })
+    } catch (err) {
+      log('Standard FTP failed, trying with passive mode disabled...')
+      client.close()
+      const client2 = new Client()
+      client2.ftp.verbose = true
+      await client2.access({
+        host: ftpHost,
+        user: ftpUser,
+        password: ftpPassword,
+        secure: false,
+        port: 21,
+        pasvTimeout: 10000,
+      })
+      // If this succeeds, use client2 instead
+      return await uploadWithClient(client2, screenshots)
+    }
     
     log(`Connected to FTP server: ${ftpHost}`)
-    
-    // Get current date in YYYY-MM-DD format
+    return await uploadWithClient(client, screenshots)
+  } catch (err) {
+    warn('FTP upload failed:', err)
+    return []
+  }
+}
+
+const uploadWithClient = async (client, screenshots) => {
+  try {
     const date = new Date().toISOString().split('T')[0]
     const uploadDir = `${ftpBaseDir}/${date}`
     
