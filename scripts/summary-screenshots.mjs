@@ -9,7 +9,7 @@ const githubRepo = process.env.GITHUB_REPOSITORY
 const eventPath = process.env.GITHUB_EVENT_PATH
 const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
 
-const ftpHost = 'images.connected-web.net'
+const ftpHost = 'ftp.connected-web.net'
 const ftpUser = process.env.CWEB_IMAGES_FTP_USER
 const ftpPassword = process.env.CWEB_IMAGES_FTP_PASSWORD
 const ftpBaseDir = '/www/images/github'
