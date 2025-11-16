@@ -23,21 +23,35 @@ const readPullRequestNumber = async () => {
   }
 }
 
-const buildSummary = async () => {
+const loadScreenshots = async () => {
   const files = await fs.readdir(screenshotDir)
-  if (!files.length) return null
-
-  let content = `${marker}\n\n## Playwright Screenshots\n\n`
+  const screenshots = []
   for (const file of files.sort()) {
     const filePath = path.join(screenshotDir, file)
     const data = await fs.readFile(filePath)
-    const base64 = data.toString('base64')
     const title = file.replace(/\.(png|jpg|jpeg)$/i, '')
     const ext = path.extname(file).toLowerCase()
     const mime = ext === '.png' ? 'image/png' : 'image/jpeg'
+    screenshots.push({
+      file,
+      title,
+      mime,
+      data,
+      base64: data.toString('base64'),
+    })
+  }
+
+  return screenshots
+}
+
+const buildSummary = (screenshots) => {
+  if (!screenshots.length) return null
+
+  let content = `${marker}\n\n## Playwright Screenshots\n\n`
+  for (const screenshot of screenshots) {
     content += [
-      `### ${title}`,
-      `<img src="data:${mime};base64,${base64}" alt="${title}" />`,
+      `### ${screenshot.title}`,
+      `<img src="data:${screenshot.mime};base64,${screenshot.base64}" alt="${screenshot.title}" />`,
     ].join('\n\n')
     content += '\n\n'
   }
@@ -89,7 +103,42 @@ const findExistingComment = async (owner, repo, prNumber) => {
   }
 }
 
-const upsertPullRequestComment = async (content) => {
+const uploadScreenshotAsset = async (owner, repo, prNumber, screenshot) => {
+  const url = `https://uploads.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments/assets?name=${encodeURIComponent(screenshot.file)}`
+  const response = await githubRequest(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': screenshot.mime,
+      'Content-Length': String(screenshot.data.length),
+    },
+    body: screenshot.data,
+  })
+
+  const asset = await response.json()
+  const downloadUrl = asset?.download_url ?? asset?.browser_download_url ?? asset?.url
+  if (!downloadUrl) {
+    throw new Error(`Unable to determine download URL for ${screenshot.file}`)
+  }
+
+  return { ...screenshot, downloadUrl }
+}
+
+const buildCommentBody = (screenshots) => {
+  if (!screenshots.length) return null
+
+  let content = `${marker}\n\n## Playwright Screenshots\n\n`
+  for (const screenshot of screenshots) {
+    content += [
+      `### ${screenshot.title}`,
+      `![${screenshot.title}](${screenshot.downloadUrl})`,
+    ].join('\n\n')
+    content += '\n\n'
+  }
+
+  return content.trimEnd() + '\n'
+}
+
+const upsertPullRequestComment = async (screenshots) => {
   if (!githubToken) {
     warn('GITHUB_TOKEN not available; skipping PR comment update.')
     return
@@ -112,6 +161,15 @@ const upsertPullRequestComment = async (content) => {
   }
 
   try {
+    const uploadedScreenshots = []
+    for (const screenshot of screenshots) {
+      const uploaded = await uploadScreenshotAsset(owner, repo, prNumber, screenshot)
+      uploadedScreenshots.push(uploaded)
+    }
+
+    const content = buildCommentBody(uploadedScreenshots)
+    if (!content) return
+
     const existing = await findExistingComment(owner, repo, prNumber)
     if (existing) {
       await githubRequest(
@@ -139,10 +197,13 @@ const upsertPullRequestComment = async (content) => {
 
 const run = async () => {
   try {
-    const content = await buildSummary()
-    if (!content) return
-    await appendStepSummary(content)
-    await upsertPullRequestComment(content)
+    const screenshots = await loadScreenshots()
+    if (!screenshots.length) return
+    const summary = buildSummary(screenshots)
+    if (summary) {
+      await appendStepSummary(summary)
+    }
+    await upsertPullRequestComment(screenshots)
   } catch (err) {
     if (err.code === 'ENOENT') return
     throw err
