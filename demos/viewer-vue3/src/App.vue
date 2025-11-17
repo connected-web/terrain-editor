@@ -60,7 +60,7 @@
               v-for="location in locations"
               :key="location.id"
               class="pill-button"
-              @click="focusLocation(location)"
+              @click="navigateToLocation(location)"
             >
               {{ location.name ?? location.id }}
             </button>
@@ -129,7 +129,7 @@ function resetLayers() {
   applyLayerState()
 }
 
-function focusLocation(location: TerrainLocation) {
+function navigateToLocation(location: TerrainLocation) {
   handle.value?.navigateTo({
     pixel: location.pixel,
     locationId: location.id,
@@ -164,6 +164,16 @@ async function bootstrap() {
       },
       onLocationPick: (payload: { pixel: { x: any; y: any } }) => {
         status.value = `Placement: (${payload.pixel.x}, ${payload.pixel.y})`
+      },
+      onLocationClick: (id: any) => {
+        console.log('Location clicked:', id)
+        const location = locations?.value?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
+        status.value = location
+          ? `Focused location: '${location.name ?? location.id}'`
+          : `Focused location: ${id}`
+        if (location) {
+          navigateToLocation(location)
+        }
       }
     })
     status.value = 'Terrain loaded. Use the controls to explore.'

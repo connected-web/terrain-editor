@@ -622,8 +622,11 @@ export async function initTerrainViewer(
   }
 
   function updateMarkerVisuals() {
+    const distance = camera.position.distanceTo(controls.target)
+    const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
+    const baseScale = lerp / 80
+
     markerMap.forEach(({ sprite, stem }, id) => {
-      const baseScale = 0.5
       const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
       sprite.scale.set(baseScale, baseScale, baseScale).multiplyScalar(emphasis)
       sprite.material.opacity = currentFocusId === id ? 1 : hoveredLocationId === id ? 0.9 : 0.6
@@ -660,7 +663,7 @@ export async function initTerrainViewer(
         })
       )
       stem.position.y = -(stemHeight / 4)
-      sprite.position.set(0, 0.1 + (stemHeight / 4), 0)
+      sprite.position.set(0, 0.05 + (stemHeight / 4), 0)
       stem.userData.locationId = location.id
       const container = new THREE.Group()
       container.position.copy(world)
