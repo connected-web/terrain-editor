@@ -8,6 +8,12 @@ import {
   HeightSampler,
   sampleHeightValue
 } from './geometry'
+import {
+  MarkerSpriteStateStyle,
+  MarkerSpriteTheme,
+  resolveTerrainTheme,
+  TerrainThemeOverrides
+} from './theme'
 
 const MAP_RATIO = 1536 / 1024
 const TERRAIN_WIDTH = 4.2
@@ -71,6 +77,7 @@ type TerrainInitOptions = {
   onLocationHover?: (locationId: string | null) => void
   onLocationClick?: (locationId: string) => void
   locations?: TerrainLocation[]
+  theme?: TerrainThemeOverrides
 }
 
 export type TerrainHandle = {
@@ -113,6 +120,7 @@ export type TerrainDataset = {
   getTopologyMapUrl: () => Resolvable<string>
   resolveAssetUrl: (path: string) => Resolvable<string>
   cleanup?: () => void
+  theme?: TerrainThemeOverrides
 }
 
 function uvToWorld(
@@ -278,7 +286,46 @@ function drawRoundedRect(
   ctx.closePath()
 }
 
-function createMarkerMaterial(label: string) {
+type MarkerVisualState = 'default' | 'hover' | 'focus'
+
+type MarkerSpriteVisualResource = {
+  material: THREE.SpriteMaterial
+  texture: THREE.Texture
+}
+
+type MarkerSpriteVisualSet = Record<MarkerVisualState, MarkerSpriteVisualResource>
+
+function markerStateStylesEqual(a: MarkerSpriteStateStyle, b: MarkerSpriteStateStyle) {
+  return (
+    a.textColor === b.textColor &&
+    a.backgroundColor === b.backgroundColor &&
+    a.borderColor === b.borderColor &&
+    a.borderThickness === b.borderThickness
+  )
+}
+
+function resolveSpriteState(
+  spriteTheme: MarkerSpriteTheme,
+  state: MarkerVisualState
+): MarkerSpriteStateStyle {
+  const base = spriteTheme.states.default
+  const overrides =
+    state === 'default'
+      ? {}
+      : state === 'hover'
+      ? spriteTheme.states.hover ?? {}
+      : spriteTheme.states.focus ?? {}
+  return {
+    ...base,
+    ...overrides
+  }
+}
+
+function createMarkerSpriteResource(
+  label: string,
+  spriteTheme: MarkerSpriteTheme,
+  style: MarkerSpriteStateStyle
+): MarkerSpriteVisualResource {
   const text = (label || '?').trim().slice(0, 14)
   const canvas = document.createElement('canvas')
   canvas.width = 240
@@ -288,27 +335,29 @@ function createMarkerMaterial(label: string) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    let fontSize = 52
-    ctx.font = `${fontSize}px "DM Sans", sans-serif`
+    let fontSize = spriteTheme.maxFontSize
+    const minFontSize = spriteTheme.minFontSize
+    ctx.font = `${spriteTheme.fontWeight} ${fontSize}px ${spriteTheme.fontFamily}`
     let metrics = ctx.measureText(text)
-    while (metrics.width > canvas.width - 60 && fontSize > 22) {
-      fontSize -= 4
-      ctx.font = `${fontSize}px "DM Sans", sans-serif`
+    const maxBoxWidth = canvas.width - 12 - spriteTheme.paddingX * 2
+    while (metrics.width > maxBoxWidth && fontSize > minFontSize) {
+      fontSize -= 2
+      ctx.font = `${spriteTheme.fontWeight} ${fontSize}px ${spriteTheme.fontFamily}`
       metrics = ctx.measureText(text)
     }
-    const paddingX = 20
-    const paddingY = 10
-    const boxWidth = Math.min(canvas.width - 12, metrics.width + paddingX * 2)
-    const boxHeight = fontSize + paddingY * 2
+    const boxWidth = Math.min(canvas.width - 12, metrics.width + spriteTheme.paddingX * 2)
+    const boxHeight = fontSize + spriteTheme.paddingY * 2
     const boxX = (canvas.width - boxWidth) / 2
     const boxY = (canvas.height - boxHeight) / 2
-    ctx.fillStyle = 'rgba(8, 10, 18, 0.78)'
-    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, 18)
+    ctx.fillStyle = style.backgroundColor
+    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, spriteTheme.borderRadius)
     ctx.fill()
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    ctx.fillStyle = '#ffffff'
+    if (style.borderThickness > 0) {
+      ctx.strokeStyle = style.borderColor
+      ctx.lineWidth = style.borderThickness
+      ctx.stroke()
+    }
+    ctx.fillStyle = style.textColor
     ctx.fillText(text, canvas.width / 2, canvas.height / 2 + fontSize * 0.05)
   }
   const texture = new THREE.CanvasTexture(canvas)
@@ -319,6 +368,29 @@ function createMarkerMaterial(label: string) {
     depthWrite: false
   })
   return { material, texture }
+}
+
+function createMarkerSpriteVisuals(
+  label: string,
+  spriteTheme: MarkerSpriteTheme
+): MarkerSpriteVisualSet {
+  const defaultStyle = resolveSpriteState(spriteTheme, 'default')
+  const hoverStyle = resolveSpriteState(spriteTheme, 'hover')
+  const focusStyle = resolveSpriteState(spriteTheme, 'focus')
+  const defaultResource = createMarkerSpriteResource(label, spriteTheme, defaultStyle)
+  const hoverResource = markerStateStylesEqual(defaultStyle, hoverStyle)
+    ? defaultResource
+    : createMarkerSpriteResource(label, spriteTheme, hoverStyle)
+  const focusResource = markerStateStylesEqual(defaultStyle, focusStyle)
+    ? defaultResource
+    : markerStateStylesEqual(hoverStyle, focusStyle)
+    ? hoverResource
+    : createMarkerSpriteResource(label, spriteTheme, focusStyle)
+  return {
+    default: defaultResource,
+    hover: hoverResource,
+    focus: focusResource
+  }
 }
 
 function createGradientTexture(renderer: THREE.WebGLRenderer) {
@@ -461,6 +533,8 @@ export async function initTerrainViewer(
   const disposables: Cleanup[] = []
 
   const legend = dataset.legend
+  const theme = resolveTerrainTheme(dataset.theme, options.theme)
+  const markerTheme = theme.locationMarkers
   const seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
   const mapWidth = Math.max(1, legend.size[0] - 1)
   const mapHeight = Math.max(1, legend.size[1] - 1)
@@ -552,15 +626,16 @@ export async function initTerrainViewer(
 
   const markersGroup = new THREE.Group()
   scene.add(markersGroup)
-  const markerResources: Array<{
-    material: THREE.SpriteMaterial
-    texture: THREE.Texture
+  type MarkerResource = {
+    spriteMaterials: Set<THREE.SpriteMaterial>
+    spriteTextures: Set<THREE.Texture>
     stemMaterial?: THREE.MeshStandardMaterial
     stemGeometry?: THREE.BufferGeometry
-  }> = []
+  }
+  const markerResources: MarkerResource[] = []
   const markerMap = new Map<
     string,
-    { container: THREE.Group; sprite: THREE.Sprite; stem: THREE.Mesh }
+    { container: THREE.Group; sprite: THREE.Sprite; stem: THREE.Mesh; spriteVisuals: MarkerSpriteVisualSet }
   >()
   const markerInteractiveTargets: THREE.Object3D[] = []
   let hoveredLocationId: string | null = null
@@ -602,9 +677,9 @@ export async function initTerrainViewer(
   })
 
   function clearMarkerResources() {
-    markerResources.splice(0).forEach(({ material, texture, stemMaterial, stemGeometry }) => {
-      material.dispose()
-      texture.dispose()
+    markerResources.splice(0).forEach(({ spriteMaterials, spriteTextures, stemMaterial, stemGeometry }) => {
+      spriteMaterials.forEach((material) => material.dispose())
+      spriteTextures.forEach((texture) => texture.dispose())
       stemMaterial?.dispose()
       stemGeometry?.dispose()
     })
@@ -626,12 +701,29 @@ export async function initTerrainViewer(
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
     const baseScale = lerp / 80
 
-    markerMap.forEach(({ sprite, stem }, id) => {
-      const emphasis = currentFocusId === id ? 1.2 : hoveredLocationId === id ? 1.05 : 1
+    markerMap.forEach(({ sprite, stem, spriteVisuals }, id) => {
+      const isFocused = currentFocusId === id
+      const isHovered = hoveredLocationId === id
+      const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
       sprite.scale.set(baseScale, baseScale, baseScale).multiplyScalar(emphasis)
-      sprite.material.opacity = currentFocusId === id ? 1 : hoveredLocationId === id ? 0.9 : 0.6
+      const visualState: MarkerVisualState = isFocused ? 'focus' : isHovered ? 'hover' : 'default'
+      const nextVisual = spriteVisuals[visualState]
+      if (sprite.material !== nextVisual.material) {
+        sprite.material = nextVisual.material
+      }
+      sprite.material.opacity = isFocused ? 1 : isHovered ? 0.9 : 0.6
       const stemMat = stem.material as THREE.MeshStandardMaterial
-      stemMat.opacity = currentFocusId === id ? 0.8 : hoveredLocationId === id ? 0.95 : 0.75
+      const stemTheme = markerTheme.stem
+      if (isFocused) {
+        stemMat.opacity = stemTheme.focusOpacity
+        stemMat.color.set(stemTheme.focusColor ?? stemTheme.color)
+      } else if (isHovered) {
+        stemMat.opacity = stemTheme.hoverOpacity
+        stemMat.color.set(stemTheme.hoverColor ?? stemTheme.color)
+      } else {
+        stemMat.opacity = stemTheme.opacity
+        stemMat.color.set(stemTheme.color)
+      }
     })
   }
 
@@ -650,20 +742,21 @@ export async function initTerrainViewer(
       if (!world) return
       locationWorldCache.set(id, world.clone())
       const glyph = formatMarkerGlyph(location)
-      const { material, texture } = createMarkerMaterial(glyph)
-      const sprite = new THREE.Sprite(material.clone())
+      const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite)
+      const sprite = new THREE.Sprite(spriteVisuals.default.material)
       sprite.userData.locationId = location.id
       const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
+      const stemMaterial = new THREE.MeshStandardMaterial({
+        color: markerTheme.stem.color,
+        transparent: true,
+        opacity: markerTheme.stem.opacity
+      })
       const stem = new THREE.Mesh(
         new THREE.CylinderGeometry(0.015, 0.015, stemHeight, 6),
-        new THREE.MeshStandardMaterial({
-          color: 0xd9c39c,
-          transparent: true,
-          opacity: 0.75
-        })
+        stemMaterial
       )
       stem.position.y = -(stemHeight / 4)
-      sprite.position.set(0, 0.05 + (stemHeight / 4), 0)
+      sprite.position.set(0, 0.05 + stemHeight / 4, 0)
       stem.userData.locationId = location.id
       const container = new THREE.Group()
       container.position.copy(world)
@@ -671,14 +764,20 @@ export async function initTerrainViewer(
       container.add(stem)
       container.add(sprite)
       markersGroup.add(container)
-      markerMap.set(location.id, { container, sprite, stem })
+      markerMap.set(location.id, { container, sprite, stem, spriteVisuals })
       markerInteractiveTargets.push(sprite, stem)
+      const spriteMaterials = new Set<THREE.SpriteMaterial>()
+      const spriteTextures = new Set<THREE.Texture>()
+      Object.values(spriteVisuals).forEach(({ material, texture }) => {
+        spriteMaterials.add(material)
+        spriteTextures.add(texture)
+      })
       markerResources.push({
-        material,
-        texture,
-        stemMaterial: stem.material as THREE.MeshStandardMaterial,
+        spriteMaterials,
+        spriteTextures,
+        stemMaterial,
         stemGeometry: stem.geometry
-      } as any)
+      })
     })
     updateMarkerVisuals()
   }

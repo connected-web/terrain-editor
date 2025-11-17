@@ -5,6 +5,7 @@ import type {
   TerrainLegend,
   TerrainLocation
 } from './initTerrainViewer'
+import type { TerrainThemeOverrides } from './theme'
 
 function ensureFile(zip: JSZip, path: string) {
   const file = zip.file(path)
@@ -67,6 +68,13 @@ export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
     locations = JSON.parse(contents) as TerrainLocation[]
   }
 
+  const themeEntry = zip.file('theme.json')
+  let themeOverrides: TerrainThemeOverrides | undefined
+  if (themeEntry) {
+    const contents = await themeEntry.async('string')
+    themeOverrides = JSON.parse(contents) as TerrainThemeOverrides
+  }
+
   const { getUrl, cleanup } = createObjectUrlResolver(zip)
   const heightMapPath = legend.heightmap
   const topologyPath = legend.topology ?? legend.heightmap
@@ -76,7 +84,8 @@ export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
     getHeightMapUrl: () => getUrl(heightMapPath),
     getTopologyMapUrl: () => getUrl(topologyPath),
     resolveAssetUrl: (path: string) => getUrl(path),
-    cleanup
+    cleanup,
+    theme: themeOverrides
   }
   return { dataset, legend, locations }
 }
