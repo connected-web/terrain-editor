@@ -4,21 +4,38 @@
       "states": {
         "default": {
           "backgroundColor": "rgba(6, 9, 18, 0.82)",
-          "borderColor": "rgba(255, 255, 255, 0.45)"
+          "borderColor": "rgba(255, 255, 255, 0.45)",
+          "opacity": 0.9
         },
         "hover": {
           "backgroundColor": "rgba(10, 14, 26, 0.92)",
-          "borderColor": "rgba(255, 255, 255, 0.75)"
+          "borderColor": "rgba(255, 255, 255, 0.75)",
+          "opacity": 0.98
         },
         "focus": {
           "backgroundColor": "rgba(255, 244, 223, 0.98)",
-          "borderColor": "#ffe4b3"
+          "borderColor": "#ffe4b3",
+          "opacity": 1
         }
       }
     },
     "stem": {
-      "color": "#cda772",
-      "hoverOpacity": 0.98
+      "shape": "hexagon",
+      "radius": 0.017,
+      "states": {
+        "default": {
+          "color": "#cda772",
+          "opacity": 0.82
+        },
+        "hover": {
+          "color": "#f6dfb5",
+          "opacity": 0.98
+        },
+        "focus": {
+          "color": "#ffe7b5",
+          "opacity": 1
+        }
+      }
     }
   }
 }

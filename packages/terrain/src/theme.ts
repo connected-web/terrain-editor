@@ -5,6 +5,7 @@ export type MarkerSpriteStateStyle = {
   backgroundColor: string
   borderColor: string
   borderThickness: number
+  opacity: number
 }
 
 export type MarkerSpriteTheme = {
@@ -22,13 +23,21 @@ export type MarkerSpriteTheme = {
   }
 }
 
-export type MarkerStemTheme = {
+export type MarkerStemStateStyle = {
   color: string
-  hoverColor?: string
-  focusColor?: string
   opacity: number
-  hoverOpacity: number
-  focusOpacity: number
+}
+
+export type MarkerStemGeometryShape = 'cylinder' | 'triangle' | 'square' | 'pentagon' | 'hexagon'
+
+export type MarkerStemTheme = {
+  shape: MarkerStemGeometryShape
+  radius: number
+  states: {
+    default: MarkerStemStateStyle
+    hover?: Partial<MarkerStemStateStyle>
+    focus?: Partial<MarkerStemStateStyle>
+  }
 }
 
 export type TerrainTheme = {

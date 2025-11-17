@@ -13,27 +13,40 @@
           "textColor": "#ffffff",
           "backgroundColor": "rgba(8, 10, 18, 0.78)",
           "borderColor": "rgba(255, 255, 255, 0.35)",
-          "borderThickness": 2
+          "borderThickness": 2,
+          "opacity": 0.85
         },
         "hover": {
           "backgroundColor": "rgba(8, 10, 18, 0.9)",
-          "borderColor": "rgba(255, 255, 255, 0.6)"
+          "borderColor": "rgba(255, 255, 255, 0.6)",
+          "opacity": 0.95
         },
         "focus": {
           "textColor": "#111216",
           "backgroundColor": "rgba(255, 240, 218, 0.95)",
           "borderColor": "#f1d9a6",
-          "borderThickness": 3
+          "borderThickness": 3,
+          "opacity": 1
         }
       }
     },
     "stem": {
-      "color": "#d9c39c",
-      "hoverColor": "#f6dfb5",
-      "focusColor": "#ffe7b5",
-      "opacity": 0.75,
-      "hoverOpacity": 0.95,
-      "focusOpacity": 1
+      "shape": "cylinder",
+      "radius": 0.015,
+      "states": {
+        "default": {
+          "color": "#d9c39c",
+          "opacity": 0.75
+        },
+        "hover": {
+          "color": "#f6dfb5",
+          "opacity": 0.95
+        },
+        "focus": {
+          "color": "#ffe7b5",
+          "opacity": 1
+        }
+      }
     }
   }
 }
