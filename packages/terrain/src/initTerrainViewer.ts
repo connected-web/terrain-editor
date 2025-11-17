@@ -442,9 +442,9 @@ function createOceanMesh(
 ) {
   const oceanWidth = Math.max(0, TERRAIN_WIDTH - WATER_INSET)
   const oceanDepth = Math.max(0, TERRAIN_DEPTH - WATER_INSET)
-  const geometry = new THREE.PlaneGeometry(oceanWidth, oceanDepth, 1, 1)
-  geometry.rotateX(-Math.PI / 2)
-  geometry.translate(0, waterHeight, 0)
+  const surfaceGeometry = new THREE.PlaneGeometry(oceanWidth, oceanDepth, 1, 1)
+  surfaceGeometry.rotateX(-Math.PI / 2)
+  surfaceGeometry.translate(0, waterHeight, 0)
 
   const uniforms = {
     uHeightMap: { value: heightMap },
@@ -489,7 +489,7 @@ function createOceanMesh(
     }
   `
 
-  const material = new THREE.ShaderMaterial({
+  const surfaceMaterial = new THREE.ShaderMaterial({
     uniforms,
     vertexShader,
     fragmentShader,
@@ -498,13 +498,69 @@ function createOceanMesh(
     side: THREE.DoubleSide
   })
 
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.receiveShadow = true
+  const waterRenderOrder = -10
+
+  const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial)
+  surfaceMesh.receiveShadow = true
+  surfaceMesh.renderOrder = waterRenderOrder
+
+  const waterBottom = FLOOR_Y + BASE_THICKNESS
+  const waterDepth = Math.max(0.01, waterHeight - waterBottom)
+  const volumeCenterY = waterBottom + waterDepth / 2
+  const sideMaterial = new THREE.MeshStandardMaterial({
+    color: '#1d415a',
+    transparent: true,
+    opacity: 0.4,
+    roughness: 0.55,
+    metalness: 0.1,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  })
+  const frontBackGeometry = new THREE.PlaneGeometry(oceanWidth, waterDepth)
+  const leftRightGeometry = new THREE.PlaneGeometry(oceanDepth, waterDepth)
+  const sideMeshes: THREE.Mesh[] = []
+
+  function addSide(mesh: THREE.Mesh, position: THREE.Vector3, rotation?: THREE.Euler) {
+    mesh.position.copy(position)
+    if (rotation) {
+      mesh.rotation.copy(rotation)
+    }
+    mesh.renderOrder = waterRenderOrder
+    sideMeshes.push(mesh)
+  }
+
+  addSide(
+    new THREE.Mesh(frontBackGeometry, sideMaterial),
+    new THREE.Vector3(0, volumeCenterY, oceanDepth / 2)
+  )
+  addSide(
+    new THREE.Mesh(frontBackGeometry, sideMaterial),
+    new THREE.Vector3(0, volumeCenterY, -oceanDepth / 2),
+    new THREE.Euler(0, Math.PI, 0)
+  )
+  addSide(
+    new THREE.Mesh(leftRightGeometry, sideMaterial),
+    new THREE.Vector3(oceanWidth / 2, volumeCenterY, 0),
+    new THREE.Euler(0, -Math.PI / 2, 0)
+  )
+  addSide(
+    new THREE.Mesh(leftRightGeometry, sideMaterial),
+    new THREE.Vector3(-oceanWidth / 2, volumeCenterY, 0),
+    new THREE.Euler(0, Math.PI / 2, 0)
+  )
+
+  const group = new THREE.Group()
+  group.add(surfaceMesh)
+  sideMeshes.forEach((mesh) => group.add(mesh))
+
   return {
-    mesh,
+    mesh: group,
     dispose: () => {
-      geometry.dispose()
-      material.dispose()
+      surfaceGeometry.dispose()
+      surfaceMaterial.dispose()
+      frontBackGeometry.dispose()
+      leftRightGeometry.dispose()
+      sideMaterial.dispose()
     }
   }
 }
@@ -626,6 +682,7 @@ export async function initTerrainViewer(
 
   const markersGroup = new THREE.Group()
   scene.add(markersGroup)
+  markersGroup.renderOrder = 10
   type MarkerResource = {
     spriteMaterials: Set<THREE.SpriteMaterial>
     spriteTextures: Set<THREE.Texture>
@@ -745,6 +802,7 @@ export async function initTerrainViewer(
       const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite)
       const sprite = new THREE.Sprite(spriteVisuals.default.material)
       sprite.userData.locationId = location.id
+      sprite.renderOrder = 10
       const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
       const stemMaterial = new THREE.MeshStandardMaterial({
         color: markerTheme.stem.color,
@@ -755,6 +813,7 @@ export async function initTerrainViewer(
         new THREE.CylinderGeometry(0.015, 0.015, stemHeight, 6),
         stemMaterial
       )
+      stem.renderOrder = 9
       stem.position.y = -(stemHeight / 4)
       sprite.position.set(0, 0.05 + stemHeight / 4, 0)
       stem.userData.locationId = location.id
