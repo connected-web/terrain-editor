@@ -91,7 +91,7 @@ function navigateToLocation(location: TerrainLocation) {
 
 let terrainHandle: TerrainHandle | null = null
 let layerState: LayerToggleState | null = null
-let interactiveEnabled = false
+const interactiveEnabled = false
 let activeArchive: LoadedWynFile | null = null
 let hostHandle: TerrainViewerHostHandle | null = null
 let overlayHandle: ViewerOverlayHandle | null = null
@@ -157,16 +157,10 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 
 overlayHandle = createViewerOverlay(viewerEl, {
   onFileSelected: (file) => loadArchive({ kind: 'file', file }),
-  onToggleInteraction: () => {
-    interactiveEnabled = !interactiveEnabled
-    terrainHandle?.setInteractiveMode(interactiveEnabled)
-    overlayHandle?.setInteractionActive(interactiveEnabled)
-  },
   onRequestPopout: () => hostHandle?.openPopout(),
   onRequestClosePopout: () => hostHandle?.closePopout(),
   onRequestFullscreenToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
 })
-overlayHandle.setInteractionActive(interactiveEnabled)
 
 hostHandle = createTerrainViewerHost({
   viewerElement: viewerEl,

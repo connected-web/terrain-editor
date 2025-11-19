@@ -41,13 +41,7 @@ const OVERLAY_CSS = `
   gap: 0.35rem;
 }
 
-.ctw-viewer-overlay__bottom {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.ctw-chip-button,
-.ctw-interaction-toggle {
+.ctw-chip-button {
   background: rgba(5, 7, 13, 0.65);
   border: 1px solid rgba(223, 195, 135, 0.5);
   color: #f6e7c3;
@@ -66,15 +60,8 @@ const OVERLAY_CSS = `
   cursor: not-allowed;
 }
 
-.ctw-chip-button:not(:disabled):hover,
-.ctw-interaction-toggle:hover {
+.ctw-chip-button:not(:disabled):hover {
   border-color: rgba(223, 195, 135, 0.85);
-}
-
-.ctw-interaction-toggle {
-  background: linear-gradient(135deg, #dfc387, #c07d4c);
-  color: #05070d;
-  border: none;
 }
 
 .ctw-drop-overlay {
@@ -101,7 +88,6 @@ import { TerrainViewMode } from './viewerHost'
 
 type ViewerOverlayCallbacks = {
   onFileSelected?: (file: File) => void
-  onToggleInteraction?: () => void
   onRequestPopout?: () => void
   onRequestClosePopout?: () => void
   onRequestFullscreenToggle?: () => void
@@ -109,7 +95,6 @@ type ViewerOverlayCallbacks = {
 
 export type ViewerOverlayHandle = {
   setStatus: (message: string) => void
-  setInteractionActive: (active: boolean) => void
   setViewMode: (mode: TerrainViewMode) => void
   destroy: () => void
 }
@@ -129,7 +114,6 @@ export function createViewerOverlay(
   if (typeof window === 'undefined') {
     return {
       setStatus: () => {},
-      setInteractionActive: () => {},
       setViewMode: () => {},
       destroy: () => {}
     }
@@ -167,16 +151,7 @@ export function createViewerOverlay(
 
   buttonGroup.append(loadBtn, modeBtn, fullscreenBtn)
   topRow.append(statusLabel, buttonGroup)
-
-  const bottomRow = doc.createElement('div')
-  bottomRow.className = 'ctw-viewer-overlay__bottom'
-  const interactionBtn = doc.createElement('button')
-  interactionBtn.type = 'button'
-  interactionBtn.className = 'ctw-interaction-toggle'
-  interactionBtn.textContent = 'Enable Placement Mode'
-  bottomRow.appendChild(interactionBtn)
-
-  overlay.append(topRow, bottomRow)
+  overlay.append(topRow)
 
   const dropOverlay = doc.createElement('div')
   dropOverlay.className = 'ctw-drop-overlay'
@@ -199,10 +174,6 @@ export function createViewerOverlay(
   fileInput.addEventListener('change', () => {
     handleFiles(fileInput.files)
     fileInput.value = ''
-  })
-
-  interactionBtn.addEventListener('click', () => {
-    callbacks.onToggleInteraction?.()
   })
 
   modeBtn.addEventListener('click', () => {
@@ -279,9 +250,6 @@ export function createViewerOverlay(
   return {
     setStatus(message: string) {
       statusLabel.textContent = message
-    },
-    setInteractionActive(active: boolean) {
-      interactionBtn.textContent = active ? 'Disable Placement Mode' : 'Enable Placement Mode'
     },
     setViewMode(mode: TerrainViewMode) {
       applyMode(mode)

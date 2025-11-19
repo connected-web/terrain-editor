@@ -145,16 +145,6 @@ function navigateToLocation(location: TerrainLocation) {
   })
 }
 
-function setInteractiveState(next: boolean) {
-  interactive.value = next
-  handle.value?.setInteractiveMode(next)
-  overlayHandle.value?.setInteractionActive(next)
-}
-
-function toggleInteraction() {
-  setInteractiveState(!interactive.value)
-}
-
 function updateStatus(message: string) {
   status.value = message
   overlayHandle.value?.setStatus(message)
@@ -211,12 +201,10 @@ onMounted(() => {
   if (!viewerRef.value || !viewerSlotRef.value) return
   overlayHandle.value = createViewerOverlay(viewerRef.value, {
     onFileSelected: (file) => loadArchive({ kind: 'file', file }),
-    onToggleInteraction: () => toggleInteraction(),
     onRequestPopout: () => hostHandle.value?.openPopout(),
     onRequestClosePopout: () => hostHandle.value?.closePopout(),
     onRequestFullscreenToggle: () => hostHandle.value?.toggleFullscreen().catch((err) => console.warn(err))
   })
-  overlayHandle.value?.setInteractionActive(interactive.value)
 
   hostHandle.value = createTerrainViewerHost({
     viewerElement: viewerRef.value,

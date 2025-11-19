@@ -98,12 +98,6 @@ function updateStatus(message: string) {
   overlayHandle?.setStatus(message)
 }
 
-function setInteractionState(active: boolean) {
-  interactiveEnabled = active
-  terrainHandle?.setInteractiveMode(active)
-  overlayHandle?.setInteractionActive(active)
-}
-
 async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: File }) {
   terrainHandle?.destroy()
   activeArchive?.dataset.cleanup?.()
@@ -160,12 +154,10 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 
 overlayHandle = createViewerOverlay(viewerEl, {
   onFileSelected: (file) => loadArchive({ kind: 'file', file }),
-  onToggleInteraction: () => setInteractionState(!interactiveEnabled),
   onRequestPopout: () => hostHandle?.openPopout(),
   onRequestClosePopout: () => hostHandle?.closePopout(),
   onRequestFullscreenToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
 })
-overlayHandle.setInteractionActive(interactiveEnabled)
 
 hostHandle = createTerrainViewerHost({
   viewerElement: viewerEl,
