@@ -185,7 +185,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
           return
         }
         const entry = locations.value.find((loc: { id: TerrainLocation['id'] }) => loc.id === id)
-        updateStatus(entry ? `Hovering location: '${entry.name ?? entry.id}'` : `Hovering ${id}`)
+        updateStatus(entry ? `Location: ${entry.name ?? entry.id}` : `Hovering ${id}`)
       },
       onLocationPick: (payload: { pixel: { x: any; y: any } }) => {
         updateStatus(`Placement: (${payload.pixel.x}, ${payload.pixel.y})`)
@@ -193,7 +193,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
       onLocationClick: (id: any) => {
         const location = locations?.value?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
         updateStatus(
-          location ? `Focused location: '${location.name ?? location.id}'` : `Focused location: ${id}`
+          location ? `Focused location: ${location.name ?? location.id}` : `Focused location: ${id}`
         )
         if (location) {
           navigateToLocation(location)

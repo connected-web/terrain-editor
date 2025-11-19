@@ -141,13 +141,13 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
           return
         }
         const location = archive.locations?.find((entry) => entry.id === id)
-        updateStatus(location ? `Hovering location: '${location.name ?? location.id}'` : `Hovering ${id}`)
+        updateStatus(location ? `Location: ${location.name ?? location.id}` : `Hovering ${id}`)
       },
       onLocationClick: (id: any) => {
         const location = archive.locations?.find((entry) => entry.id === id)
         if (location) {
           navigateToLocation(location)
-          updateStatus(`Focused location: '${location.name ?? location.id}'`)
+          updateStatus(`Focused location: ${location.name ?? location.id}`)
         }
       }
     })

@@ -139,7 +139,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
           return
         }
         const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
-        setStatus(location ? `Hovering location: '${location.name ?? location.id}'` : `Hovering ${id}`)
+        setStatus(location ? `Location: ${location.name ?? location.id}` : `Hovering ${id}`)
       },
       onLocationClick: (id: any) => {
         const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)

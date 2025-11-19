@@ -17,6 +17,98 @@ export type TerrainViewerHostHandle = {
   destroy: () => void
 }
 
+const HOST_STYLE_ID = 'ctw-viewer-host-style'
+const HOST_CSS = `
+.viewer-popout {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 13, 0.85);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  z-index: 999;
+}
+
+.viewer-popout.is-open {
+  display: flex;
+}
+
+.viewer-popout.is-fullscreen {
+  padding: 0;
+}
+
+.viewer-popout__chrome {
+  width: min(1200px, 100%);
+  height: min(90vh, 760px);
+  background: #05070d;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.viewer-popout.is-fullscreen .viewer-popout__chrome {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+}
+
+.viewer-popout__header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #f6e7c3;
+}
+
+.viewer-popout__header .label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.viewer-popout__header .hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b8b2a3;
+}
+
+.viewer-popout__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.viewer-popout__slot {
+  flex: 1;
+  padding: 1rem;
+}
+
+.viewer-popout.is-fullscreen .viewer-popout__slot {
+  padding: 0;
+}
+
+.chip-button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f6e7c3;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.chip-button:hover {
+  border-color: rgba(223, 195, 135, 0.7);
+}
+`
+
 const noopHandle: TerrainViewerHostHandle = {
   openPopout: () => {},
   closePopout: () => {},
@@ -25,11 +117,21 @@ const noopHandle: TerrainViewerHostHandle = {
   destroy: () => {}
 }
 
+function ensureHostStyles(doc: Document) {
+  if (doc.getElementById(HOST_STYLE_ID)) return
+  const style = doc.createElement('style')
+  style.id = HOST_STYLE_ID
+  style.textContent = HOST_CSS
+  doc.head.appendChild(style)
+}
+
 export function createTerrainViewerHost(options: TerrainViewerHostOptions): TerrainViewerHostHandle {
   if (typeof window === 'undefined') return noopHandle
   const { viewerElement, embedTarget, title = 'Terrain Viewer', subtitle = 'Pop-out mode' } = options
   const doc = options.documentRoot ?? document
   if (!viewerElement || !embedTarget) return noopHandle
+
+  ensureHostStyles(doc)
 
   let mode: TerrainViewMode = 'embed'
   let popoutOpen = false

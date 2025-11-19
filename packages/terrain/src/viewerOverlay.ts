@@ -33,6 +33,7 @@ const OVERLAY_CSS = `
   border-radius: 999px;
   padding: 0.35rem 0.9rem;
   backdrop-filter: blur(6px);
+  line-height: 1.2rem;
 }
 
 .ctw-viewer-overlay__buttons {
@@ -57,6 +58,7 @@ const OVERLAY_CSS = `
   pointer-events: auto;
   cursor: pointer;
   transition: border-color 0.2s ease;
+  line-height: 1.2rem;
 }
 
 .ctw-chip-button:disabled {
