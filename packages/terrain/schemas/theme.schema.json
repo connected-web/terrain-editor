@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "theme.schema.json",
+  "title": "Theme",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "locationMarkers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sprite": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "states": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "default": {
+                  "$ref": "#/$defs/spriteState"
+                },
+                "hover": {
+                  "$ref": "#/$defs/spriteState"
+                },
+                "focus": {
+                  "$ref": "#/$defs/spriteState"
+                }
+              },
+              "required": [
+                "default",
+                "hover",
+                "focus"
+              ]
+            }
+          },
+          "required": [
+            "states"
+          ]
+        },
+        "stem": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "shape": {
+              "type": "string"
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "states": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "default": {
+                  "$ref": "#/$defs/stemState"
+                },
+                "hover": {
+                  "$ref": "#/$defs/stemState"
+                },
+                "focus": {
+                  "$ref": "#/$defs/stemState"
+                }
+              },
+              "required": [
+                "default",
+                "hover",
+                "focus"
+              ]
+            }
+          },
+          "required": [
+            "shape",
+            "radius",
+            "states"
+          ]
+        }
+      },
+      "required": [
+        "sprite",
+        "stem"
+      ]
+    }
+  },
+  "required": [
+    "locationMarkers"
+  ],
+  "$defs": {
+    "spriteState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backgroundColor": {
+          "type": "string"
+        },
+        "borderColor": {
+          "type": "string"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "backgroundColor",
+        "borderColor",
+        "opacity"
+      ]
+    },
+    "stemState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "color",
+        "opacity"
+      ]
+    }
+  }
+}

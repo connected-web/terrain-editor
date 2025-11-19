@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "legend.schema.json",
+  "title": "Legend",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "size": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "sea_level": {
+      "type": "number"
+    },
+    "heightmap": {
+      "type": "string"
+    },
+    "topology": {
+      "type": "string"
+    },
+    "biomes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/layer"
+      }
+    },
+    "overlays": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/layer"
+      }
+    }
+  },
+  "required": [
+    "size",
+    "sea_level",
+    "heightmap",
+    "topology",
+    "biomes",
+    "overlays"
+  ],
+  "$defs": {
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mask": {
+          "type": "string"
+        },
+        "rgb": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "mask",
+        "rgb"
+      ]
+    }
+  }
+}
