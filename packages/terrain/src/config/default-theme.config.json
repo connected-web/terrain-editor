@@ -33,6 +33,7 @@
     "stem": {
       "shape": "cylinder",
       "radius": 0.015,
+      "scale": 0.01,
       "states": {
         "default": {
           "color": "#d9c39c",

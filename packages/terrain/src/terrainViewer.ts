@@ -18,14 +18,13 @@ import {
   TerrainThemeOverrides
 } from './theme'
 
-const MAP_RATIO = 1536 / 1024
-const TERRAIN_WIDTH = 4.2
-const TERRAIN_DEPTH = TERRAIN_WIDTH * MAP_RATIO
+const DEFAULT_MAP_WIDTH = 1024
+const DEFAULT_MAP_HEIGHT = 1536
+const DEFAULT_MAP_RATIO = DEFAULT_MAP_HEIGHT / DEFAULT_MAP_WIDTH
+const DEFAULT_TERRAIN_WIDTH = 4.2
+const DEFAULT_TERRAIN_DEPTH = DEFAULT_TERRAIN_WIDTH * DEFAULT_MAP_RATIO
 const SEGMENTS_X = 256
-const SEGMENTS_Z = Math.round(SEGMENTS_X * MAP_RATIO)
 const EDGE_RIM = 0.25
-const BASE_WIDTH = TERRAIN_WIDTH + EDGE_RIM * 2
-const BASE_DEPTH = TERRAIN_DEPTH + EDGE_RIM * 2
 const BASE_THICKNESS = 0.65
 
 const SEA_LEVEL_DEFAULT = 0.28
@@ -41,6 +40,7 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
   cities: 1,
   roads: 0.85
 }
+const DEFAULT_STEM_SCALE = 0.01
 const BASE_FILL_COLOR = '#7b5c3a'
 
 export type LayerToggleState = {
@@ -131,12 +131,16 @@ function uvToWorld(
   v: number,
   sampler: HeightSampler | null,
   heightScale: number,
-  seaLevel: number
+  seaLevel: number,
+  dimensions: { width: number; depth: number } = {
+    width: DEFAULT_TERRAIN_WIDTH,
+    depth: DEFAULT_TERRAIN_DEPTH
+  }
 ) {
   if (!sampler) return null
   const heightSample = sampleHeightValue(sampler, u, v)
-  const x = (u - 0.5) * TERRAIN_WIDTH
-  const z = (v - 0.5) * TERRAIN_DEPTH
+  const x = (u - 0.5) * dimensions.width
+  const z = (v - 0.5) * dimensions.depth
   const y = (heightSample - seaLevel) * heightScale
   return new THREE.Vector3(x, y, z)
 }
@@ -467,8 +471,8 @@ function createGradientTexture(renderer: THREE.WebGLRenderer) {
   return { background: texture, environment: envRenderTarget }
 }
 
-function createBaseSlice() {
-  const geometry = new THREE.BoxGeometry(BASE_WIDTH, BASE_THICKNESS, BASE_DEPTH)
+function createBaseSlice(width: number, depth: number) {
+  const geometry = new THREE.BoxGeometry(width, BASE_THICKNESS, depth)
   const material = new THREE.MeshStandardMaterial({
     color: 0x0f0f18,
     roughness: 0.85,
@@ -491,11 +495,13 @@ function createOceanMesh(
   sampler: HeightSampler,
   heightScale: number,
   waterHeight: number,
-  seaLevel: number
+  seaLevel: number,
+  oceanWidth: number,
+  oceanDepth: number
 ) {
-  const oceanWidth = Math.max(0, TERRAIN_WIDTH - WATER_INSET)
-  const oceanDepth = Math.max(0, TERRAIN_DEPTH - WATER_INSET)
-  const surfaceGeometry = new THREE.PlaneGeometry(oceanWidth, oceanDepth, 1, 1)
+  const clampedWidth = Math.max(0, oceanWidth - WATER_INSET)
+  const clampedDepth = Math.max(0, oceanDepth - WATER_INSET)
+  const surfaceGeometry = new THREE.PlaneGeometry(clampedWidth, clampedDepth, 1, 1)
   surfaceGeometry.rotateX(-Math.PI / 2)
   surfaceGeometry.translate(0, waterHeight, 0)
 
@@ -645,8 +651,28 @@ export async function initTerrainViewer(
   const theme = resolveTerrainTheme(dataset.theme, options.theme)
   const markerTheme = theme.locationMarkers
   const seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
-  const mapWidth = Math.max(1, legend.size[0] - 1)
-  const mapHeight = Math.max(1, legend.size[1] - 1)
+  const [rawLegendWidth, rawLegendHeight] = legend.size
+  const safeLegendWidth = Math.max(1, rawLegendWidth || DEFAULT_MAP_WIDTH)
+  const safeLegendHeight = Math.max(1, rawLegendHeight || DEFAULT_MAP_HEIGHT)
+  const mapWidth = Math.max(1, safeLegendWidth - 1)
+  const mapHeight = Math.max(1, safeLegendHeight - 1)
+  const mapRatio =
+    safeLegendWidth > 0 ? safeLegendHeight / safeLegendWidth : DEFAULT_MAP_RATIO
+  const terrainWidth = DEFAULT_TERRAIN_WIDTH
+  const terrainDepth = terrainWidth * mapRatio
+  const terrainSegmentsZ = Math.max(1, Math.round(SEGMENTS_X * mapRatio))
+  const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
+  const baseWidth = terrainWidth + EDGE_RIM * 2
+  const baseDepth = terrainDepth + EDGE_RIM * 2
+  const rawStemScale = markerTheme.stem.scale
+  const stemScale =
+    typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
+      ? Math.max(0, rawStemScale)
+      : DEFAULT_STEM_SCALE
+  const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
+  const stemRadius = Number.isFinite(maxStemRadiusCandidate)
+    ? Math.min(markerTheme.stem.radius, Math.max(0, maxStemRadiusCandidate))
+    : markerTheme.stem.radius
   const layerImageCache = new Map<string, HTMLImageElement>()
   const maskCanvasCache = new Map<string, HTMLCanvasElement>()
 
@@ -845,7 +871,14 @@ const markerMap = new Map<
       const id = location.id ?? `${location.name ?? 'loc'}-${i}`
       location.id = id
       const { u, v } = pixelToUV(location.pixel)
-      const world = uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel)
+      const world = uvToWorld(
+        u,
+        v,
+        heightSampler,
+        currentHeightScale,
+        seaLevel,
+        terrainDimensions
+      )
       if (!world) return
       locationWorldCache.set(id, world.clone())
       const glyph = formatMarkerGlyph(location)
@@ -861,7 +894,7 @@ const markerMap = new Map<
         opacity: stemStates.default.opacity,
         flatShading: markerTheme.stem.shape !== 'cylinder'
       })
-      const stemGeometry = createStemGeometry(markerTheme.stem.shape, markerTheme.stem.radius, stemHeight)
+      const stemGeometry = createStemGeometry(markerTheme.stem.shape, stemRadius, stemHeight)
       const stem = new THREE.Mesh(stemGeometry, stemMaterial)
       stem.renderOrder = 9
       stem.position.y = -(stemHeight / 4)
@@ -913,7 +946,12 @@ const markerMap = new Map<
   if (!sampler) throw new Error('Unable to read heightmap data')
   heightSampler = sampler
 
-  const terrainGeometry = new THREE.PlaneGeometry(TERRAIN_WIDTH, TERRAIN_DEPTH, SEGMENTS_X, SEGMENTS_Z)
+  const terrainGeometry = new THREE.PlaneGeometry(
+    terrainWidth,
+    terrainDepth,
+    SEGMENTS_X,
+    terrainSegmentsZ
+  )
   terrainGeometry.rotateX(-Math.PI / 2)
   applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
 
@@ -941,7 +979,7 @@ const markerMap = new Map<
     setLocationMarkers(currentLocations, currentFocusId)
   }
 
-  const base = createBaseSlice()
+  const base = createBaseSlice(baseWidth, baseDepth)
   scene.add(base.mesh)
 
   const rimMesh = buildRimMesh(
@@ -957,7 +995,15 @@ const markerMap = new Map<
   rimMesh.receiveShadow = true
   scene.add(rimMesh)
 
-  const ocean = createOceanMesh(heightMap, sampler, heightScale, waterHeight, seaLevel)
+  const ocean = createOceanMesh(
+    heightMap,
+    sampler,
+    heightScale,
+    waterHeight,
+    seaLevel,
+    terrainWidth,
+    terrainDepth
+  )
   scene.add(ocean.mesh)
 
   disposables.push(() => {
@@ -1198,7 +1244,8 @@ const markerMap = new Map<
         pixelToUV(pixel).v,
         heightSampler,
         currentHeightScale,
-        seaLevel
+        seaLevel,
+        terrainDimensions
       )
     if (!world) return
     const distance =

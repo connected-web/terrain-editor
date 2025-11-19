@@ -33,6 +33,7 @@ export type MarkerStemGeometryShape = 'cylinder' | 'triangle' | 'square' | 'pent
 export type MarkerStemTheme = {
   shape: MarkerStemGeometryShape
   radius: number
+  scale?: number
   states: {
     default: MarkerStemStateStyle
     hover?: Partial<MarkerStemStateStyle>

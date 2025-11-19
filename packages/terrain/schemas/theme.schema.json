@@ -43,12 +43,23 @@
           "additionalProperties": false,
           "properties": {
             "shape": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "cylinder",
+                "triangle",
+                "square",
+                "pentagon",
+                "hexagon"
+              ]
             },
             "radius": {
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "scale": {
+              "type": "number",
+              "minimum": 0
             },
             "states": {
               "type": "object",
