@@ -33,7 +33,7 @@ const HEIGHT_SCALE_DEFAULT = 0.45
 const WATER_PERCENT_DEFAULT = 65
 const WATER_MIN = -0.08
 const WATER_MAX = 0.14
-const WATER_INSET = 0.08
+const WATER_INSET = 0.03
 const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
   water: 0.92,
   rivers: 0.95,
@@ -499,9 +499,9 @@ function createOceanMesh(
   oceanWidth: number,
   oceanDepth: number
 ) {
-  const clampedWidth = Math.max(0, oceanWidth - WATER_INSET)
-  const clampedDepth = Math.max(0, oceanDepth - WATER_INSET)
-  const surfaceGeometry = new THREE.PlaneGeometry(clampedWidth, clampedDepth, 1, 1)
+  const surfaceWidth = Math.max(0, oceanWidth - WATER_INSET)
+  const surfaceDepth = Math.max(0, oceanDepth - WATER_INSET)
+  const surfaceGeometry = new THREE.PlaneGeometry(surfaceWidth, surfaceDepth, 1, 1)
   surfaceGeometry.rotateX(-Math.PI / 2)
   surfaceGeometry.translate(0, waterHeight, 0)
 
@@ -573,10 +573,13 @@ function createOceanMesh(
     roughness: 0.55,
     metalness: 0.1,
     depthWrite: false,
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1
   })
-  const frontBackGeometry = new THREE.PlaneGeometry(oceanWidth, waterDepth)
-  const leftRightGeometry = new THREE.PlaneGeometry(oceanDepth, waterDepth)
+  const frontBackGeometry = new THREE.PlaneGeometry(surfaceWidth, waterDepth)
+  const leftRightGeometry = new THREE.PlaneGeometry(surfaceDepth, waterDepth)
   const sideMeshes: THREE.Mesh[] = []
 
   function addSide(mesh: THREE.Mesh, position: THREE.Vector3, rotation?: THREE.Euler) {
@@ -590,21 +593,21 @@ function createOceanMesh(
 
   addSide(
     new THREE.Mesh(frontBackGeometry, sideMaterial),
-    new THREE.Vector3(0, volumeCenterY, oceanDepth / 2)
+    new THREE.Vector3(0, volumeCenterY, surfaceDepth / 2)
   )
   addSide(
     new THREE.Mesh(frontBackGeometry, sideMaterial),
-    new THREE.Vector3(0, volumeCenterY, -oceanDepth / 2),
+    new THREE.Vector3(0, volumeCenterY, -surfaceDepth / 2),
     new THREE.Euler(0, Math.PI, 0)
   )
   addSide(
     new THREE.Mesh(leftRightGeometry, sideMaterial),
-    new THREE.Vector3(oceanWidth / 2, volumeCenterY, 0),
+    new THREE.Vector3(surfaceWidth / 2, volumeCenterY, 0),
     new THREE.Euler(0, -Math.PI / 2, 0)
   )
   addSide(
     new THREE.Mesh(leftRightGeometry, sideMaterial),
-    new THREE.Vector3(-oceanWidth / 2, volumeCenterY, 0),
+    new THREE.Vector3(-surfaceWidth / 2, volumeCenterY, 0),
     new THREE.Euler(0, Math.PI / 2, 0)
   )
 
