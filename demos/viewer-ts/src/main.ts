@@ -6,21 +6,22 @@ import {
   type TerrainLegend,
   type TerrainLocation,
   type TerrainHandle,
-  loadWynArchive
+  type LoadedWynFile,
+  loadWynArchive,
+  loadWynArchiveFromFile,
+  createTerrainViewerHost,
+  type TerrainViewerHostHandle,
+  createViewerOverlay,
+  type ViewerOverlayHandle
 } from '@connected-web/terrain-editor'
 
 const viewerEl = document.getElementById('viewer-root') as HTMLElement
-const statusBar = document.getElementById('status-bar') as HTMLElement
+const embedSlot = document.getElementById('viewer-embed-slot') as HTMLElement
 const layerControlsEl = document.getElementById('layer-controls') as HTMLElement
 const locationListEl = document.getElementById('location-list') as HTMLElement
-const interactionBtn = document.getElementById('toggle-interaction') as HTMLButtonElement
 
 function resolveArchivePath() {
   return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
-}
-
-function setStatus(message: string) {
-  if (statusBar) statusBar.textContent = message
 }
 
 function createDefaultLayerState(legend: TerrainLegend): LayerToggleState {
@@ -89,57 +90,92 @@ function navigateToLocation(location: TerrainLocation) {
 let terrainHandle: TerrainHandle | null = null
 let layerState: LayerToggleState | null = null
 let interactiveEnabled = false
+let activeArchive: LoadedWynFile | null = null
+let hostHandle: TerrainViewerHostHandle | null = null
+let overlayHandle: ViewerOverlayHandle | null = null
 
-async function bootstrap() {
-  setStatus('Downloading wynnal-terrain.wyn…')
+function updateStatus(message: string) {
+  overlayHandle?.setStatus(message)
+}
+
+function setInteractionState(active: boolean) {
+  interactiveEnabled = active
+  terrainHandle?.setInteractiveMode(active)
+  overlayHandle?.setInteractionActive(active)
+}
+
+async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: File }) {
+  terrainHandle?.destroy()
+  activeArchive?.dataset.cleanup?.()
+  terrainHandle = null
+
+  updateStatus(source.kind === 'default' ? 'Downloading wynnal-terrain.wyn…' : `Loading ${source.file.name}…`)
   try {
-    const archiveUrl = resolveArchivePath()
-    const { dataset, legend, locations } = await loadWynArchive(archiveUrl)
-    layerState = createDefaultLayerState(legend)
-    renderLayerControls(legend, layerState, () => {
+    const archive =
+      source.kind === 'default' ? await loadWynArchive(resolveArchivePath()) : await loadWynArchiveFromFile(source.file)
+    activeArchive = archive
+    layerState = createDefaultLayerState(archive.legend)
+    renderLayerControls(archive.legend, layerState, () => {
       if (terrainHandle && layerState) {
         terrainHandle.updateLayers(layerState)
       }
     })
-    renderLocations(locations ?? [], (location) => {
+    renderLocations(archive.locations ?? [], (location) => {
       navigateToLocation(location)
     })
 
-    terrainHandle = await initTerrainViewer(viewerEl, dataset, {
+    terrainHandle = await initTerrainViewer(viewerEl, archive.dataset, {
       interactive: interactiveEnabled,
       layers: layerState,
-      locations,
-      onLocationPick: (payload: { pixel: { x: any; y: any }; uv: { u: number; v: number } }) => {
-        setStatus(
-          `Picked pixel (${payload.pixel.x}, ${payload.pixel.y}) – uv (${payload.uv.u.toFixed(2)}, ${payload.uv.v.toFixed(2)})`
+      locations: archive.locations,
+      onLocationPick: (payload: { pixel: { x: number; y: number }; uv: { u: number; v: number } }) => {
+        updateStatus(
+          `Picked pixel (${payload.pixel.x}, ${payload.pixel.y}) – uv (${payload.uv.u.toFixed(2)}, ${payload.uv.v.toFixed(
+            2
+          )})`
         )
       },
       onLocationHover: (id: any) => {
         if (!id) {
-          setStatus('Hovering terrain')
+          updateStatus('Hovering terrain')
           return
         }
-        const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
-        setStatus(location ? `Hovering location: '${location.name ?? location.id}'` : `Hovering ${id}`)
+        const location = archive.locations?.find((entry) => entry.id === id)
+        updateStatus(location ? `Hovering location: '${location.name ?? location.id}'` : `Hovering ${id}`)
       },
       onLocationClick: (id: any) => {
-        const location = locations?.find((entry: { id: TerrainLocation['id'] }) => entry.id === id)
+        const location = archive.locations?.find((entry) => entry.id === id)
         if (location) {
           navigateToLocation(location)
+          updateStatus(`Focused location: '${location.name ?? location.id}'`)
         }
       }
     })
-    setStatus('Terrain loaded. Use the controls to explore.')
+    updateStatus('Terrain loaded. Use the controls to explore.')
   } catch (error) {
     console.error(error)
-    setStatus('Failed to load terrain archive. Check the console for details.')
+    updateStatus('Failed to load terrain archive.')
   }
 }
 
-interactionBtn.addEventListener('click', () => {
-  interactiveEnabled = !interactiveEnabled
-  interactionBtn.textContent = interactiveEnabled ? 'Disable Placement Mode' : 'Enable Placement Mode'
-  terrainHandle?.setInteractiveMode(interactiveEnabled)
+overlayHandle = createViewerOverlay(viewerEl, {
+  onFileSelected: (file) => loadArchive({ kind: 'file', file }),
+  onToggleInteraction: () => setInteractionState(!interactiveEnabled),
+  onRequestPopout: () => hostHandle?.openPopout(),
+  onRequestFullscreen: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+})
+overlayHandle.setInteractionActive(interactiveEnabled)
+overlayHandle.setPopoutEnabled(true)
+
+hostHandle = createTerrainViewerHost({
+  viewerElement: viewerEl,
+  embedTarget: embedSlot,
+  title: 'Terrain Viewer',
+  subtitle: 'Pop-out mode',
+  onModeChange: (mode) => {
+    overlayHandle?.setPopoutEnabled(mode === 'embed')
+    overlayHandle?.setFullscreenActive(mode === 'fullscreen')
+  }
 })
 
-bootstrap()
+loadArchive({ kind: 'default' })

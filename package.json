@@ -17,7 +17,7 @@
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test:smoke": "node ./scripts/smoke-tests.mjs",
     "test:e2e": "playwright test",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run test:smoke && npm run test:e2e"
   },
   "repository": {
     "type": "git",

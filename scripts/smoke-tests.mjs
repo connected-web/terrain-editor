@@ -55,7 +55,7 @@ async function startServer() {
     }
   })
 
-  await new Promise((resolve) => server.listen(serverPort, resolve))
+  await new Promise((resolve) => server.listen({ port: serverPort, host: '127.0.0.1' }, resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Failed to determine server port')
   return { server, port: address.port }
@@ -71,12 +71,26 @@ function runCommand(command, args) {
   })
 }
 
-async function fetchWithRetry(url, retries = 5) {
+const CONTENT_CHECKS = new Map([
+  ['/', '<title>Terrain Editor - Connected Web</title>'],
+  ['/viewer-js/', 'Terrain Viewer Demo'],
+  ['/viewer-vue3/', 'Terrain Viewer Demo (Vue 3)'],
+  ['/editor-vue3/', 'Terrain Editor Demo'],
+  ['/maps/wynnal-terrain.wyn', 'PK']
+])
+
+async function fetchWithRetry(url, retries = 5, expectedText) {
   let attempt = 0
   while (attempt < retries) {
     try {
       const response = await fetch(url)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (expectedText) {
+        const body = await response.text()
+        if (!body.includes(expectedText)) {
+          throw new Error(`Unexpected response for ${url}: missing marker "${expectedText}"`)
+        }
+      }
       return
     } catch (err) {
       attempt += 1
@@ -94,7 +108,7 @@ async function run() {
     for (const endpoint of endpoints) {
       const url = `http://127.0.0.1:${port}${endpoint}`
       console.log(`Checking ${url}`)
-      await fetchWithRetry(url)
+      await fetchWithRetry(url, 5, CONTENT_CHECKS.get(endpoint))
     }
     console.log('Smoke tests completed successfully.')
   } finally {

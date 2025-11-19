@@ -6,21 +6,22 @@ import {
   type TerrainLegend,
   type TerrainLocation,
   type TerrainHandle,
-  loadWynArchive
+  type LoadedWynFile,
+  loadWynArchive,
+  loadWynArchiveFromFile,
+  createTerrainViewerHost,
+  type TerrainViewerHostHandle,
+  createViewerOverlay,
+  type ViewerOverlayHandle
 } from '@connected-web/terrain-editor'
 
 const viewerEl = document.getElementById('viewer-root') as HTMLElement
-const statusBar = document.getElementById('status-bar') as HTMLElement
+const embedSlot = document.getElementById('viewer-embed-slot') as HTMLElement
 const layerControlsEl = document.getElementById('layer-controls') as HTMLElement
 const locationListEl = document.getElementById('location-list') as HTMLElement
-const interactionBtn = document.getElementById('toggle-interaction') as HTMLButtonElement
 
 function resolveArchivePath() {
   return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
-}
-
-function setStatus(message: string) {
-  if (statusBar) statusBar.textContent = message
 }
 
 function createDefaultLayerState(legend: TerrainLegend): LayerToggleState {
@@ -29,6 +30,8 @@ function createDefaultLayerState(legend: TerrainLegend): LayerToggleState {
     overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
   }
 }
+
+console.log('Here')
 
 function renderLayerControls(
   legend: TerrainLegend,
@@ -89,12 +92,28 @@ function navigateToLocation(location: TerrainLocation) {
 let terrainHandle: TerrainHandle | null = null
 let layerState: LayerToggleState | null = null
 let interactiveEnabled = false
+let activeArchive: LoadedWynFile | null = null
+let hostHandle: TerrainViewerHostHandle | null = null
+let overlayHandle: ViewerOverlayHandle | null = null
 
-async function bootstrap() {
-  setStatus('Downloading wynnal-terrain.wyn…')
+function setStatus(message: string) {
+  overlayHandle?.setStatus(message)
+}
+
+async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: File }) {
+  terrainHandle?.destroy()
+  activeArchive?.dataset.cleanup?.()
+  terrainHandle = null
+
+  setStatus(source.kind === 'default' ? 'Downloading wynnal-terrain.wyn…' : `Loading ${source.file.name}…`)
+
   try {
-    const archiveUrl = resolveArchivePath()
-    const { dataset, legend, locations } = await loadWynArchive(archiveUrl)
+    const archive =
+      source.kind === 'default'
+        ? await loadWynArchive(resolveArchivePath())
+        : await loadWynArchiveFromFile(source.file)
+    activeArchive = archive
+    const { legend, locations } = archive
     layerState = createDefaultLayerState(legend)
     renderLayerControls(legend, layerState, () => {
       if (terrainHandle && layerState) {
@@ -105,11 +124,11 @@ async function bootstrap() {
       navigateToLocation(location)
     })
 
-    terrainHandle = await initTerrainViewer(viewerEl, dataset, {
+    terrainHandle = await initTerrainViewer(viewerEl, archive.dataset, {
       interactive: interactiveEnabled,
       layers: layerState,
       locations,
-      onLocationPick: (payload: { pixel: { x: any; y: any }; uv: { u: number; v: number } }) => {
+      onLocationPick: (payload: { pixel: { x: number; y: number }; uv: { u: number; v: number } }) => {
         setStatus(
           `Picked pixel (${payload.pixel.x}, ${payload.pixel.y}) – uv (${payload.uv.u.toFixed(2)}, ${payload.uv.v.toFixed(2)})`
         )
@@ -132,14 +151,32 @@ async function bootstrap() {
     setStatus('Terrain loaded. Use the controls to explore.')
   } catch (error) {
     console.error(error)
-    setStatus('Failed to load terrain archive. Check the console for details.')
+    setStatus('Failed to load terrain archive.')
   }
 }
 
-interactionBtn.addEventListener('click', () => {
-  interactiveEnabled = !interactiveEnabled
-  interactionBtn.textContent = interactiveEnabled ? 'Disable Placement Mode' : 'Enable Placement Mode'
-  terrainHandle?.setInteractiveMode(interactiveEnabled)
+const overlay = createViewerOverlay(viewerEl, {
+  onFileSelected: (file) => loadArchive({ kind: 'file', file }),
+  onToggleInteraction: () => {
+    interactiveEnabled = !interactiveEnabled
+    terrainHandle?.setInteractiveMode(interactiveEnabled)
+    overlayHandle?.setInteractionActive(interactiveEnabled)
+  },
+  onRequestPopout: () => hostHandle?.openPopout(),
+  onRequestFullscreen: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+})
+overlayHandle = overlay
+overlayHandle.setInteractionActive(interactiveEnabled)
+
+hostHandle = createTerrainViewerHost({
+  viewerElement: viewerEl,
+  embedTarget: embedSlot,
+  title: 'Terrain Viewer',
+  subtitle: 'Pop-out mode',
+  onModeChange: (mode) => {
+    overlayHandle?.setPopoutEnabled(mode === 'embed')
+    overlayHandle?.setFullscreenActive(mode === 'fullscreen')
+  }
 })
 
-bootstrap()
+loadArchive({ kind: 'default' })

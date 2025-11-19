@@ -4,7 +4,7 @@ import type {
   TerrainDataset,
   TerrainLegend,
   TerrainLocation
-} from './initTerrainViewer'
+} from './terrainViewer'
 import type { TerrainThemeOverrides } from './theme'
 
 function ensureFile(zip: JSZip, path: string) {
@@ -49,14 +49,7 @@ export type LoadedWynFile = {
   locations?: TerrainLocation[]
 }
 
-export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch WYN file (${response.status} ${response.statusText})`)
-  }
-  const arrayBuffer = await response.arrayBuffer()
-  const zip = await JSZip.loadAsync(arrayBuffer)
-
+async function parseWynZip(zip: JSZip): Promise<LoadedWynFile> {
   const legendFile = ensureFile(zip, 'legend.json')
   const legendRaw = await legendFile.async('string')
   const legend = JSON.parse(legendRaw) as TerrainLegend
@@ -88,4 +81,24 @@ export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
     theme: themeOverrides
   }
   return { dataset, legend, locations }
+}
+
+export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch WYN file (${response.status} ${response.statusText})`)
+  }
+  const arrayBuffer = await response.arrayBuffer()
+  const zip = await JSZip.loadAsync(arrayBuffer)
+  return parseWynZip(zip)
+}
+
+export async function loadWynArchiveFromArrayBuffer(data: ArrayBuffer): Promise<LoadedWynFile> {
+  const zip = await JSZip.loadAsync(data)
+  return parseWynZip(zip)
+}
+
+export async function loadWynArchiveFromFile(file: File): Promise<LoadedWynFile> {
+  const buffer = await file.arrayBuffer()
+  return loadWynArchiveFromArrayBuffer(buffer)
 }

@@ -16,16 +16,15 @@
     </header>
     <main>
       <section class="viewer-panel">
-        <div id="viewer-root" class="viewer-root"></div>
-        <div id="status-bar" class="status-bar">Waiting for initialization…</div>
+        <div id="viewer-embed-slot" class="viewer-root-slot">
+          <div id="viewer-root" class="viewer-root"></div>
+        </div>
       </section>
       <section class="controls-panel">
         <h2>Layers</h2>
         <div id="layer-controls" class="control-grid"></div>
         <h2>Locations</h2>
         <div id="location-list" class="location-list"></div>
-        <h2>Actions</h2>
-        <button id="toggle-interaction" class="action-button">Enable Placement Mode</button>
       </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
