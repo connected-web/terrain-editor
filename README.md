@@ -10,6 +10,7 @@ This terrain editor loads compressedd `.wyn` files which have the following pack
 - `layers/layername.png`: PNG files representing different terrain layers (e.g., heightmap, colormap, normalmap).
 - `thumbnails/thumbnail.png`: (Optional) A thumbnail image representing the terrain.
 - `locations.json` : (Optional) A JSON file containing predefined camera locations and related information for the terrain.
+- `theme.json`: (Optional) A JSON file defining the visual theme for the terrain viewer, including colors and styles for various UI elements.
 
 ## Usage
 

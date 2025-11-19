@@ -97,18 +97,20 @@ const OVERLAY_CSS = `
 }
 `
 
+import { TerrainViewMode } from './viewerHost'
+
 type ViewerOverlayCallbacks = {
   onFileSelected?: (file: File) => void
   onToggleInteraction?: () => void
   onRequestPopout?: () => void
-  onRequestFullscreen?: () => void
+  onRequestClosePopout?: () => void
+  onRequestFullscreenToggle?: () => void
 }
 
 export type ViewerOverlayHandle = {
   setStatus: (message: string) => void
   setInteractionActive: (active: boolean) => void
-  setPopoutEnabled: (enabled: boolean) => void
-  setFullscreenActive: (active: boolean) => void
+  setViewMode: (mode: TerrainViewMode) => void
   destroy: () => void
 }
 
@@ -128,8 +130,7 @@ export function createViewerOverlay(
     return {
       setStatus: () => {},
       setInteractionActive: () => {},
-      setPopoutEnabled: () => {},
-      setFullscreenActive: () => {},
+      setViewMode: () => {},
       destroy: () => {}
     }
   }
@@ -153,19 +154,18 @@ export function createViewerOverlay(
   const loadBtn = doc.createElement('button')
   loadBtn.type = 'button'
   loadBtn.className = 'ctw-chip-button'
-  loadBtn.textContent = 'Load .wyn'
+  loadBtn.textContent = 'Load Map'
 
-  const popoutBtn = doc.createElement('button')
-  popoutBtn.type = 'button'
-  popoutBtn.className = 'ctw-chip-button'
-  popoutBtn.textContent = 'Pop Out'
+  const modeBtn = doc.createElement('button')
+  modeBtn.type = 'button'
+  modeBtn.className = 'ctw-chip-button'
 
   const fullscreenBtn = doc.createElement('button')
   fullscreenBtn.type = 'button'
   fullscreenBtn.className = 'ctw-chip-button'
   fullscreenBtn.textContent = 'Full Screen'
 
-  buttonGroup.append(loadBtn, popoutBtn, fullscreenBtn)
+  buttonGroup.append(loadBtn, modeBtn, fullscreenBtn)
   topRow.append(statusLabel, buttonGroup)
 
   const bottomRow = doc.createElement('div')
@@ -205,12 +205,16 @@ export function createViewerOverlay(
     callbacks.onToggleInteraction?.()
   })
 
-  popoutBtn.addEventListener('click', () => {
-    callbacks.onRequestPopout?.()
+  modeBtn.addEventListener('click', () => {
+    if (currentMode === 'embed') {
+      callbacks.onRequestPopout?.()
+    } else {
+      callbacks.onRequestClosePopout?.()
+    }
   })
 
   fullscreenBtn.addEventListener('click', () => {
-    callbacks.onRequestFullscreen?.()
+    callbacks.onRequestFullscreenToggle?.()
   })
 
   function prevent(event: Event) {
@@ -251,6 +255,27 @@ export function createViewerOverlay(
   target.addEventListener('dragleave', dragLeave)
   target.addEventListener('drop', drop)
 
+  let currentMode: TerrainViewMode = 'embed'
+  function applyMode(mode: TerrainViewMode) {
+    currentMode = mode
+    if (mode === 'embed') {
+      modeBtn.textContent = 'Pop Out'
+      modeBtn.disabled = false
+      fullscreenBtn.hidden = true
+    } else if (mode === 'popout') {
+      modeBtn.textContent = 'Close'
+      modeBtn.disabled = false
+      fullscreenBtn.hidden = false
+      fullscreenBtn.textContent = 'Full Screen'
+    } else {
+      modeBtn.textContent = 'Close'
+      modeBtn.disabled = false
+      fullscreenBtn.hidden = false
+      fullscreenBtn.textContent = 'Exit Full Screen'
+    }
+  }
+  applyMode('embed')
+
   return {
     setStatus(message: string) {
       statusLabel.textContent = message
@@ -258,11 +283,8 @@ export function createViewerOverlay(
     setInteractionActive(active: boolean) {
       interactionBtn.textContent = active ? 'Disable Placement Mode' : 'Enable Placement Mode'
     },
-    setPopoutEnabled(enabled: boolean) {
-      popoutBtn.disabled = !enabled
-    },
-    setFullscreenActive(active: boolean) {
-      fullscreenBtn.textContent = active ? 'Exit Full Screen' : 'Full Screen'
+    setViewMode(mode: TerrainViewMode) {
+      applyMode(mode)
     },
     destroy() {
       target.removeEventListener('dragenter', dragEnter)

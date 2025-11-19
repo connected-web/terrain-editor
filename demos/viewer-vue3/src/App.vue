@@ -213,19 +213,17 @@ onMounted(() => {
     onFileSelected: (file) => loadArchive({ kind: 'file', file }),
     onToggleInteraction: () => toggleInteraction(),
     onRequestPopout: () => hostHandle.value?.openPopout(),
-    onRequestFullscreen: () => hostHandle.value?.toggleFullscreen().catch((err) => console.warn(err))
+    onRequestClosePopout: () => hostHandle.value?.closePopout(),
+    onRequestFullscreenToggle: () => hostHandle.value?.toggleFullscreen().catch((err) => console.warn(err))
   })
   overlayHandle.value?.setInteractionActive(interactive.value)
 
   hostHandle.value = createTerrainViewerHost({
     viewerElement: viewerRef.value,
     embedTarget: viewerSlotRef.value,
-    title: 'Terrain Viewer',
-    subtitle: 'Pop-out mode',
     onModeChange: (mode) => {
       viewMode.value = mode
-      overlayHandle.value?.setPopoutEnabled(mode === 'embed')
-      overlayHandle.value?.setFullscreenActive(mode === 'fullscreen')
+      overlayHandle.value?.setViewMode(mode)
     }
   })
 

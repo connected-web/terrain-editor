@@ -162,20 +162,15 @@ overlayHandle = createViewerOverlay(viewerEl, {
   onFileSelected: (file) => loadArchive({ kind: 'file', file }),
   onToggleInteraction: () => setInteractionState(!interactiveEnabled),
   onRequestPopout: () => hostHandle?.openPopout(),
-  onRequestFullscreen: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+  onRequestClosePopout: () => hostHandle?.closePopout(),
+  onRequestFullscreenToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
 })
 overlayHandle.setInteractionActive(interactiveEnabled)
-overlayHandle.setPopoutEnabled(true)
 
 hostHandle = createTerrainViewerHost({
   viewerElement: viewerEl,
   embedTarget: embedSlot,
-  title: 'Terrain Viewer',
-  subtitle: 'Pop-out mode',
-  onModeChange: (mode) => {
-    overlayHandle?.setPopoutEnabled(mode === 'embed')
-    overlayHandle?.setFullscreenActive(mode === 'fullscreen')
-  }
+  onModeChange: (mode) => overlayHandle?.setViewMode(mode)
 })
 
 loadArchive({ kind: 'default' })

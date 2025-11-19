@@ -127,7 +127,7 @@ function ensureHostStyles(doc: Document) {
 
 export function createTerrainViewerHost(options: TerrainViewerHostOptions): TerrainViewerHostHandle {
   if (typeof window === 'undefined') return noopHandle
-  const { viewerElement, embedTarget, title = 'Terrain Viewer', subtitle = 'Pop-out mode' } = options
+  const { viewerElement, embedTarget } = options
   const doc = options.documentRoot ?? document
   if (!viewerElement || !embedTarget) return noopHandle
 
@@ -143,33 +143,6 @@ export function createTerrainViewerHost(options: TerrainViewerHostOptions): Terr
   const chrome = doc.createElement('div')
   chrome.className = 'viewer-popout__chrome'
   overlay.appendChild(chrome)
-
-  const header = doc.createElement('header')
-  header.className = 'viewer-popout__header'
-  chrome.appendChild(header)
-
-  const headerText = doc.createElement('div')
-  const label = doc.createElement('p')
-  label.className = 'label'
-  label.textContent = title
-  const hint = doc.createElement('p')
-  hint.className = 'hint'
-  hint.textContent = subtitle
-  headerText.append(label, hint)
-  header.appendChild(headerText)
-
-  const actionContainer = doc.createElement('div')
-  actionContainer.className = 'viewer-popout__actions'
-  const fullscreenBtn = doc.createElement('button')
-  fullscreenBtn.className = 'chip-button'
-  fullscreenBtn.type = 'button'
-  fullscreenBtn.textContent = 'Enter Full Screen'
-  const closeBtn = doc.createElement('button')
-  closeBtn.className = 'chip-button'
-  closeBtn.type = 'button'
-  closeBtn.textContent = 'Return to Embed'
-  actionContainer.append(fullscreenBtn, closeBtn)
-  header.appendChild(actionContainer)
 
   const popoutSlot = doc.createElement('div')
   popoutSlot.className = 'viewer-popout__slot'
@@ -223,12 +196,6 @@ export function createTerrainViewerHost(options: TerrainViewerHostOptions): Terr
       await overlay.requestFullscreen()
       setMode('fullscreen')
     }
-    updateFullscreenLabel()
-  }
-
-  function updateFullscreenLabel() {
-    const inFullscreen = doc.fullscreenElement === overlay
-    fullscreenBtn.textContent = inFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'
   }
 
   function handleOverlayClick(event: MouseEvent) {
@@ -247,17 +214,11 @@ export function createTerrainViewerHost(options: TerrainViewerHostOptions): Terr
     } else if (doc.fullscreenElement === overlay) {
       setMode('fullscreen')
     }
-    updateFullscreenLabel()
   }
 
   overlay.addEventListener('click', handleOverlayClick)
-  closeBtn.addEventListener('click', closePopout)
-  fullscreenBtn.addEventListener('click', () => {
-    toggleFullscreen().catch((error) => console.warn('Fullscreen request failed', error))
-  })
   doc.addEventListener('fullscreenchange', handleFullscreenChange)
 
-  updateFullscreenLabel()
   syncOverlayState()
   options.onModeChange?.(mode)
 

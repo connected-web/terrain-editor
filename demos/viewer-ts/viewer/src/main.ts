@@ -155,7 +155,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
   }
 }
 
-const overlay = createViewerOverlay(viewerEl, {
+overlayHandle = createViewerOverlay(viewerEl, {
   onFileSelected: (file) => loadArchive({ kind: 'file', file }),
   onToggleInteraction: () => {
     interactiveEnabled = !interactiveEnabled
@@ -163,20 +163,15 @@ const overlay = createViewerOverlay(viewerEl, {
     overlayHandle?.setInteractionActive(interactiveEnabled)
   },
   onRequestPopout: () => hostHandle?.openPopout(),
-  onRequestFullscreen: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+  onRequestClosePopout: () => hostHandle?.closePopout(),
+  onRequestFullscreenToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
 })
-overlayHandle = overlay
 overlayHandle.setInteractionActive(interactiveEnabled)
 
 hostHandle = createTerrainViewerHost({
   viewerElement: viewerEl,
   embedTarget: embedSlot,
-  title: 'Terrain Viewer',
-  subtitle: 'Pop-out mode',
-  onModeChange: (mode) => {
-    overlayHandle?.setPopoutEnabled(mode === 'embed')
-    overlayHandle?.setFullscreenActive(mode === 'fullscreen')
-  }
+  onModeChange: (mode) => overlayHandle?.setViewMode(mode)
 })
 
 loadArchive({ kind: 'default' })
