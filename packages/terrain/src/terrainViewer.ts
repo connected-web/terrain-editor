@@ -42,6 +42,7 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
 }
 const DEFAULT_STEM_SCALE = 0.01
 const BASE_FILL_COLOR = '#7b5c3a'
+const ICON_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i
 
 export type LayerToggleState = {
   biomes: Record<string, boolean>
@@ -124,6 +125,11 @@ export type TerrainDataset = {
   resolveAssetUrl: (path: string) => Resolvable<string>
   cleanup?: () => void
   theme?: TerrainThemeOverrides
+}
+
+function isAssetIconReference(value?: string | null) {
+  if (!value) return false
+  return value.includes('/') || ICON_ASSET_PATTERN.test(value)
 }
 
 function uvToWorld(
@@ -377,11 +383,27 @@ function resolveSpriteState(
   }
 }
 
+type SpriteVisualOptions = {
+  iconTexture?: THREE.Texture
+}
+
 function createMarkerSpriteResource(
   label: string,
   spriteTheme: MarkerSpriteTheme,
-  style: MarkerSpriteStateStyle
+  style: MarkerSpriteStateStyle,
+  options?: SpriteVisualOptions
 ): MarkerSpriteVisualResource {
+  if (options?.iconTexture) {
+    const texture = options.iconTexture.clone()
+    texture.needsUpdate = true
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      opacity: style.opacity
+    })
+    return { material, texture }
+  }
   const text = (label || '?').trim().slice(0, 14)
   const canvas = document.createElement('canvas')
   canvas.width = 240
@@ -429,20 +451,21 @@ function createMarkerSpriteResource(
 
 function createMarkerSpriteVisuals(
   label: string,
-  spriteTheme: MarkerSpriteTheme
+  spriteTheme: MarkerSpriteTheme,
+  options?: SpriteVisualOptions
 ): MarkerSpriteVisualSet {
   const defaultStyle = resolveSpriteState(spriteTheme, 'default')
   const hoverStyle = resolveSpriteState(spriteTheme, 'hover')
   const focusStyle = resolveSpriteState(spriteTheme, 'focus')
-  const defaultResource = createMarkerSpriteResource(label, spriteTheme, defaultStyle)
+  const defaultResource = createMarkerSpriteResource(label, spriteTheme, defaultStyle, options)
   const hoverResource = markerStateStylesEqual(defaultStyle, hoverStyle)
     ? defaultResource
-    : createMarkerSpriteResource(label, spriteTheme, hoverStyle)
+    : createMarkerSpriteResource(label, spriteTheme, hoverStyle, options)
   const focusResource = markerStateStylesEqual(defaultStyle, focusStyle)
     ? defaultResource
     : markerStateStylesEqual(hoverStyle, focusStyle)
     ? hoverResource
-    : createMarkerSpriteResource(label, spriteTheme, focusStyle)
+    : createMarkerSpriteResource(label, spriteTheme, focusStyle, options)
   return {
     default: defaultResource,
     hover: hoverResource,
@@ -805,6 +828,7 @@ const markerMap = new Map<
     }
   }
   const locationWorldCache = new Map<string, THREE.Vector3>()
+  let markerGeneration = 0
 
   const placementIndicator = new THREE.Mesh(
     new THREE.CylinderGeometry(0.04, 0.01, 0.7, 18),
@@ -821,6 +845,10 @@ const markerMap = new Map<
     ;(placementIndicator.material as THREE.Material).dispose()
   })
 
+  const loader = new THREE.TextureLoader()
+  const iconTextureCache = new Map<string, THREE.Texture>()
+  const iconTexturePromises = new Map<string, Promise<THREE.Texture | null>>()
+
   function clearMarkerResources() {
     markerResources.splice(0).forEach(({ spriteMaterials, spriteTextures, stemMaterial, stemGeometry }) => {
       spriteMaterials.forEach((material) => material.dispose())
@@ -834,8 +862,45 @@ const markerMap = new Map<
     markerInteractiveTargets.length = 0
   }
 
+  function loadIconTexture(iconPath: string): Promise<THREE.Texture | null> {
+    if (iconTextureCache.has(iconPath)) {
+      return Promise.resolve(iconTextureCache.get(iconPath)!)
+    }
+    if (iconTexturePromises.has(iconPath)) {
+      return iconTexturePromises.get(iconPath)!
+    }
+    const pending = Promise.resolve(dataset.resolveAssetUrl(iconPath))
+      .then(
+        (assetUrl) =>
+          new Promise<THREE.Texture | null>((resolve) => {
+            loader.load(
+              assetUrl,
+              (texture) => {
+                texture.colorSpace = THREE.SRGBColorSpace
+                iconTextureCache.set(iconPath, texture)
+                resolve(texture)
+              },
+              undefined,
+              (error) => {
+                console.warn('[TerrainViewer] Failed to load icon asset', iconPath, error)
+                resolve(null)
+              }
+            )
+          })
+      )
+      .finally(() => {
+        iconTexturePromises.delete(iconPath)
+      })
+    iconTexturePromises.set(iconPath, pending)
+    return pending
+  }
+
   function formatMarkerGlyph(location: TerrainLocation) {
-    const raw = (location.icon || location.name || '?').trim()
+    const rawSource =
+      location.icon && !isAssetIconReference(location.icon)
+        ? location.icon
+        : location.name ?? ''
+    const raw = (rawSource || '?').trim()
     if (!raw) return '?'
     const first = raw[0]
     return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
@@ -866,68 +931,82 @@ const markerMap = new Map<
   function setLocationMarkers(locations: TerrainLocation[], focusedId?: string) {
     currentLocations = locations
     currentFocusId = focusedId
+    markerGeneration += 1
+    const runId = markerGeneration
     clearMarkerResources()
-    markerMap.clear()
-    markerInteractiveTargets.length = 0
     if (!heightSampler || !locations.length) return
-    locations.forEach((location, i) => {
-      const id = location.id ?? `${location.name ?? 'loc'}-${i}`
-      location.id = id
-      const { u, v } = pixelToUV(location.pixel)
-      const world = uvToWorld(
-        u,
-        v,
-        heightSampler,
-        currentHeightScale,
-        seaLevel,
-        terrainDimensions
-      )
-      if (!world) return
-      locationWorldCache.set(id, world.clone())
-      const glyph = formatMarkerGlyph(location)
-      const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite)
-      const sprite = new THREE.Sprite(spriteVisuals.default.material)
-      sprite.userData.locationId = location.id
-      sprite.renderOrder = 10
-      const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
-      const stemStates = createMarkerStemVisuals(markerTheme.stem)
-      const stemMaterial = new THREE.MeshStandardMaterial({
-        color: stemStates.default.color,
-        transparent: true,
-        opacity: stemStates.default.opacity,
-        flatShading: markerTheme.stem.shape !== 'cylinder'
-      })
-      const stemGeometry = createStemGeometry(markerTheme.stem.shape, stemRadius, stemHeight)
-      const stem = new THREE.Mesh(stemGeometry, stemMaterial)
-      stem.renderOrder = 9
-      stem.position.y = -(stemHeight / 4)
-      sprite.position.set(0, 0.05 + stemHeight / 4, 0)
-      stem.userData.locationId = location.id
-      const container = new THREE.Group()
-      container.position.copy(world)
-      container.userData.locationId = location.id
-      container.add(stem)
-      container.add(sprite)
-      markersGroup.add(container)
-      markerMap.set(location.id, { container, sprite, stem, spriteVisuals, stemStates })
-      markerInteractiveTargets.push(sprite, stem)
-      const spriteMaterials = new Set<THREE.SpriteMaterial>()
-      const spriteTextures = new Set<THREE.Texture>()
-      Object.values(spriteVisuals).forEach(({ material, texture }) => {
-        spriteMaterials.add(material)
-        spriteTextures.add(texture)
-      })
-      markerResources.push({
-        spriteMaterials,
-        spriteTextures,
-        stemMaterial,
-        stemGeometry: stem.geometry
-      })
+    const iconPromises = locations.map((location) => {
+      const iconPath = isAssetIconReference(location.icon) ? location.icon! : null
+      return iconPath
+        ? loadIconTexture(iconPath)
+        : Promise.resolve<THREE.Texture | null>(null)
     })
-    updateMarkerVisuals()
+    Promise.all(iconPromises)
+      .then((iconTextures) => {
+        if (markerGeneration !== runId) return
+        locations.forEach((location, i) => {
+          const id = location.id ?? `${location.name ?? 'loc'}-${i}`
+          location.id = id
+          const { u, v } = pixelToUV(location.pixel)
+          const world = uvToWorld(
+            u,
+            v,
+            heightSampler,
+            currentHeightScale,
+            seaLevel,
+            terrainDimensions
+          )
+          if (!world) return
+          locationWorldCache.set(id, world.clone())
+          const glyph = formatMarkerGlyph(location)
+          const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
+            iconTexture: iconTextures[i] ?? undefined
+          })
+          const sprite = new THREE.Sprite(spriteVisuals.default.material)
+          sprite.userData.locationId = location.id
+          sprite.renderOrder = 10
+          const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
+          const stemStates = createMarkerStemVisuals(markerTheme.stem)
+          const stemMaterial = new THREE.MeshStandardMaterial({
+            color: stemStates.default.color,
+            transparent: true,
+            opacity: stemStates.default.opacity,
+            flatShading: markerTheme.stem.shape !== 'cylinder'
+          })
+          const stemGeometry = createStemGeometry(markerTheme.stem.shape, stemRadius, stemHeight)
+          const stem = new THREE.Mesh(stemGeometry, stemMaterial)
+          stem.renderOrder = 9
+          stem.position.y = -(stemHeight / 4)
+          sprite.position.set(0, 0.05 + stemHeight / 4, 0)
+          stem.userData.locationId = location.id
+          const container = new THREE.Group()
+          container.position.copy(world)
+          container.userData.locationId = location.id
+          container.add(stem)
+          container.add(sprite)
+          markersGroup.add(container)
+          markerMap.set(location.id, { container, sprite, stem, spriteVisuals, stemStates })
+          markerInteractiveTargets.push(sprite, stem)
+          const spriteMaterials = new Set<THREE.SpriteMaterial>()
+          const spriteTextures = new Set<THREE.Texture>()
+          Object.values(spriteVisuals).forEach(({ material, texture }) => {
+            spriteMaterials.add(material)
+            spriteTextures.add(texture)
+          })
+          markerResources.push({
+            spriteMaterials,
+            spriteTextures,
+            stemMaterial,
+            stemGeometry: stem.geometry
+          })
+        })
+        if (markerGeneration === runId) {
+          updateMarkerVisuals()
+        }
+      })
+      .catch((error) => console.error('[TerrainViewer] Failed to populate location markers', error))
   }
 
-  const loader = new THREE.TextureLoader()
   const [heightMapSource, topoMapSource] = await Promise.all([
     Promise.resolve(dataset.getHeightMapUrl()),
     Promise.resolve(dataset.getTopologyMapUrl())
@@ -1021,6 +1100,12 @@ const markerMap = new Map<
     heightMap.dispose()
     topoTexture.dispose()
     legendTexture?.dispose()
+  })
+
+  disposables.push(() => {
+    iconTextureCache.forEach((texture) => texture.dispose())
+    iconTextureCache.clear()
+    iconTexturePromises.clear()
   })
 
   function applyViewOffset() {
