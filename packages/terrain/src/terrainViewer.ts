@@ -795,7 +795,19 @@ export async function initTerrainViewer(
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.08
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(width, height)
+  const hostStyle = window.getComputedStyle(container)
+  if (hostStyle.position === 'static') {
+    container.style.position = 'relative'
+  }
+  renderer.domElement.style.width = '100%'
+  renderer.domElement.style.height = '100%'
+  renderer.domElement.style.display = 'block'
+  renderer.domElement.style.position = 'absolute'
+  renderer.domElement.style.top = '0'
+  renderer.domElement.style.right = '0'
+  renderer.domElement.style.bottom = '0'
+  renderer.domElement.style.left = '0'
+  renderer.setSize(width, height, false)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   container.appendChild(renderer.domElement)
@@ -1229,7 +1241,7 @@ const markerMap = new Map<
     viewOffsetPixels = shiftTarget
     camera.aspect = clientWidth / clientHeight
     camera.updateProjectionMatrix()
-    renderer.setSize(clientWidth, clientHeight)
+    renderer.setSize(clientWidth, clientHeight, false)
     applyViewOffset()
   })
   resizeObserver.observe(container)
