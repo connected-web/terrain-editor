@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
 async function waitForStatus(page, text) {
-  await expect(page.getByText(text, { exact: false })).toBeVisible({ timeout: 30_000 })
+  const overlayStatus = page.locator('.ctw-viewer-overlay__status')
+  await expect(overlayStatus).toContainText(text, { timeout: 30_000 })
 }
 
 test('vanilla viewer loads sample terrain', async ({ page }, testInfo) => {
