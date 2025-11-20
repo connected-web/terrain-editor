@@ -9,7 +9,15 @@
 - [x] Update TS and Vue demos to the “single container div/ref” contract:
   - [x] Remove bespoke buttons/markup; each demo now provides a container + overlay helper.
   - [x] Verify both demos support URL load, file upload, drag/drop, pop-out, and fullscreen. *Tests:* `npm run build:viewer`, `npm run build:viewer-vue`, `npm run test:smoke`.
-- [ ] Document the new embed API in README/AGENTS so other agents know how to bootstrap the viewer.
+- [x] Document the new embed API in README/AGENTS so other agents know how to bootstrap the viewer.
+
+### Viewer embed contract
+
+1. **Single container div/ref:** render one persistent element (e.g., `viewerRoot`) and keep host markup outside it. The Three.js renderer and overlay expect to own this subtree.
+2. **Overlay helper:** call `createViewerOverlay(viewerRoot, callbacks)` immediately after creating the container. It injects the status pill, load button, pop-out/fullscreen controls, drag/drop target, and hidden file input. Wire the callbacks to your host logic (local `.wyn` loader + host helper).
+3. **Host helper:** call `createTerrainViewerHost({ viewerElement: viewerRoot, embedTarget })` so the helper can move the viewer between the embed slot and the pop-out chrome. Propagate `onModeChange` back to the overlay handle so the buttons update when entering/exiting fullscreen.
+4. **Archive loading:** always load maps via `loadWynArchive` / `loadWynArchiveFromFile`, then pass the resulting dataset into `initTerrainViewer(viewerRoot, dataset, options)`. Use the legend to build your default layer state, and remember to destroy the previous `TerrainHandle` + call `dataset.cleanup()` before loading another archive.
+5. **Host responsibilities:** hosts provide status text (via overlay handle), supply callbacks for file inputs/drag-drop, and expose pop-out/fullscreen UI through the overlay rather than reinventing buttons in the embed slot.
 
 ## Backlog – Editor
 - [ ] Persist active project into local storage for offline editing.
@@ -24,6 +32,20 @@
 - [ ] Provide pop-out dialog + fullscreen controls via host helper (in progress).
 - [ ] Expose configuration hooks for host apps (theme overrides, UI toggles, analytics events).
 - [ ] Expose configuration hooks for host apps (theme overrides, UI toggles, analytics events).
+
+## Next Phase – Editor Support
+
+### Export / Repack Pipeline
+- [ ] Create a shared `buildWynArchive` helper in `packages/terrain` that accepts the live project graph (legend JSON, locations JSON, layer image/map blobs, thumbnails, theme) and returns a `.wyn` Blob backed by JSZip.
+- [ ] Track the decompressed file table in the editor (e.g., `projectStore`) so edits mutate a canonical set of `ArrayBuffer`s instead of re-reading from disk. Keep metadata (source filename, mime type, lastModified) for every entry.
+- [ ] Implement “Save/Export .wyn” in the editor UI that calls the helper, downloads the Blob, and refreshes the persisted project snapshot so reloads stay in sync.
+- [ ] Wire a “Save JSON only” action that emits updated `legend.json`, `locations.json`, and `theme.json` for quick diffs without touching binary layers.
+
+### Layer Tooling Plan
+- [ ] Build a layer browser panel that lists every biome/overlay/heightmap entry with visibility toggles and metadata (dimensions, channel usage, source file).
+- [ ] Add image import + resize utilities (canvas-based) so users can add/replace layers, ensuring exported dimensions always match the legend’s declared size.
+- [ ] Scaffold a brush-based mask editor using an offscreen canvas so we can support paint/erase, opacity, and undo/redo history before hooking into more advanced tools.
+- [ ] Define data contracts for future tools (heightmap sculpting, river polylines) so each tool operates on a shared command history and can be repacked without format drift.
 
 ## Completed / Guardrails
 - Theme system with per-state sprite/stem styling and `.wyn` overrides. **Guardrail:** keep JSON schema backward compatible; tests should cover default + map override merges.

@@ -49,6 +49,57 @@ setup()
   .catch((err) => console.error('Error loading terrain:', err))
 ```
 
+### Embedding the shared viewer UI
+
+The package now ships a self-contained overlay (status text, load button, pop-out/fullscreen controls, drag/drop prompt) and a host helper that moves the `<canvas>` between an embed slot and a modal pop-out. To wire them up:
+
+1. Render a single container element for the viewer and keep it mounted—hosts should not sprinkle bespoke buttons or additional DOM inside it.
+2. Call `createViewerOverlay(container, callbacks)` to inject the chrome and connect overlay callbacks (`onFileSelected`, `onRequestPopout`, `onRequestClosePopout`, `onRequestFullscreenToggle`) to your host logic.
+3. Call `createTerrainViewerHost({ viewerElement, embedTarget })` so the helper can move the renderer between the embed slot and the pop-out shell. Pass `onModeChange` back into the overlay handle so it can toggle button labels.
+4. Load `.wyn` archives through `loadWynArchive` / `loadWynArchiveFromFile` and pass the resulting dataset into `initTerrainViewer`.
+
+```ts
+import {
+  createTerrainViewerHost,
+  createViewerOverlay,
+  initTerrainViewer,
+  loadWynArchive,
+  loadWynArchiveFromFile
+} from '@connected-web/terrain-editor'
+
+const embedSlot = document.getElementById('viewer-embed-slot')
+const viewerRoot = document.getElementById('viewer-root')
+
+const overlayHandle = createViewerOverlay(viewerRoot, {
+  onFileSelected: (file) => loadArchive({ kind: 'file', file }),
+  onRequestPopout: () => hostHandle.openPopout(),
+  onRequestClosePopout: () => hostHandle.closePopout(),
+  onRequestFullscreenToggle: () => hostHandle.toggleFullscreen()
+})
+
+const hostHandle = createTerrainViewerHost({
+  viewerElement: viewerRoot,
+  embedTarget: embedSlot,
+  onModeChange: (mode) => overlayHandle.setViewMode(mode)
+})
+
+async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: File }) {
+  const archive =
+    source.kind === 'default'
+      ? await loadWynArchive('/maps/wynnal-terrain.wyn')
+      : await loadWynArchiveFromFile(source.file)
+  await initTerrainViewer(viewerRoot, archive.dataset, {
+    locations: archive.locations,
+    layers: {
+      biomes: Object.fromEntries(Object.keys(archive.legend.biomes).map((key) => [key, true])),
+      overlays: Object.fromEntries(Object.keys(archive.legend.overlays).map((key) => [key, true]))
+    }
+  })
+}
+```
+
+This mirror the TS + Vue demos, so run `npm run build:viewer` or `npm run build:viewer-vue` if you want a reference implementation.
+
 ## Editor
 
 To make construction of the terrain easier, a Vue 3 based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
