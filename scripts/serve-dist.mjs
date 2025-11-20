@@ -7,6 +7,25 @@ const __filename = fileURLToPath(import.meta.url)
 const repoRoot = path.join(path.dirname(__filename), '..')
 const distDir = path.join(repoRoot, 'dist')
 const port = Number(process.env.PREVIEW_PORT || 4173)
+const cliArgs = process.argv.slice(2)
+
+let host = process.env.PREVIEW_HOST
+for (let i = 0; i < cliArgs.length; i += 1) {
+  const arg = cliArgs[i]
+  if (arg === '--host') {
+    const next = cliArgs[i + 1]
+    host = next && !next.startsWith('-') ? next : '0.0.0.0'
+    break
+  }
+  if (arg.startsWith('--host=')) {
+    const value = arg.slice('--host='.length)
+    host = value || '0.0.0.0'
+    break
+  }
+}
+if (!host) {
+  host = '127.0.0.1'
+}
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -45,8 +64,8 @@ const server = createServer((req, res) => {
   sendFile(filePath, res)
 })
 
-server.listen(port, () => {
-  console.log(`Serving dist/ on http://127.0.0.1:${port}`)
+server.listen(port, host, () => {
+  console.log(`Serving dist/ on http://${host}:${port}`)
 })
 
 process.on('SIGINT', () => {

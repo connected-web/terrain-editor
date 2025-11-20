@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "locations.schema.json",
+  "title": "Locations",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "icon": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "pixel": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "type": "integer"
+          },
+          "y": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "view": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "distance": {
+            "type": "number"
+          },
+          "polar": {
+            "type": "number"
+          },
+          "azimuth": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "distance",
+          "polar",
+          "azimuth"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "icon",
+      "description",
+      "pixel",
+      "view"
+    ]
+  }
+}

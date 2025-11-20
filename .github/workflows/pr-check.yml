@@ -43,9 +43,9 @@ jobs:
 
       - name: Install demos dependencies
         run: |
-          npm --prefix demos/viewer-ts ci
-          npm --prefix demos/viewer-vue3 ci
-          npm --prefix demos/editor-vue3 ci
+          npm --prefix demos/viewer-ts install
+          npm --prefix demos/viewer-vue3 install
+          npm --prefix demos/editor-vue3 install
 
       - name: Determine Playwright version
         id: playwright-version

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap');
+
 * { box-sizing: border-box }
 
 :root {
@@ -11,8 +13,8 @@
   --ring: #f0e6d2;
 
   /* Typography */
-  --font-family-serif: 'Georgia', 'Garamond', 'Times New Roman', serif;
-  --font-family-sans: 'Helvetica Neue', Arial, sans-serif;
+  --font-family-serif: 'Playfair Display', 'DM Serif Display', 'Times New Roman', serif;
+  --font-family-sans: 'Inter', 'Inter var', 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
   --font-size-base: 16px;
   --line-height-base: 1.6;
   --letter-spacing-base: 0.2px;

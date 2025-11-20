@@ -1,3 +1,6 @@
 export * from './geometry'
-export * from './initTerrainViewer'
+export * from './terrainViewer'
 export * from './loadWynArchive'
+export * from './theme'
+export * from './viewerHost'
+export * from './viewerOverlay'
