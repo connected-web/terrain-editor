@@ -7,10 +7,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@connected-web/terrain-editor': path.resolve(
-        __dirname,
-        '../../packages/terrain/src/index.ts'
-      )
+      '@connected-web/terrain-editor': path.resolve(__dirname, '../packages/terrain/src/index.ts')
     }
   },
   build: {

@@ -18,14 +18,14 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 
 - [Viewer demo (TS)](https://connected-web.github.io/terrain-editor/viewer-js/)
 - [Viewer demo (Vue 3)](https://connected-web.github.io/terrain-editor/viewer-vue3/)
-- [Editor demo (Vue 3)](https://connected-web.github.io/terrain-editor/editor-vue3/)
+- [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
 
 ### Demos
 
-- `npm run dev:viewer` / `npm run dev:viewer-vue` / `npm run dev:editor-vue` – Run the TS viewer, Vue viewer, or Vue editor harnesses locally.
-- `npm run build:viewer` / `npm run build:viewer-vue` / `npm run build:editor-vue` – Build demos individually.
+- `npm run dev:viewer` / `npm run dev:viewer-vue` / `npm run dev:editor` – Run the TS viewer, Vue viewer, or Vue editor harnesses locally.
+- `npm run build:viewer` / `npm run build:viewer-vue` / `npm run build:editor` – Build demos individually.
 - `npm run build:lib` – Build the shared `@connected-web/terrain-editor` package via tsup.
-- `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/viewer-vue3`, `/editor-vue3`, and hosted `.wyn` assets for GitHub Pages.
+- `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/viewer-vue3`, `/editor/`, and hosted `.wyn` assets for GitHub Pages.
 
 ### Testing
 
@@ -105,7 +105,7 @@ This mirror the TS + Vue demos, so run `npm run build:viewer` or `npm run build:
 To make construction of the terrain easier, a Vue 3 based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
 
 - [Website](https://connected-web.github.io/terrain-editor/)
-- [Editor demo (Vue 3)](https://connected-web.github.io/terrain-editor/editor-vue3/)
+- [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
 
 ## License
 
@@ -122,7 +122,7 @@ Copyright 2025 Connected Web.
 - `packages/terrain` – source for the `@connected-web/terrain-editor` package (viewer/editor utilities).
 - `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
 - `demos/viewer-vue3` – Vue 3 wrapper harness validating reactive integration before landing in the editor.
-- `demos/editor-vue3` – Early editor playground with metadata + location tooling.
+- `editor` – Early editor workspace with metadata + location tooling.
 - `website` – Vue 3 SPA for marketing pages and the future editor shell.
 - `maps/` – Source assets used to build sample Wyn archives (e.g., `wynnal-terrain.wyn`).
 

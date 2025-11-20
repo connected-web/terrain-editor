@@ -13,7 +13,7 @@
     "prepreview": "npm run prepare:map"
   },
   "dependencies": {
-    "@connected-web/terrain-editor": "file:../../packages/terrain",
+    "@connected-web/terrain-editor": "file:../packages/terrain",
     "jszip": "^3.10.1",
     "three": "^0.181.1",
     "vue": "^3.5.22"

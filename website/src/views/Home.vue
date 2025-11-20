@@ -13,9 +13,8 @@
       <a class="button primary" href="./viewer-vue3/" target="_blank" rel="noreferrer">
         Launch Viewer (Vue)
       </a>
-      <RouterLink class="button secondary" to="/editor">Visit Editor Preview</RouterLink>
-      <a class="button secondary" href="./editor-vue3/" target="_blank" rel="noreferrer">
-        Open Editor Demo
+      <a class="button secondary" href="./editor/" target="_blank" rel="noreferrer">
+        Open Editor
       </a>
       <a
         class="button secondary"
@@ -79,20 +78,9 @@
     </div>
   </section>
 
-  <section class="section-card">
-    <h2>Need the Editor?</h2>
-    <p class="muted">
-      The editor SPA will live at <RouterLink to="/editor">/editor</RouterLink>. Today it’s a stub,
-      but it will grow into a fully featured Wyn authoring experience with metadata editing,
-      location tools, and layer manipulation.
-    </p>
-    <RouterLink class="button primary" to="/editor">Preview the editor route</RouterLink>
-  </section>
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-
 type RoadmapItem = { label: string; done?: boolean }
 type DemoCard = { title: string; description: string; available: boolean; url?: string }
 
@@ -113,7 +101,7 @@ const demos: DemoCard[] = [
     title: 'Editor (Vue 3)',
     description: 'Early editor playground for modifying metadata and locations.',
     available: true,
-    url: './editor-vue3/'
+    url: './editor/'
   }
 ]
 

@@ -61,7 +61,7 @@
 - Always destroy viewer handles (`TerrainHandle.destroy()`) and call `dataset.cleanup()` when tearing down live demos to avoid leaking object URLs.
 - **Script guide (agent-friendly usage):**
   - ✅ `npm run build:lib` – safe; required after editing package source.
-  - ✅ `npm run build:viewer`, `npm run build:viewer-vue`, `npm run build:editor-vue` – deterministic builds for demos; run after UI changes.
+  - ✅ `npm run build:viewer`, `npm run build:viewer-vue`, `npm run build:editor` – deterministic builds for demos; run after UI changes.
   - ✅ `npm run packmap` – regenerates the sample `.wyn`; harmless but only needed when changing map assets.
   - ✅ `npm run build` – bundles the entire monorepo; slower but acceptable before releases.
   - ⚠️ `npm run dev:*` – starts Vite dev servers; avoid unless interactive debugging is explicitly requested.

@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
-test('editor demo loads and imports sample archive', async ({ page }, testInfo) => {
-  await page.goto('/editor-vue3/')
+test('editor loads and imports sample archive', async ({ page }, testInfo) => {
+  await page.goto('/editor/')
   await expect(
     page.getByRole('heading', {
       name: 'Inspect and tweak Wyn archives in a browser-first workflow.'
@@ -23,5 +23,5 @@ test('editor demo loads and imports sample archive', async ({ page }, testInfo) 
       }
     }, { timeout: 15_000 })
     .toBe('layers/heightmap.png')
-  await captureScreenshot(page, testInfo, 'editor-demo')
+  await captureScreenshot(page, testInfo, 'editor')
 })

@@ -6,11 +6,11 @@
   "main": "index.js",
   "scripts": {
     "build": "node ./scripts/build-dist.mjs",
-    "build:editor-vue": "npm --prefix demos/editor-vue3 run build",
+    "build:editor": "npm --prefix editor run build",
     "build:lib": "npm --prefix packages/terrain run build",
     "build:viewer": "npm --prefix demos/viewer-ts run build",
     "build:viewer-vue": "npm --prefix demos/viewer-vue3 run build",
-    "dev:editor-vue": "npm --prefix demos/editor-vue3 run dev -- --host",
+    "dev:editor": "npm --prefix editor run dev -- --host",
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
     "dev:viewer-vue": "npm --prefix demos/viewer-vue3 run dev -- --host",
     "dev:website": "npm --prefix website run dev",
@@ -31,6 +31,7 @@
   "workspaces": [
     "packages/*",
     "demos/*",
+    "editor",
     "website"
   ],
   "bugs": {
