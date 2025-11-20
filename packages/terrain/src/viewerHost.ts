@@ -64,7 +64,7 @@ const HOST_CSS = `
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
   color: #f6e7c3;
 }
 

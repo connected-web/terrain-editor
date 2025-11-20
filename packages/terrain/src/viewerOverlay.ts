@@ -13,7 +13,7 @@ const OVERLAY_CSS = `
   justify-content: space-between;
   padding: 0.75rem;
   pointer-events: none;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
   color: #f6e7c3;
   z-index: 10;
 }

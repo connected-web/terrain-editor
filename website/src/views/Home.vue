@@ -121,7 +121,7 @@ const viewerRoadmap: RoadmapItem[] = [
   { label: 'Shared Three.js renderer', done: true },
   { label: 'Vanilla TS demo & loader', done: true },
   { label: 'Vue 3 wrapper demo', done: true },
-  { label: 'Location & layer UX polish' }
+  { label: 'Location & layer UX polish', done: true }
 ]
 
 const editorRoadmap: RoadmapItem[] = [
