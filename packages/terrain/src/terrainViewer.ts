@@ -29,7 +29,7 @@ const BASE_THICKNESS = 0.65
 
 const SEA_LEVEL_DEFAULT = 0.28
 const FLOOR_Y = -BASE_THICKNESS - 0.22
-const HEIGHT_SCALE_DEFAULT = 0.45
+const HEIGHT_SCALE_DEFAULT = 0.30
 const WATER_PERCENT_DEFAULT = 65
 const WATER_MIN = -0.08
 const WATER_MAX = 0.14
@@ -42,6 +42,9 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
 }
 const DEFAULT_STEM_SCALE = 0.01
 const BASE_FILL_COLOR = '#7b5c3a'
+const SPRITE_CANVAS_WIDTH = 240
+const SPRITE_CANVAS_HEIGHT = 160
+const ICON_CANVAS_MARGIN = 18
 const ICON_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i
 
 export type LayerToggleState = {
@@ -387,6 +390,54 @@ type SpriteVisualOptions = {
   iconTexture?: THREE.Texture
 }
 
+function createIconSpriteTexture(iconTexture: THREE.Texture) {
+  const source = iconTexture.image as
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | ImageBitmap
+    | undefined
+    | null
+  if (!source) {
+    const fallback = iconTexture.clone()
+    fallback.needsUpdate = true
+    return fallback
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = SPRITE_CANVAS_WIDTH
+  canvas.height = SPRITE_CANVAS_HEIGHT
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    const fallback = iconTexture.clone()
+    fallback.needsUpdate = true
+    return fallback
+  }
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  const imageLike = source as any
+  const rawWidth =
+    imageLike?.naturalWidth ??
+    imageLike?.width ??
+    SPRITE_CANVAS_WIDTH
+  const rawHeight =
+    imageLike?.naturalHeight ??
+    imageLike?.height ??
+    SPRITE_CANVAS_HEIGHT
+  const aspect = rawWidth > 0 && rawHeight > 0 ? rawWidth / rawHeight : 1
+  const maxWidth = canvas.width - ICON_CANVAS_MARGIN * 2
+  const maxHeight = canvas.height - ICON_CANVAS_MARGIN * 2
+  let drawWidth = maxWidth
+  let drawHeight = drawWidth / aspect
+  if (drawHeight > maxHeight) {
+    drawHeight = maxHeight
+    drawWidth = drawHeight * aspect
+  }
+  const offsetX = (canvas.width - drawWidth) / 2
+  const offsetY = (canvas.height - drawHeight) / 2
+  ctx.drawImage(source, offsetX, offsetY, drawWidth, drawHeight)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 function createMarkerSpriteResource(
   label: string,
   spriteTheme: MarkerSpriteTheme,
@@ -394,7 +445,7 @@ function createMarkerSpriteResource(
   options?: SpriteVisualOptions
 ): MarkerSpriteVisualResource {
   if (options?.iconTexture) {
-    const texture = options.iconTexture.clone()
+    const texture = createIconSpriteTexture(options.iconTexture)
     texture.needsUpdate = true
     const material = new THREE.SpriteMaterial({
       map: texture,
@@ -406,8 +457,8 @@ function createMarkerSpriteResource(
   }
   const text = (label || '?').trim().slice(0, 14)
   const canvas = document.createElement('canvas')
-  canvas.width = 240
-  canvas.height = 160
+  canvas.width = SPRITE_CANVAS_WIDTH
+  canvas.height = SPRITE_CANVAS_HEIGHT
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -715,7 +766,14 @@ export async function initTerrainViewer(
     0,
     100
   )
-  const waterHeight = THREE.MathUtils.mapLinear(waterPercent, 0, 100, WATER_MIN, WATER_MAX)
+  const waterPercentNormalized = waterPercent / 100
+  const waterHeight = THREE.MathUtils.mapLinear(
+    waterPercentNormalized,
+    0,
+    1,
+    WATER_MIN * heightScale,
+    WATER_MAX * heightScale
+  )
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(43, width / height, 0.1, 100)
