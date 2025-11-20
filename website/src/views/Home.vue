@@ -37,7 +37,7 @@
           <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
         </div>
         <h3>{{ demo.title }}</h3>
-        <p class="muted">{{ demo.description }}</p>
+        <p class="muted spacer">{{ demo.description }}</p>
         <a
           v-if="demo.url"
           class="button secondary"
