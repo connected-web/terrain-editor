@@ -15,7 +15,6 @@ const distDir = join(repoRoot, 'dist')
 
 const demos = [
   { dir: 'demos/viewer-ts', target: 'viewer-js' },
-  { dir: 'demos/viewer-vue3', target: 'viewer-vue3' },
   { dir: 'editor', target: 'editor' }
 ]
 

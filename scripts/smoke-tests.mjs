@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const repoRoot = path.join(path.dirname(__filename), '..')
 const distDir = path.join(repoRoot, 'dist')
 const serverPort = 0 // let OS pick available port
-const endpoints = ['/', '/viewer-js/', '/viewer-vue3/', '/editor/', '/maps/wynnal-terrain.wyn']
+const endpoints = ['/', '/viewer-js/', '/editor/', '/maps/wynnal-terrain.wyn']
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -74,7 +74,6 @@ function runCommand(command, args) {
 const CONTENT_CHECKS = new Map([
   ['/', '<title>Terrain Editor - Connected Web</title>'],
   ['/viewer-js/', 'Terrain Viewer Demo'],
-  ['/viewer-vue3/', 'Terrain Viewer Demo (Vue 3)'],
   ['/editor/', 'Editor Demo (Vue 3)'],
   ['/maps/wynnal-terrain.wyn', 'PK']
 ])

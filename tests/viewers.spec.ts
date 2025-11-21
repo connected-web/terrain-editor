@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, Page } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
-async function waitForStatus(page, text) {
+async function waitForStatus(page: Page, text: string | RegExp | readonly (string | RegExp)[]) {
   const overlayStatus = page.locator('.ctw-viewer-overlay__status')
   await expect(overlayStatus).toContainText(text, { timeout: 30_000 })
 }
@@ -11,11 +11,4 @@ test('vanilla viewer loads sample terrain', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Terrain Viewer Demo' })).toBeVisible()
   await waitForStatus(page, 'Terrain loaded')
   await captureScreenshot(page, testInfo, 'viewer-ts')
-})
-
-test('vue viewer loads sample terrain', async ({ page }, testInfo) => {
-  await page.goto('/viewer-vue3/')
-  await expect(page.getByText('Terrain Viewer Demo (Vue 3)')).toBeVisible()
-  await waitForStatus(page, 'Terrain loaded')
-  await captureScreenshot(page, testInfo, 'viewer-vue')
 })

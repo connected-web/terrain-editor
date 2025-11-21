@@ -59,8 +59,9 @@ async function sendFile(filePath, res) {
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
-  const requestedPath = decodeURIComponent(url.pathname)
-  const filePath = path.join(distDir, requestedPath)
+  const requestedPath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+  const targetPath = requestedPath || 'index.html'
+  const filePath = path.join(distDir, targetPath)
   sendFile(filePath, res)
 })
 

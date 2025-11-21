@@ -41,10 +41,9 @@ jobs:
       - name: Install website dependencies
         run: npm --prefix website ci
 
-      - name: Install demos + editor dependencies
+      - name: Install viewer + editor dependencies
         run: |
           npm --prefix demos/viewer-ts install
-          npm --prefix demos/viewer-vue3 install
           npm --prefix editor install
 
       - name: Determine Playwright version

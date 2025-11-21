@@ -6,9 +6,9 @@
   - [x] Inject overlay DOM (status text, load button, pop-out/full-screen, drag/drop prompt) when the viewer mounts. *Files:* `packages/terrain/src/viewerOverlay.ts`, `terrainViewer.ts`.
   - [x] Inject the required stylesheet into the document head to keep demos minimal.
   - [x] Wire overlay controls to host helper + local `.wyn` loader so hosts only pass callbacks. *Ensure `loadWynArchive` utilities remain the single entry point.*
-- [x] Update TS and Vue demos to the “single container div/ref” contract:
+- [x] Update the viewer demo to the “single container div/ref” contract:
   - [x] Remove bespoke buttons/markup; each demo now provides a container + overlay helper.
-  - [x] Verify both demos support URL load, file upload, drag/drop, pop-out, and fullscreen. *Tests:* `npm run build:viewer`, `npm run build:viewer-vue`, `npm run test:smoke`.
+  - [x] Verify the demo supports URL load, file upload, drag/drop, pop-out, and fullscreen. *Tests:* `npm run build:viewer`, `npm run test:smoke`.
 - [x] Document the new embed API in README/AGENTS so other agents know how to bootstrap the viewer.
 
 ### Viewer embed contract
@@ -55,15 +55,15 @@
 
 ## How to Work on This Repo
 - `npm run build:lib` – builds the package (must pass before publishing or consuming from demos).
-- `npm run build:viewer`, `npm run build:viewer-vue` – smoke-test TS and Vue harnesses.
+- `npm run build:viewer` – smoke-test the TS harness.
 - `.wyn` archives live under `maps/`; use `npm run packmap` to regenerate after edits.
 - Preferred branch: `fix/marker-sizes-by-setting-location-ids` (current working branch). Keep changes scoped; avoid rewriting unrelated files.
 - Always destroy viewer handles (`TerrainHandle.destroy()`) and call `dataset.cleanup()` when tearing down live demos to avoid leaking object URLs.
-- **Dev ports & proxies:** viewer (TS) runs on `http://localhost:4173/viewer-js/`, viewer (Vue) on `http://localhost:4174/viewer-vue3/`, editor on `http://localhost:4175/editor/`, and the website on `http://localhost:4176/`. Vite proxies `/viewer-js`, `/viewer-vue3`, and `/editor` so links still work in dev—run whichever combo of servers you need simultaneously.
+- **Dev ports:** viewer runs on `http://localhost:4173/viewer-js/`, editor on `http://localhost:4175/editor/`, and the website on `http://localhost:4176/`. Use `npm run dev:all` to keep them in sync; CTA buttons link directly to the running ports during development.
 - **Script guide (agent-friendly usage):**
   - ✅ `npm run build:lib` – safe; required after editing package source.
-  - ✅ `npm run build:viewer`, `npm run build:viewer-vue`, `npm run build:editor` – deterministic builds for demos; run after UI changes.
-  - ✅ `npm run dev:all` – boots every Vite dev server (viewer TS/Vue, editor, website) on fixed ports with shared proxies; CTRL+C tears them all down.
+  - ✅ `npm run build:viewer`, `npm run build:editor` – deterministic builds for demos; run after UI changes.
+  - ✅ `npm run dev:all` – boots the viewer, editor, and website dev servers on fixed ports; CTRL+C tears them all down.
   - ✅ `npm run packmap` – regenerates the sample `.wyn`; harmless but only needed when changing map assets.
   - ✅ `npm run build` – bundles the entire monorepo; slower but acceptable before releases.
   - ⚠️ `npm run dev:*` – starts Vite dev servers; avoid unless interactive debugging is explicitly requested.

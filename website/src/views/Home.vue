@@ -89,8 +89,9 @@ type DemoCard = { title: string; description: string; available: boolean; url?: 
 const devUrls =
   typeof window !== 'undefined' && import.meta.env.DEV
     ? (() => {
+        const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
         const protocol = window.location.protocol || 'http:'
-        const hostname = window.location.hostname || 'localhost'
+        const hostname = isLoopback ? window.location.hostname : 'localhost'
         const base = (port: number, path: string) => `${protocol}//${hostname}:${port}${path}`
         return {
           viewerTs: base(4173, '/viewer-js/'),

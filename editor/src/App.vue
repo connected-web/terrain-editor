@@ -1,11 +1,10 @@
 <template>
   <div class="editor-demo">
     <header class="hero">
-      <p class="muted">Editor Demo (Vue 3)</p>
-      <h1>Inspect and tweak Wyn archives in a browser-first workflow.</h1>
+      <h1 class="muted">Terrain Editor</h1>
       <p class="muted">
         Load a Wyn file from disk or use the sample map, preview it inside the Three.js viewer, and
-        experiment with updating metadata or locations before exporting JSON back out.
+        then go ahead with updating metadata or locations before exporting JSON back out.
       </p>
       <div class="cta-row">
         <input ref="fileInput" type="file" accept=".wyn" @change="onFileSelected" />

@@ -3,11 +3,7 @@ import { captureScreenshot } from './utils'
 
 test('editor loads and imports sample archive', async ({ page }, testInfo) => {
   await page.goto('/editor/')
-  await expect(
-    page.getByRole('heading', {
-      name: 'Inspect and tweak Wyn archives in a browser-first workflow.'
-    })
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Terrain Editor' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Load sample archive' }).click()
   await expect(page.getByText('sample archive loaded.', { exact: true })).toBeVisible({

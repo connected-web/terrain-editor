@@ -16,30 +16,26 @@ This terrain editor loads compressedd `.wyn` files which have the following pack
 
 The viewer component creates a 3D scene which can load and unpack Wyn files into browser memory. This provides a navigable interface for exploring terrain data.
 
-- [Viewer demo (TS)](https://connected-web.github.io/terrain-editor/viewer-js/)
-- [Viewer demo (Vue 3)](https://connected-web.github.io/terrain-editor/viewer-vue3/)
+- [Viewer demo](https://connected-web.github.io/terrain-editor/viewer-js/)
 - [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
 
 ### Demos
 
-- `npm run dev:viewer` / `npm run dev:viewer-vue` / `npm run dev:editor` – Run the TS viewer, Vue viewer, or Vue editor harnesses locally.
-- `npm run dev:all` – Launch viewer TS, viewer Vue, editor, and website dev servers together. CTRL+C stops everything cleanly and clears stale processes.
-- `npm run build:viewer` / `npm run build:viewer-vue` / `npm run build:editor` – Build demos individually.
+- `npm run dev:viewer` / `npm run dev:editor` – Run the TS viewer or Vue editor harness locally.
+- `npm run dev:all` – Launch viewer, editor, and website dev servers together. CTRL+C stops everything cleanly and clears stale processes.
+- `npm run build:viewer` / `npm run build:editor` – Build demos individually.
 - `npm run build:lib` – Build the shared `@connected-web/terrain-editor` package via tsup.
-- `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/viewer-vue3`, `/editor/`, and hosted `.wyn` assets for GitHub Pages.
+- `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/editor/`, and hosted `.wyn` assets for GitHub Pages.
 
 During development each harness uses a fixed Vite port so the cross-links keep working:
 
-- Viewer (TS) → `http://localhost:4173/viewer-js/`
-- Viewer (Vue) → `http://localhost:4174/viewer-vue3/`
+- Viewer → `http://localhost:4173/viewer-js/`
 - Editor → `http://localhost:4175/editor/`
 - Website → `http://localhost:4176/`
 
-Those dev servers proxy `/viewer-js`, `/viewer-vue3`, and `/editor` to one another—just keep the targets running when you want to hop between apps without changing URLs.
+The website CTA buttons link directly to those ports during development so you always land on the correct running server.
 
-`npm run dev:all` starts all four servers together and tears them down cleanly when you hit CTRL+C, so you don’t have to manage PIDs by hand.
-
-When `npm run dev:website` is running the CTA buttons use those absolute ports (e.g. clicking “Open Editor” jumps to `http://127.0.0.1:4175/editor/`), so you always land on the correct dev server instead of a proxied copy.
+`npm run dev:all` starts all dev servers together and tears them down cleanly when you hit CTRL+C, so you don’t have to manage PIDs by hand.
 
 ### Testing
 
@@ -112,7 +108,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 }
 ```
 
-This mirror the TS + Vue demos, so run `npm run build:viewer` or `npm run build:viewer-vue` if you want a reference implementation.
+This mirrors the TS viewer demo, so run `npm run build:viewer` if you want a reference implementation.
 
 ## Editor
 
@@ -135,7 +131,6 @@ Copyright 2025 Connected Web.
 
 - `packages/terrain` – source for the `@connected-web/terrain-editor` package (viewer/editor utilities).
 - `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
-- `demos/viewer-vue3` – Vue 3 wrapper harness validating reactive integration before landing in the editor.
 - `editor` – Early editor workspace with metadata + location tooling.
 - `website` – Vue 3 SPA for marketing pages and the future editor shell.
 - `maps/` – Source assets used to build sample Wyn archives (e.g., `wynnal-terrain.wyn`).
@@ -149,7 +144,6 @@ Copyright 2025 Connected Web.
 
 - ✅ Create shared three.js logic for viewing maps
 - ✅ Create example viewer application (pure Vanilla TS)
-- ✅ Create example viewer application (Vue 3 + TS)
 - ✅ Create example `.wyn` file using local assets
 - ✅ Implement loading and unpacking of `.wyn` files
 

@@ -11,7 +11,6 @@ const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const services = [
   { name: 'viewer (TS)', script: ['run', 'dev:viewer'] },
-  { name: 'viewer (Vue)', script: ['run', 'dev:viewer-vue'] },
   { name: 'editor', script: ['run', 'dev:editor'] },
   { name: 'website', script: ['run', 'dev:website'] }
 ]
