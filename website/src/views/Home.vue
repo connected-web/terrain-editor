@@ -24,13 +24,10 @@
   </section>
 
   <section class="section-card" id="demos">
-    <h2>Demos & Test Harnesses</h2>
-    <p class="muted">Each demo validates reusable packages in different environments.</p>
+    <h2>Interactive Demos</h2>
+    <p class="muted">The following demos showcase the terrain viewer package for its intended use cases.</p>
     <div class="card-grid">
       <article v-for="demo in demos" :key="demo.title" class="info-card">
-        <div class="status-pill" :class="demo.available ? 'done' : 'todo'">
-          <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
-        </div>
         <h3>{{ demo.title }}</h3>
         <p class="muted spacer">{{ demo.description }}</p>
         <a
@@ -42,6 +39,9 @@
         >
           Open Demo
         </a>
+        <div class="status-pill" :class="demo.available ? 'done' : 'todo'">
+          <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
+        </div>
       </article>
     </div>
   </section>
@@ -94,46 +94,38 @@ const devUrls =
         const base = (port: number, path: string) => `${protocol}//${hostname}:${port}${path}`
         return {
           viewerTs: base(4173, '/viewer-js/'),
-          viewerVue: base(4174, '/viewer-vue3/'),
           editor: base(4175, '/editor/')
         }
       })()
     : null
 
 const viewerTsUrl = devUrls?.viewerTs ?? './viewer-js/'
-const viewerVueUrl = devUrls?.viewerVue ?? './viewer-vue3/'
 const editorUrl = devUrls?.editor ?? './editor/'
 
 const demos: DemoCard[] = [
   {
-    title: 'Viewer (Vanilla TS)',
-    description: 'SSG-hosted harness that loads Wyn archives asynchronously with JSZip.',
+    title: 'Terrain Viewer',
+    description: 'Browser based harness that loads Wyn archives asynchronously and decodes with JSZip.',
     available: true,
     url: viewerTsUrl
   },
   {
-    title: 'Viewer (Vue 3)',
-    description: 'Vue 3 wrapper that binds viewer events to reactive UI controls.',
-    available: true,
-    url: viewerVueUrl
-  },
-  {
-    title: 'Editor (Vue 3)',
-    description: 'Early editor playground for modifying metadata and locations.',
+    title: 'Terrain Editor',
+    description: 'Full terrain editor for creating and modifying metadata and locations in existing Wyn archives.',
     available: true,
     url: editorUrl
   }
 ]
 
 const viewerRoadmap: RoadmapItem[] = [
-  { label: 'Shared Three.js renderer', done: true },
-  { label: 'Vanilla TS demo & loader', done: true },
-  { label: 'Vue 3 wrapper demo', done: true },
-  { label: 'Location & layer UX polish', done: true }
+  { label: 'Self-contained Three.js renderer', done: true },
+  { label: 'TS based viewer and .wyn loader', done: true },
+  { label: 'Popout and full screen modes', done: true },
+  { label: 'Location and layer UX polish', done: true }
 ]
 
 const editorRoadmap: RoadmapItem[] = [
-  { label: 'Editor SPA skeleton', done: true },
+  { label: 'Editor skeleton with basic viewer', done: true },
   { label: 'Wyn import/export pipeline', done: false },
   { label: 'Layer + mask editing tools', done: false },
   { label: 'Height + location workflows', done: false }
