@@ -23,9 +23,23 @@ The viewer component creates a 3D scene which can load and unpack Wyn files into
 ### Demos
 
 - `npm run dev:viewer` / `npm run dev:viewer-vue` / `npm run dev:editor` – Run the TS viewer, Vue viewer, or Vue editor harnesses locally.
+- `npm run dev:all` – Launch viewer TS, viewer Vue, editor, and website dev servers together. CTRL+C stops everything cleanly and clears stale processes.
 - `npm run build:viewer` / `npm run build:viewer-vue` / `npm run build:editor` – Build demos individually.
 - `npm run build:lib` – Build the shared `@connected-web/terrain-editor` package via tsup.
 - `npm run build` – Produce a combined `dist/` folder with the website root plus `/viewer-js`, `/viewer-vue3`, `/editor/`, and hosted `.wyn` assets for GitHub Pages.
+
+During development each harness uses a fixed Vite port so the cross-links keep working:
+
+- Viewer (TS) → `http://localhost:4173/viewer-js/`
+- Viewer (Vue) → `http://localhost:4174/viewer-vue3/`
+- Editor → `http://localhost:4175/editor/`
+- Website → `http://localhost:4176/`
+
+Those dev servers proxy `/viewer-js`, `/viewer-vue3`, and `/editor` to one another—just keep the targets running when you want to hop between apps without changing URLs.
+
+`npm run dev:all` starts all four servers together and tears them down cleanly when you hit CTRL+C, so you don’t have to manage PIDs by hand.
+
+When `npm run dev:website` is running the CTA buttons use those absolute ports (e.g. clicking “Open Editor” jumps to `http://127.0.0.1:4175/editor/`), so you always land on the correct dev server instead of a proxied copy.
 
 ### Testing
 

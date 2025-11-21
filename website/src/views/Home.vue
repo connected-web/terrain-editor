@@ -7,13 +7,13 @@
       metadata, and validating Wyn archive workflows.
     </p>
     <div class="cta-row">
-      <a class="button primary" href="./viewer-js/" target="_blank" rel="noreferrer">
+      <a class="button primary" :href="viewerTsUrl" target="_blank" rel="noreferrer">
         Launch Viewer (TS)
       </a>
-      <a class="button primary" href="./viewer-vue3/" target="_blank" rel="noreferrer">
+      <a class="button primary" :href="viewerVueUrl" target="_blank" rel="noreferrer">
         Launch Viewer (Vue)
       </a>
-      <a class="button secondary" href="./editor/" target="_blank" rel="noreferrer">
+      <a class="button secondary" :href="editorUrl" target="_blank" rel="noreferrer">
         Open Editor
       </a>
       <a
@@ -84,24 +84,42 @@
 type RoadmapItem = { label: string; done?: boolean }
 type DemoCard = { title: string; description: string; available: boolean; url?: string }
 
+const devUrls =
+  typeof window !== 'undefined' && import.meta.env.DEV
+    ? (() => {
+        const protocol = window.location.protocol || 'http:'
+        const hostname = window.location.hostname || 'localhost'
+        const base = (port: number, path: string) => `${protocol}//${hostname}:${port}${path}`
+        return {
+          viewerTs: base(4173, '/viewer-js/'),
+          viewerVue: base(4174, '/viewer-vue3/'),
+          editor: base(4175, '/editor/')
+        }
+      })()
+    : null
+
+const viewerTsUrl = devUrls?.viewerTs ?? './viewer-js/'
+const viewerVueUrl = devUrls?.viewerVue ?? './viewer-vue3/'
+const editorUrl = devUrls?.editor ?? './editor/'
+
 const demos: DemoCard[] = [
   {
     title: 'Viewer (Vanilla TS)',
     description: 'SSG-hosted harness that loads Wyn archives asynchronously with JSZip.',
     available: true,
-    url: './viewer-js/'
+    url: viewerTsUrl
   },
   {
     title: 'Viewer (Vue 3)',
     description: 'Vue 3 wrapper that binds viewer events to reactive UI controls.',
     available: true,
-    url: './viewer-vue3/'
+    url: viewerVueUrl
   },
   {
     title: 'Editor (Vue 3)',
     description: 'Early editor playground for modifying metadata and locations.',
     available: true,
-    url: './editor/'
+    url: editorUrl
   }
 ]
 

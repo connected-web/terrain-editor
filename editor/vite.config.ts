@@ -10,6 +10,10 @@ export default defineConfig({
       '@connected-web/terrain-editor': path.resolve(__dirname, '../packages/terrain/src/index.ts')
     }
   },
+  server: {
+    port: 4175,
+    strictPort: true
+  },
   build: {
     chunkSizeWarningLimit: 2048
   }

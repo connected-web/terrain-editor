@@ -14,6 +14,7 @@
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
     "dev:viewer-vue": "npm --prefix demos/viewer-vue3 run dev -- --host",
     "dev:website": "npm --prefix website run dev",
+    "dev:all": "node ./scripts/dev-all.mjs",
     "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json theme.json",
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke && npm run test:e2e",

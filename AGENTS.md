@@ -59,9 +59,11 @@
 - `.wyn` archives live under `maps/`; use `npm run packmap` to regenerate after edits.
 - Preferred branch: `fix/marker-sizes-by-setting-location-ids` (current working branch). Keep changes scoped; avoid rewriting unrelated files.
 - Always destroy viewer handles (`TerrainHandle.destroy()`) and call `dataset.cleanup()` when tearing down live demos to avoid leaking object URLs.
+- **Dev ports & proxies:** viewer (TS) runs on `http://localhost:4173/viewer-js/`, viewer (Vue) on `http://localhost:4174/viewer-vue3/`, editor on `http://localhost:4175/editor/`, and the website on `http://localhost:4176/`. Vite proxies `/viewer-js`, `/viewer-vue3`, and `/editor` so links still work in dev—run whichever combo of servers you need simultaneously.
 - **Script guide (agent-friendly usage):**
   - ✅ `npm run build:lib` – safe; required after editing package source.
   - ✅ `npm run build:viewer`, `npm run build:viewer-vue`, `npm run build:editor` – deterministic builds for demos; run after UI changes.
+  - ✅ `npm run dev:all` – boots every Vite dev server (viewer TS/Vue, editor, website) on fixed ports with shared proxies; CTRL+C tears them all down.
   - ✅ `npm run packmap` – regenerates the sample `.wyn`; harmless but only needed when changing map assets.
   - ✅ `npm run build` – bundles the entire monorepo; slower but acceptable before releases.
   - ⚠️ `npm run dev:*` – starts Vite dev servers; avoid unless interactive debugging is explicitly requested.
