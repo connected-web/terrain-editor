@@ -1,20 +1,16 @@
 <template>
   <section class="hero">
-    <p class="muted">Connected Web experiments</p>
+    <p class="muted">Connected Web Experiments</p>
     <h1>Build, edit, and explore Wyn terrain files directly in the browser.</h1>
     <p class="muted">
-      A suite of Three.js powered tools and demos for inspecting rich terrain datasets, editing
-      metadata, and validating Wyn archive workflows.
+      A collection of Three.js powered tools for building and navigating layered map topologies; sharable as <code>.wyn</code> archives.
     </p>
     <div class="cta-row">
       <a class="button primary" :href="viewerTsUrl" target="_blank" rel="noreferrer">
-        Launch Viewer (TS)
+        Launch Viewer
       </a>
-      <a class="button primary" :href="viewerVueUrl" target="_blank" rel="noreferrer">
-        Launch Viewer (Vue)
-      </a>
-      <a class="button secondary" :href="editorUrl" target="_blank" rel="noreferrer">
-        Open Editor
+      <a class="button primary" :href="editorUrl" target="_blank" rel="noreferrer">
+        Launch Editor
       </a>
       <a
         class="button secondary"
@@ -51,7 +47,10 @@
   </section>
 
   <section class="section-card" id="roadmap">
-    <h2>Roadmap Snapshot</h2>
+    <h2 class="row">
+      <label class="spacer">Roadmap</label>
+      <code>Nov 2025</code>
+    </h2>
     <div class="card-grid">
       <article class="info-card">
         <h3>Viewer</h3>
@@ -76,6 +75,9 @@
         </ul>
       </article>
     </div>
+    <p class="muted spacer">
+      See activity on the <a href="https://github.com/connected-web/terrain-editor" target="_blank" rel="noreferrer">GitHub project page</a> for the latest updates and upcoming features.
+    </p>
   </section>
 
 </template>
