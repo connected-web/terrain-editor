@@ -105,13 +105,35 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
   activeArchive?.dataset.cleanup?.()
   terrainHandle = null
 
-  setStatus(source.kind === 'default' ? 'Downloading wynnal-terrain.wyn…' : `Loading ${source.file.name}…`)
+  const loadingLabel = source.kind === 'default' ? 'Downloading wynnal-terrain.wyn…' : `Loading ${source.file.name}…`
+  setStatus(loadingLabel)
+  overlayHandle?.setLoadingProgress({
+    label: loadingLabel,
+    loadedBytes: 0,
+    totalBytes: source.kind === 'file' ? source.file.size : undefined
+  })
 
   try {
     const archive =
       source.kind === 'default'
-        ? await loadWynArchive(resolveArchivePath())
-        : await loadWynArchiveFromFile(source.file)
+        ? await loadWynArchive(resolveArchivePath(), {
+            onProgress: (event) => {
+              overlayHandle?.setLoadingProgress({
+                label: loadingLabel,
+                loadedBytes: event.loadedBytes,
+                totalBytes: event.totalBytes
+              })
+            }
+          })
+        : await loadWynArchiveFromFile(source.file, {
+            onProgress: (event) => {
+              overlayHandle?.setLoadingProgress({
+                label: loadingLabel,
+                loadedBytes: event.loadedBytes,
+                totalBytes: event.totalBytes ?? source.file.size
+              })
+            }
+          })
     activeArchive = archive
     const { legend, locations } = archive
     layerState = createDefaultLayerState(legend)
@@ -152,6 +174,8 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
   } catch (error) {
     console.error(error)
     setStatus('Failed to load terrain archive.')
+  } finally {
+    overlayHandle?.setLoadingProgress(null)
   }
 }
 

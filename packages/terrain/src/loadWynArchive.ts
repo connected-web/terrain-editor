@@ -7,6 +7,22 @@ import type {
 } from './terrainViewer'
 import type { TerrainThemeOverrides } from './theme'
 
+export type WynArchiveProgressEvent =
+  | {
+      type: 'network-download'
+      loadedBytes: number
+      totalBytes?: number
+    }
+  | {
+      type: 'file-read'
+      loadedBytes: number
+      totalBytes?: number
+    }
+
+export type LoadWynArchiveOptions = {
+  onProgress?: (event: WynArchiveProgressEvent) => void
+}
+
 function ensureFile(zip: JSZip, path: string) {
   const file = zip.file(path)
   if (!file) {
@@ -49,6 +65,90 @@ export type LoadedWynFile = {
   locations?: TerrainLocation[]
 }
 
+function parseContentLength(header: string | null): number | undefined {
+  if (!header) return undefined
+  const parsed = Number(header)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+async function readResponseWithProgress(
+  response: Response,
+  onProgress?: (event: WynArchiveProgressEvent) => void
+): Promise<ArrayBuffer> {
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const buffer = await response.arrayBuffer()
+    if (onProgress) {
+      const totalBytes = buffer.byteLength
+      onProgress({ type: 'network-download', loadedBytes: totalBytes, totalBytes })
+    }
+    return buffer
+  }
+
+  const reader = response.body.getReader()
+  const totalBytes = parseContentLength(response.headers.get('content-length'))
+  const chunks: Uint8Array[] = []
+  let loadedBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value) {
+      chunks.push(value)
+      loadedBytes += value.length
+      onProgress?.({ type: 'network-download', loadedBytes, totalBytes })
+    }
+  }
+  reader.releaseLock()
+
+  if (!chunks.length) {
+    onProgress?.({ type: 'network-download', loadedBytes, totalBytes })
+  }
+
+  const merged = new Uint8Array(loadedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    merged.set(chunk, offset)
+    offset += chunk.length
+  }
+  return merged.buffer
+}
+
+async function readFileWithProgress(
+  file: File,
+  onProgress?: (event: WynArchiveProgressEvent) => void
+): Promise<ArrayBuffer> {
+  if (typeof FileReader === 'undefined') {
+    const buffer = await file.arrayBuffer()
+    onProgress?.({ type: 'file-read', loadedBytes: buffer.byteLength, totalBytes: buffer.byteLength })
+    return buffer
+  }
+
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('error', () => {
+      reject(reader.error ?? new Error('Failed to read file.'))
+    })
+    reader.addEventListener('abort', () => {
+      reject(new Error('File read aborted.'))
+    })
+    reader.addEventListener('load', () => {
+      onProgress?.({ type: 'file-read', loadedBytes: file.size, totalBytes: file.size })
+      resolve(reader.result as ArrayBuffer)
+    })
+    if (onProgress) {
+      reader.addEventListener('progress', (event: ProgressEvent<FileReader>) => {
+        const totalBytes = event.lengthComputable ? event.total : file.size
+        onProgress({
+          type: 'file-read',
+          loadedBytes: event.loaded,
+          totalBytes
+        })
+      })
+    }
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 async function parseWynZip(zip: JSZip): Promise<LoadedWynFile> {
   const legendFile = ensureFile(zip, 'legend.json')
   const legendRaw = await legendFile.async('string')
@@ -83,12 +183,15 @@ async function parseWynZip(zip: JSZip): Promise<LoadedWynFile> {
   return { dataset, legend, locations }
 }
 
-export async function loadWynArchive(url: string): Promise<LoadedWynFile> {
+export async function loadWynArchive(
+  url: string,
+  options: LoadWynArchiveOptions = {}
+): Promise<LoadedWynFile> {
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Failed to fetch WYN file (${response.status} ${response.statusText})`)
   }
-  const arrayBuffer = await response.arrayBuffer()
+  const arrayBuffer = await readResponseWithProgress(response, options.onProgress)
   const zip = await JSZip.loadAsync(arrayBuffer)
   return parseWynZip(zip)
 }
@@ -98,7 +201,10 @@ export async function loadWynArchiveFromArrayBuffer(data: ArrayBuffer): Promise<
   return parseWynZip(zip)
 }
 
-export async function loadWynArchiveFromFile(file: File): Promise<LoadedWynFile> {
-  const buffer = await file.arrayBuffer()
+export async function loadWynArchiveFromFile(
+  file: File,
+  options: LoadWynArchiveOptions = {}
+): Promise<LoadedWynFile> {
+  const buffer = await readFileWithProgress(file, options.onProgress)
   return loadWynArchiveFromArrayBuffer(buffer)
 }
