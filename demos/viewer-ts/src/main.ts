@@ -180,10 +180,16 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 }
 
 overlayHandle = createViewerOverlay(viewerEl, {
-  onFileSelected: (file) => loadArchive({ kind: 'file', file }),
-  onRequestPopout: () => hostHandle?.openPopout(),
-  onRequestClosePopout: () => hostHandle?.closePopout(),
-  onRequestFullscreenToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+  selectFile: {
+    callback: (file) => loadArchive({ kind: 'file', file })
+  },
+  popout: {
+    onRequestOpen: () => hostHandle?.openPopout(),
+    onRequestClose: () => hostHandle?.closePopout()
+  },
+  fullscreen: {
+    onToggle: () => hostHandle?.toggleFullscreen().catch((err) => console.warn(err))
+  }
 })
 
 hostHandle = createTerrainViewerHost({

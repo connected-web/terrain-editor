@@ -23,6 +23,49 @@ const OVERLAY_CSS = `
   z-index: 10;
 }
 
+.ctw-viewer-overlay__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.ctw-viewer-overlay__row--bottom {
+  margin-top: 0.5rem;
+}
+
+.ctw-viewer-overlay__slot {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ctw-viewer-overlay__slot--top-left,
+.ctw-viewer-overlay__slot--top-right,
+.ctw-viewer-overlay__slot--top-center,
+.ctw-viewer-overlay__slot--bottom-left,
+.ctw-viewer-overlay__slot--bottom-right,
+.ctw-viewer-overlay__slot--bottom-center {
+  justify-content: flex-start;
+  justify-self: flex-start;
+}
+
+.ctw-viewer-overlay__slot--top-right,
+.ctw-viewer-overlay__slot--bottom-right {
+  justify-content: flex-end;
+  justify-self: flex-end;
+}
+
+.ctw-viewer-overlay__slot--top-center,
+.ctw-viewer-overlay__slot--bottom-center {
+  justify-content: center;
+  justify-self: center;
+  text-align: center;
+}
+
 .ctw-viewer-overlay__progress {
   position: absolute;
   left: 0.75rem;
@@ -86,14 +129,6 @@ const OVERLAY_CSS = `
   }
 }
 
-.ctw-viewer-overlay__top {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .ctw-viewer-overlay__status {
   font-size: 0.85rem;
   background: rgba(5, 7, 13, 0.6);
@@ -107,6 +142,12 @@ const OVERLAY_CSS = `
 .ctw-viewer-overlay__buttons {
   display: flex;
   gap: 0.35rem;
+}
+
+.ctw-viewer-overlay__label {
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  color: rgba(246, 231, 195, 0.85);
 }
 
 .ctw-chip-button {
@@ -154,11 +195,100 @@ const OVERLAY_CSS = `
 
 import { TerrainViewMode } from './viewerHost'
 
-type ViewerOverlayCallbacks = {
-  onFileSelected?: (file: File) => void
-  onRequestPopout?: () => void
-  onRequestClosePopout?: () => void
-  onRequestFullscreenToggle?: () => void
+type ViewerOverlayButtonLocation =
+  | 'top-left'
+  | 'top-right'
+  | 'top-center'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'bottom-center'
+
+export type ViewerOverlayCustomButton = {
+  location: ViewerOverlayButtonLocation
+  label: string
+  callback?: () => void
+}
+
+type ViewerOverlayStatusOptions = {
+  initialText: string
+}
+
+type ViewerOverlaySelectFileOptions = {
+  enabled: boolean
+  label: string
+  callback?: (file: File) => void
+}
+
+type ViewerOverlayPopoutOptions = {
+  enabled: boolean
+  labelOpen: string
+  labelClose: string
+  onRequestOpen?: () => void
+  onRequestClose?: () => void
+}
+
+type ViewerOverlayFullscreenOptions = {
+  enabled: boolean
+  labelEnter: string
+  labelExit: string
+  onToggle?: () => void
+  displayInEmbed: boolean
+}
+
+type ResolvedViewerOverlayOptions = {
+  status: ViewerOverlayStatusOptions
+  selectFile: ViewerOverlaySelectFileOptions
+  popout: ViewerOverlayPopoutOptions
+  fullscreen: ViewerOverlayFullscreenOptions
+  customButtons: ViewerOverlayCustomButton[]
+}
+
+export type ViewerOverlayOptions = {
+  status?: Partial<ViewerOverlayStatusOptions>
+  selectFile?: Partial<Omit<ViewerOverlaySelectFileOptions, 'enabled' | 'label'>> & {
+    enabled?: boolean
+    label?: string
+  }
+  popout?: Partial<Omit<ViewerOverlayPopoutOptions, 'enabled' | 'labelOpen' | 'labelClose'>> & {
+    enabled?: boolean
+    labelOpen?: string
+    labelClose?: string
+  }
+  fullscreen?: Partial<Omit<ViewerOverlayFullscreenOptions, 'enabled' | 'labelEnter' | 'labelExit' | 'displayInEmbed'>> & {
+    enabled?: boolean
+    labelEnter?: string
+    labelExit?: string
+    displayInEmbed?: boolean
+  }
+  customButtons?: ViewerOverlayCustomButton[]
+}
+
+function resolveViewerOverlayOptions(options: ViewerOverlayOptions = {}): ResolvedViewerOverlayOptions {
+  return {
+    status: {
+      initialText: options.status?.initialText ?? 'Loading…'
+    },
+    selectFile: {
+      enabled: options.selectFile?.enabled ?? true,
+      label: options.selectFile?.label ?? 'Load Map',
+      callback: options.selectFile?.callback
+    },
+    popout: {
+      enabled: options.popout?.enabled ?? true,
+      labelOpen: options.popout?.labelOpen ?? 'Pop Out',
+      labelClose: options.popout?.labelClose ?? 'Close',
+      onRequestOpen: options.popout?.onRequestOpen,
+      onRequestClose: options.popout?.onRequestClose
+    },
+    fullscreen: {
+      enabled: options.fullscreen?.enabled ?? true,
+      labelEnter: options.fullscreen?.labelEnter ?? 'Full Screen',
+      labelExit: options.fullscreen?.labelExit ?? 'Exit Full Screen',
+      onToggle: options.fullscreen?.onToggle,
+      displayInEmbed: options.fullscreen?.displayInEmbed ?? false
+    },
+    customButtons: options.customButtons ?? []
+  }
 }
 
 export type ViewerOverlayLoadingState = {
@@ -193,7 +323,7 @@ function ensureStyles(doc: Document) {
 
 export function createViewerOverlay(
   target: HTMLElement,
-  callbacks: ViewerOverlayCallbacks = {}
+  optionsInput: ViewerOverlayOptions = {}
 ): ViewerOverlayHandle {
   if (typeof window === 'undefined') {
     return {
@@ -203,6 +333,7 @@ export function createViewerOverlay(
       destroy: () => {}
     }
   }
+  const options = resolveViewerOverlayOptions(optionsInput)
   const doc = target.ownerDocument
   ensureStyles(doc)
   target.classList.add('ctw-viewer-host')
@@ -211,32 +342,32 @@ export function createViewerOverlay(
   overlay.className = 'ctw-viewer-overlay'
   target.appendChild(overlay)
 
+  const createSlot = (position: ViewerOverlayButtonLocation) => {
+    const slot = doc.createElement('div')
+    slot.className = `ctw-viewer-overlay__slot ctw-viewer-overlay__slot--${position}`
+    return slot
+  }
+
   const topRow = doc.createElement('div')
-  topRow.className = 'ctw-viewer-overlay__top'
-  const statusLabel = doc.createElement('div')
-  statusLabel.className = 'ctw-viewer-overlay__status'
-  statusLabel.textContent = 'Loading…'
-
-  const buttonGroup = doc.createElement('div')
-  buttonGroup.className = 'ctw-viewer-overlay__buttons'
-
-  const loadBtn = doc.createElement('button')
-  loadBtn.type = 'button'
-  loadBtn.className = 'ctw-chip-button'
-  loadBtn.textContent = 'Load Map'
-
-  const modeBtn = doc.createElement('button')
-  modeBtn.type = 'button'
-  modeBtn.className = 'ctw-chip-button'
-
-  const fullscreenBtn = doc.createElement('button')
-  fullscreenBtn.type = 'button'
-  fullscreenBtn.className = 'ctw-chip-button'
-  fullscreenBtn.textContent = 'Full Screen'
-
-  buttonGroup.append(loadBtn, modeBtn, fullscreenBtn)
-  topRow.append(statusLabel, buttonGroup)
+  topRow.className = 'ctw-viewer-overlay__row ctw-viewer-overlay__row--top'
+  const topLeftSlot = createSlot('top-left')
+  const topCenterSlot = createSlot('top-center')
+  const topRightSlot = createSlot('top-right')
+  topRow.append(topLeftSlot, topCenterSlot, topRightSlot)
   overlay.append(topRow)
+
+  const bottomRow = doc.createElement('div')
+  bottomRow.className = 'ctw-viewer-overlay__row ctw-viewer-overlay__row--bottom'
+  const bottomLeftSlot = createSlot('bottom-left')
+  const bottomCenterSlot = createSlot('bottom-center')
+  const bottomRightSlot = createSlot('bottom-right')
+  bottomRow.append(bottomLeftSlot, bottomCenterSlot, bottomRightSlot)
+  const bottomLocations = new Set<ViewerOverlayButtonLocation>([
+    'bottom-left',
+    'bottom-center',
+    'bottom-right'
+  ])
+  let bottomRowMounted = false
 
   const progressPanel = doc.createElement('div')
   progressPanel.className = 'ctw-viewer-overlay__progress'
@@ -252,78 +383,162 @@ export function createViewerOverlay(
   progressPanel.append(progressLabel, progressValue, progressBar)
   overlay.append(progressPanel)
 
-  const dropOverlay = doc.createElement('div')
-  dropOverlay.className = 'ctw-drop-overlay'
-  dropOverlay.textContent = 'Drop .wyn to load'
-  target.appendChild(dropOverlay)
-
-  const fileInput = doc.createElement('input')
-  fileInput.type = 'file'
-  fileInput.accept = '.wyn'
-  fileInput.style.display = 'none'
-  target.appendChild(fileInput)
-
-  function handleFiles(files: FileList | null) {
-    const file = files?.item(0)
-    if (!file) return
-    callbacks.onFileSelected?.(file)
+  const slotMap: Record<ViewerOverlayButtonLocation, HTMLDivElement> = {
+    'top-left': topLeftSlot,
+    'top-center': topCenterSlot,
+    'top-right': topRightSlot,
+    'bottom-left': bottomLeftSlot,
+    'bottom-center': bottomCenterSlot,
+    'bottom-right': bottomRightSlot
   }
 
-  loadBtn.addEventListener('click', () => fileInput.click())
-  fileInput.addEventListener('change', () => {
-    handleFiles(fileInput.files)
-    fileInput.value = ''
-  })
+  function appendToSlot(location: ViewerOverlayButtonLocation, element: HTMLElement) {
+    if (bottomLocations.has(location) && !bottomRowMounted) {
+      overlay.insertBefore(bottomRow, progressPanel)
+      bottomRowMounted = true
+    }
+    slotMap[location].appendChild(element)
+  }
 
-  modeBtn.addEventListener('click', () => {
-    if (currentMode === 'embed') {
-      callbacks.onRequestPopout?.()
+  const statusLabel = doc.createElement('div')
+  statusLabel.className = 'ctw-viewer-overlay__status'
+  statusLabel.textContent = options.status.initialText
+  appendToSlot('top-left', statusLabel)
+
+  const buttonGroup = doc.createElement('div')
+  buttonGroup.className = 'ctw-viewer-overlay__buttons'
+  appendToSlot('top-right', buttonGroup)
+
+  let fileInput: HTMLInputElement | null = null
+  let dropOverlay: HTMLDivElement | null = null
+  let dragEnter: ((event: DragEvent) => void) | null = null
+  let dragOver: ((event: DragEvent) => void) | null = null
+  let dragLeave: ((event: DragEvent) => void) | null = null
+  let drop: ((event: DragEvent) => void) | null = null
+  let loadBtn: HTMLButtonElement | null = null
+
+  if (options.selectFile.enabled) {
+    loadBtn = doc.createElement('button')
+    loadBtn.type = 'button'
+    loadBtn.className = 'ctw-chip-button'
+    loadBtn.textContent = options.selectFile.label
+    const canHandleFiles = Boolean(options.selectFile.callback)
+    loadBtn.disabled = !canHandleFiles
+    buttonGroup.appendChild(loadBtn)
+
+    if (canHandleFiles) {
+      fileInput = doc.createElement('input')
+      fileInput.type = 'file'
+      fileInput.accept = '.wyn'
+      fileInput.style.display = 'none'
+      target.appendChild(fileInput)
+
+      const handleFiles = (files: FileList | null) => {
+        const file = files?.item(0)
+        if (!file) return
+        options.selectFile.callback?.(file)
+      }
+
+      loadBtn.addEventListener('click', () => fileInput?.click())
+      fileInput.addEventListener('change', () => {
+        handleFiles(fileInput?.files ?? null)
+        if (fileInput) {
+          fileInput.value = ''
+        }
+      })
+
+      dropOverlay = doc.createElement('div')
+      dropOverlay.className = 'ctw-drop-overlay'
+      dropOverlay.textContent = 'Drop .wyn to load'
+      target.appendChild(dropOverlay)
+
+      const prevent = (event: Event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+
+      const highlight = () => {
+        target.classList.add('ctw-viewer-host--dragging')
+      }
+      const unhighlight = () => {
+        target.classList.remove('ctw-viewer-host--dragging')
+      }
+
+      dragEnter = (event: DragEvent) => {
+        prevent(event)
+        highlight()
+      }
+      dragOver = (event: DragEvent) => {
+        prevent(event)
+        highlight()
+      }
+      dragLeave = (event: DragEvent) => {
+        prevent(event)
+        const related = event.relatedTarget as HTMLElement | null
+        if (!related || !target.contains(related)) {
+          unhighlight()
+        }
+      }
+      drop = (event: DragEvent) => {
+        prevent(event)
+        unhighlight()
+        handleFiles(event.dataTransfer?.files ?? null)
+      }
+
+      target.addEventListener('dragenter', dragEnter)
+      target.addEventListener('dragover', dragOver)
+      target.addEventListener('dragleave', dragLeave)
+      target.addEventListener('drop', drop)
+    }
+  }
+
+  let modeBtn: HTMLButtonElement | null = null
+  if (options.popout.enabled) {
+    modeBtn = doc.createElement('button')
+    modeBtn.type = 'button'
+    modeBtn.className = 'ctw-chip-button'
+    modeBtn.textContent = options.popout.labelOpen
+    buttonGroup.appendChild(modeBtn)
+    modeBtn.addEventListener('click', () => {
+      if (currentMode === 'embed') {
+        options.popout.onRequestOpen?.()
+      } else {
+        options.popout.onRequestClose?.()
+      }
+    })
+  }
+
+  let fullscreenBtn: HTMLButtonElement | null = null
+  if (options.fullscreen.enabled) {
+    fullscreenBtn = doc.createElement('button')
+    fullscreenBtn.type = 'button'
+    fullscreenBtn.className = 'ctw-chip-button'
+    fullscreenBtn.textContent = options.fullscreen.labelEnter
+    buttonGroup.appendChild(fullscreenBtn)
+    fullscreenBtn.addEventListener('click', () => {
+      options.fullscreen.onToggle?.()
+    })
+  }
+
+  if (!buttonGroup.childElementCount) {
+    buttonGroup.remove()
+  }
+
+  options.customButtons.forEach((custom) => {
+    if (custom.callback) {
+      const button = doc.createElement('button')
+      button.type = 'button'
+      button.className = 'ctw-chip-button'
+      button.textContent = custom.label
+      button.addEventListener('click', () => custom.callback?.())
+      appendToSlot(custom.location, button)
     } else {
-      callbacks.onRequestClosePopout?.()
+      const label = doc.createElement('span')
+      label.className = 'ctw-viewer-overlay__label'
+      label.textContent = custom.label
+      appendToSlot(custom.location, label)
     }
   })
-
-  fullscreenBtn.addEventListener('click', () => {
-    callbacks.onRequestFullscreenToggle?.()
-  })
-
-  function prevent(event: Event) {
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
-  function highlight() {
-    target.classList.add('ctw-viewer-host--dragging')
-  }
-  function unhighlight() {
-    target.classList.remove('ctw-viewer-host--dragging')
-  }
-
-  const dragEnter = (event: DragEvent) => {
-    prevent(event)
-    highlight()
-  }
-  const dragOver = (event: DragEvent) => {
-    prevent(event)
-    highlight()
-  }
-  const dragLeave = (event: DragEvent) => {
-    prevent(event)
-    const related = event.relatedTarget as HTMLElement | null
-    if (!related || !target.contains(related)) {
-      unhighlight()
-    }
-  }
-  const drop = (event: DragEvent) => {
-    prevent(event)
-    unhighlight()
-    handleFiles(event.dataTransfer?.files ?? null)
-  }
-
-  target.addEventListener('dragenter', dragEnter)
-  target.addEventListener('dragover', dragOver)
-  target.addEventListener('dragleave', dragLeave)
-  target.addEventListener('drop', drop)
 
   let currentMode: TerrainViewMode = 'embed'
   let currentLoading: ViewerOverlayLoadingState | null = null
@@ -404,20 +619,14 @@ export function createViewerOverlay(
 
   function applyMode(mode: TerrainViewMode) {
     currentMode = mode
-    if (mode === 'embed') {
-      modeBtn.textContent = 'Pop Out'
+    if (modeBtn) {
       modeBtn.disabled = false
-      fullscreenBtn.hidden = true
-    } else if (mode === 'popout') {
-      modeBtn.textContent = 'Close'
-      modeBtn.disabled = false
-      fullscreenBtn.hidden = false
-      fullscreenBtn.textContent = 'Full Screen'
-    } else {
-      modeBtn.textContent = 'Close'
-      modeBtn.disabled = false
-      fullscreenBtn.hidden = false
-      fullscreenBtn.textContent = 'Exit Full Screen'
+      modeBtn.textContent = mode === 'embed' ? options.popout.labelOpen : options.popout.labelClose
+    }
+    if (fullscreenBtn) {
+      const shouldShowFullscreen = options.fullscreen.displayInEmbed || mode !== 'embed'
+      fullscreenBtn.hidden = !shouldShowFullscreen
+      fullscreenBtn.textContent = mode === 'fullscreen' ? options.fullscreen.labelExit : options.fullscreen.labelEnter
     }
   }
   applyMode('embed')
@@ -436,13 +645,21 @@ export function createViewerOverlay(
       hideProgressPanel()
       cancelProgressContentReset()
       resetProgressContent()
-      target.removeEventListener('dragenter', dragEnter)
-      target.removeEventListener('dragover', dragOver)
-      target.removeEventListener('dragleave', dragLeave)
-      target.removeEventListener('drop', drop)
+      if (dragEnter) {
+        target.removeEventListener('dragenter', dragEnter)
+      }
+      if (dragOver) {
+        target.removeEventListener('dragover', dragOver)
+      }
+      if (dragLeave) {
+        target.removeEventListener('dragleave', dragLeave)
+      }
+      if (drop) {
+        target.removeEventListener('drop', drop)
+      }
       overlay.remove()
-      fileInput.remove()
-      dropOverlay.remove()
+      fileInput?.remove()
+      dropOverlay?.remove()
       target.classList.remove('ctw-viewer-host', 'ctw-viewer-host--dragging')
     }
   }
