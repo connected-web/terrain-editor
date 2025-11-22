@@ -1,5 +1,9 @@
 const STYLE_ID = 'ctw-viewer-overlay-styles'
-const PROGRESS_VISIBILITY_DELAY_MS = 250
+const PROGRESS_VISIBILITY_DELAY_MS = 500
+const PROGRESS_FADE_IN_DURATION_MS = 200
+const PROGRESS_FADE_OUT_DURATION_MS = 500
+const PROGRESS_CLEAR_DELAY_MS = PROGRESS_FADE_OUT_DURATION_MS
+const PROGRESS_FADE_DURATION_VAR = '--ctw-viewer-progress-fade-duration'
 
 const OVERLAY_CSS = `
 .ctw-viewer-host {
@@ -30,13 +34,11 @@ const OVERLAY_CSS = `
   padding: 0.65rem 0.85rem 0.8rem;
   pointer-events: none;
   opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.1s ease;
+  transition: opacity var(${PROGRESS_FADE_DURATION_VAR}, 0.1s) ease;
 }
 
 .ctw-viewer-overlay__progress--visible {
   opacity: 1;
-  visibility: visible;
 }
 
 .ctw-viewer-overlay__progress-label {
@@ -327,23 +329,57 @@ export function createViewerOverlay(
   let currentLoading: ViewerOverlayLoadingState | null = null
   let progressVisible = false
   let progressTimer: number | null = null
+  let progressClearTimer: number | null = null
+
+  function resetProgressContent() {
+    progressLabel.textContent = ''
+    progressValue.textContent = ''
+    progressFill.style.width = '0%'
+    progressBar.classList.remove('ctw-viewer-overlay__progress-bar--indeterminate')
+  }
+
+  function cancelProgressContentReset() {
+    if (progressClearTimer) {
+      window.clearTimeout(progressClearTimer)
+      progressClearTimer = null
+    }
+  }
+
+  function scheduleProgressContentReset() {
+    cancelProgressContentReset()
+    progressClearTimer = window.setTimeout(() => {
+      resetProgressContent()
+      progressClearTimer = null
+    }, PROGRESS_CLEAR_DELAY_MS)
+  }
+  function setProgressFadeDuration(durationMs: number) {
+    progressPanel.style.setProperty(PROGRESS_FADE_DURATION_VAR, `${durationMs}ms`)
+  }
+  function showProgressPanel() {
+    if (progressVisible) return
+    setProgressFadeDuration(PROGRESS_FADE_IN_DURATION_MS)
+    progressPanel.classList.add('ctw-viewer-overlay__progress--visible')
+    progressVisible = true
+  }
+  function hideProgressPanel() {
+    if (progressTimer) {
+      window.clearTimeout(progressTimer)
+      progressTimer = null
+    }
+    setProgressFadeDuration(PROGRESS_FADE_OUT_DURATION_MS)
+    progressPanel.classList.remove('ctw-viewer-overlay__progress--visible')
+    progressVisible = false
+  }
 
   function updateProgressPanel(state: ViewerOverlayLoadingState | null) {
     currentLoading = state
     if (!state) {
-      if (progressTimer) {
-        window.clearTimeout(progressTimer)
-        progressTimer = null
-      }
-      progressVisible = false
-      progressPanel.classList.remove('ctw-viewer-overlay__progress--visible')
-      progressLabel.textContent = ''
-      progressValue.textContent = ''
-      progressFill.style.width = '0%'
-      progressBar.classList.remove('ctw-viewer-overlay__progress-bar--indeterminate')
+      hideProgressPanel()
+      scheduleProgressContentReset()
       return
     }
 
+    cancelProgressContentReset()
     progressLabel.textContent = state.label
     if (typeof state.totalBytes === 'number' && state.totalBytes > 0) {
       const percent = Math.min(state.loadedBytes / state.totalBytes, 1)
@@ -361,8 +397,7 @@ export function createViewerOverlay(
       progressTimer = window.setTimeout(() => {
         progressTimer = null
         if (!currentLoading) return
-        progressVisible = true
-        progressPanel.classList.add('ctw-viewer-overlay__progress--visible')
+        showProgressPanel()
       }, PROGRESS_VISIBILITY_DELAY_MS)
     }
   }
@@ -398,10 +433,9 @@ export function createViewerOverlay(
       updateProgressPanel(state)
     },
     destroy() {
-      if (progressTimer) {
-        window.clearTimeout(progressTimer)
-        progressTimer = null
-      }
+      hideProgressPanel()
+      cancelProgressContentReset()
+      resetProgressContent()
       target.removeEventListener('dragenter', dragEnter)
       target.removeEventListener('dragover', dragOver)
       target.removeEventListener('dragleave', dragLeave)
