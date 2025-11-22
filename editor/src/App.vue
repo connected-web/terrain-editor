@@ -15,7 +15,14 @@
 
     <section class="workspace">
       <div class="viewer-panel">
-        <div ref="viewerRef" class="viewer-root"></div>
+        <EditorViewer
+          ref="viewerShell"
+          :status="status"
+          :interactive="interactive"
+          @load-file="loadArchiveFromFile"
+          @toggle-interaction="toggleInteraction"
+          @toggle-fullscreen="toggleEditorFullscreen"
+        />
       </div>
 
       <aside class="editor-panel">
@@ -61,12 +68,11 @@ import {
   type TerrainLocation,
   type TerrainHandle,
   loadWynArchiveFromArrayBuffer,
-  createViewerOverlay,
-  type ViewerOverlayHandle
+  type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
+import EditorViewer from './components/EditorViewer.vue'
 
 const editorRoot = ref<HTMLElement | null>(null)
-const viewerRef = ref<HTMLElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
 const legendJson = ref('')
 const locationsJson = ref('')
@@ -78,19 +84,14 @@ const datasetRef = ref<TerrainDataset | null>(null)
 const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
-const overlayHandle = ref<ViewerOverlayHandle | null>(null)
+const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 
 function updateStatus(message: string) {
   status.value = message
-  overlayHandle.value?.setStatus(message)
 }
 
-function beginOverlayLoading(label: string) {
-  overlayHandle.value?.setLoadingProgress({ label, loadedBytes: 0 })
-}
-
-function finishOverlayLoading() {
-  overlayHandle.value?.setLoadingProgress(null)
+function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
+  viewerShell.value?.setOverlayLoading(state)
 }
 
 const STORAGE_KEY = 'ctw-editor-project-v1'
@@ -171,41 +172,6 @@ function cleanupDataset() {
   datasetRef.value = null
 }
 
-function buildOverlayOptions() {
-  return {
-    selectFile: {
-      callback: (file: File) => {
-        void loadArchiveFromFile(file)
-      }
-    },
-    popout: {
-      enabled: false
-    },
-    fullscreen: {
-      enabled: true,
-      displayInEmbed: true,
-      onToggle: () => {
-        void toggleEditorFullscreen()
-      }
-    },
-    customButtons: [
-      {
-        location: 'bottom-right',
-        label: interactive.value ? 'Disable placement' : 'Enable placement',
-        callback: () => toggleInteraction()
-      }
-    ]
-  }
-}
-
-function setupOverlay() {
-  if (!viewerRef.value) return
-  overlayHandle.value?.destroy()
-  overlayHandle.value = createViewerOverlay(viewerRef.value, buildOverlayOptions())
-  overlayHandle.value.setStatus(status.value)
-  overlayHandle.value.setViewMode(document.fullscreenElement ? 'fullscreen' : 'embed')
-}
-
 function createLayerState(legend: TerrainLegend): LayerToggleState {
   return {
     biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
@@ -214,9 +180,10 @@ function createLayerState(legend: TerrainLegend): LayerToggleState {
 }
 
 async function mountViewer() {
-  if (!viewerRef.value || !datasetRef.value || !layerState.value) return
+  const viewerElement = viewerShell.value?.getViewerElement()
+  if (!viewerElement || !datasetRef.value || !layerState.value) return
   disposeViewer()
-  handle.value = await initTerrainViewer(viewerRef.value, datasetRef.value, {
+  handle.value = await initTerrainViewer(viewerElement, datasetRef.value, {
     layers: layerState.value,
     locations: locationsList.value,
     interactive: interactive.value,
@@ -239,7 +206,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   busy.value = true
   const loadingLabel = `Loading ${label}…`
   updateStatus(loadingLabel)
-  beginOverlayLoading(loadingLabel)
+  setOverlayLoading({ label: loadingLabel, loadedBytes: 0 })
   disposeViewer()
   cleanupDataset()
   try {
@@ -289,7 +256,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
     updateStatus(`Failed to load ${label}.`)
   } finally {
     busy.value = false
-    finishOverlayLoading()
+    setOverlayLoading(null)
   }
 }
 
@@ -368,7 +335,6 @@ function exportLocations() {
 function toggleInteraction() {
   interactive.value = !interactive.value
   handle.value?.setInteractiveMode(interactive.value)
-  setupOverlay()
 }
 
 async function toggleEditorFullscreen() {
@@ -383,10 +349,6 @@ async function toggleEditorFullscreen() {
   } catch (err) {
     console.warn('Failed to toggle fullscreen', err)
   }
-}
-
-function handleFullscreenChange() {
-  overlayHandle.value?.setViewMode(document.fullscreenElement ? 'fullscreen' : 'embed')
 }
 
 async function restorePersistedProject() {
@@ -410,15 +372,11 @@ async function restorePersistedProject() {
 }
 
 onMounted(() => {
-  setupOverlay()
-  document.addEventListener('fullscreenchange', handleFullscreenChange)
   void restorePersistedProject()
 })
 
 onBeforeUnmount(() => {
   disposeViewer()
   cleanupDataset()
-  overlayHandle.value?.destroy()
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })
 </script>
