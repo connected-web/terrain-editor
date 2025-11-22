@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-demo">
+  <div class="editor-demo" ref="editorRoot">
     <header class="hero">
       <h1 class="muted">Terrain Editor</h1>
       <p class="muted">
@@ -7,7 +7,6 @@
         then go ahead with updating metadata or locations before exporting JSON back out.
       </p>
       <div class="cta-row">
-        <input ref="fileInput" type="file" accept=".wyn" @change="onFileSelected" />
         <button class="button primary" @click="loadSample" :disabled="busy">
           Load sample archive
         </button>
@@ -17,13 +16,6 @@
     <section class="workspace">
       <div class="viewer-panel">
         <div ref="viewerRef" class="viewer-root"></div>
-        <div class="status-bar">
-          <span>{{ status }}</span>
-          <span class="spacer"></span>
-          <button class="text-button" @click="toggleInteraction" :disabled="!handle">
-            {{ interactive ? 'Disable placement' : 'Enable placement' }}
-          </button>
-        </div>
       </div>
 
       <aside class="editor-panel">
@@ -68,11 +60,13 @@ import {
   type TerrainLegend,
   type TerrainLocation,
   type TerrainHandle,
-  loadWynArchiveFromArrayBuffer
+  loadWynArchiveFromArrayBuffer,
+  createViewerOverlay,
+  type ViewerOverlayHandle
 } from '@connected-web/terrain-editor'
 
+const editorRoot = ref<HTMLElement | null>(null)
 const viewerRef = ref<HTMLElement | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
 const legendJson = ref('')
 const locationsJson = ref('')
@@ -84,6 +78,20 @@ const datasetRef = ref<TerrainDataset | null>(null)
 const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
+const overlayHandle = ref<ViewerOverlayHandle | null>(null)
+
+function updateStatus(message: string) {
+  status.value = message
+  overlayHandle.value?.setStatus(message)
+}
+
+function beginOverlayLoading(label: string) {
+  overlayHandle.value?.setLoadingProgress({ label, loadedBytes: 0 })
+}
+
+function finishOverlayLoading() {
+  overlayHandle.value?.setLoadingProgress(null)
+}
 
 const STORAGE_KEY = 'ctw-editor-project-v1'
 
@@ -163,6 +171,41 @@ function cleanupDataset() {
   datasetRef.value = null
 }
 
+function buildOverlayOptions() {
+  return {
+    selectFile: {
+      callback: (file: File) => {
+        void loadArchiveFromFile(file)
+      }
+    },
+    popout: {
+      enabled: false
+    },
+    fullscreen: {
+      enabled: true,
+      displayInEmbed: true,
+      onToggle: () => {
+        void toggleEditorFullscreen()
+      }
+    },
+    customButtons: [
+      {
+        location: 'bottom-right',
+        label: interactive.value ? 'Disable placement' : 'Enable placement',
+        callback: () => toggleInteraction()
+      }
+    ]
+  }
+}
+
+function setupOverlay() {
+  if (!viewerRef.value) return
+  overlayHandle.value?.destroy()
+  overlayHandle.value = createViewerOverlay(viewerRef.value, buildOverlayOptions())
+  overlayHandle.value.setStatus(status.value)
+  overlayHandle.value.setViewMode(document.fullscreenElement ? 'fullscreen' : 'embed')
+}
+
 function createLayerState(legend: TerrainLegend): LayerToggleState {
   return {
     biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
@@ -178,7 +221,7 @@ async function mountViewer() {
     locations: locationsList.value,
     interactive: interactive.value,
     onLocationPick: (payload) => {
-      status.value = `Picked pixel (${payload.pixel.x}, ${payload.pixel.y})`
+      updateStatus(`Picked pixel (${payload.pixel.x}, ${payload.pixel.y})`)
     }
   })
 }
@@ -194,7 +237,9 @@ type LoadArchiveOptions = {
 
 async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options: LoadArchiveOptions = {}) {
   busy.value = true
-  status.value = `Loading ${label}…`
+  const loadingLabel = `Loading ${label}…`
+  updateStatus(loadingLabel)
+  beginOverlayLoading(loadingLabel)
   disposeViewer()
   cleanupDataset()
   try {
@@ -228,7 +273,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
     }
 
     await mountViewer()
-    status.value = `${label} loaded.`
+    updateStatus(`${label} loaded.`)
     const base64 = options.base64 ?? arrayBufferToBase64(buffer)
     persistCurrentProject(
       {
@@ -241,37 +286,33 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
     )
   } catch (err) {
     console.error(err)
-    status.value = `Failed to load ${label}.`
+    updateStatus(`Failed to load ${label}.`)
   } finally {
     busy.value = false
+    finishOverlayLoading()
   }
 }
 
 async function loadSample() {
   try {
-    status.value = 'Downloading sample archive…'
+    updateStatus('Downloading sample archive…')
     const response = await fetch(archiveUrl())
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const buffer = await response.arrayBuffer()
     await loadArchiveFromBytes(buffer, 'sample archive')
   } catch (err) {
     console.error(err)
-    status.value = 'Failed to download sample archive.'
+    updateStatus('Failed to download sample archive.')
   }
 }
 
-async function onFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (!input.files?.length) return
-  const file = input.files[0]
+async function loadArchiveFromFile(file: File) {
   try {
     const buffer = await file.arrayBuffer()
     await loadArchiveFromBytes(buffer, file.name)
   } catch (err) {
     console.error(err)
-    status.value = `Failed to load ${file.name}.`
-  } finally {
-    input.value = ''
+    updateStatus(`Failed to load ${file.name}.`)
   }
 }
 
@@ -282,11 +323,11 @@ async function applyLegend() {
     datasetRef.value.legend = parsed
     layerState.value = createLayerState(parsed)
     await mountViewer()
-    status.value = 'Legend applied.'
+    updateStatus('Legend applied.')
     persistCurrentProject({ legendJson: legendJson.value })
   } catch (err) {
     console.error(err)
-    status.value = 'Invalid legend JSON.'
+    updateStatus('Invalid legend JSON.')
   }
 }
 
@@ -296,11 +337,11 @@ function applyLocations() {
     const parsed = JSON.parse(locationsJson.value) as TerrainLocation[]
     locationsList.value = parsed
     handle.value.updateLocations(parsed)
-    status.value = 'Locations applied.'
+    updateStatus('Locations applied.')
     persistCurrentProject({ locationsJson: locationsJson.value })
   } catch (err) {
     console.error(err)
-    status.value = 'Invalid locations JSON.'
+    updateStatus('Invalid locations JSON.')
   }
 }
 
@@ -327,6 +368,25 @@ function exportLocations() {
 function toggleInteraction() {
   interactive.value = !interactive.value
   handle.value?.setInteractiveMode(interactive.value)
+  setupOverlay()
+}
+
+async function toggleEditorFullscreen() {
+  const root = editorRoot.value
+  if (!root) return
+  try {
+    if (!document.fullscreenElement) {
+      await root.requestFullscreen()
+    } else {
+      await document.exitFullscreen()
+    }
+  } catch (err) {
+    console.warn('Failed to toggle fullscreen', err)
+  }
+}
+
+function handleFullscreenChange() {
+  overlayHandle.value?.setViewMode(document.fullscreenElement ? 'fullscreen' : 'embed')
 }
 
 async function restorePersistedProject() {
@@ -343,18 +403,22 @@ async function restorePersistedProject() {
         locationsJson: saved.locationsJson
       }
     })
-    status.value = `${saved.label} restored from local storage.`
+    updateStatus(`${saved.label} restored from local storage.`)
   } catch (err) {
     console.warn('Failed to restore saved project', err)
   }
 }
 
 onMounted(() => {
+  setupOverlay()
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
   void restorePersistedProject()
 })
 
 onBeforeUnmount(() => {
   disposeViewer()
   cleanupDataset()
+  overlayHandle.value?.destroy()
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })
 </script>
