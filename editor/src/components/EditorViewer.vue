@@ -15,12 +15,15 @@ import {
 const props = defineProps<{
   status: string
   interactive: boolean
+  showPrimaryActions: boolean
 }>()
 
 const emit = defineEmits<{
   loadFile: [File]
   toggleInteraction: []
   toggleFullscreen: []
+  loadSample: []
+  newMap: []
 }>()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -41,8 +44,27 @@ function buildOptions() {
       onToggle: () => emit('toggleFullscreen')
     },
     customButtons: [
+      ...(props.showPrimaryActions
+        ? [
+            {
+              location: 'center' as const,
+              label: 'Load sample map',
+              callback: () => emit('loadSample')
+            },
+            {
+              location: 'center' as const,
+              label: 'Load map',
+              callback: () => overlayHandle.value?.openFileDialog()
+            },
+            {
+              location: 'center' as const,
+              label: 'New map',
+              callback: () => emit('newMap')
+            }
+          ]
+        : []),
       {
-        location: 'bottom-right',
+        location: 'bottom-right' as const,
         label: props.interactive ? 'Disable placement' : 'Enable placement',
         callback: () => emit('toggleInteraction')
       }
@@ -66,7 +88,7 @@ watch(
 )
 
 watch(
-  () => props.interactive,
+  () => [props.interactive, props.showPrimaryActions],
   () => {
     setupOverlay()
   }
@@ -92,17 +114,19 @@ onBeforeUnmount(() => {
 
 defineExpose({
   getViewerElement: () => viewerRef.value,
-  setOverlayLoading
+  setOverlayLoading,
+  triggerFileSelect: () => overlayHandle.value?.openFileDialog()
 })
 </script>
 
 <style scoped>
+
 .editor-viewer {
-  position: relative;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   background: #060b14;
-  border-radius: 20px;
   overflow: hidden;
 }
 

@@ -1,65 +1,52 @@
 <template>
-  <div class="editor-demo" ref="editorRoot">
-    <header class="hero">
-      <h1 class="muted">Terrain Editor</h1>
-      <p class="muted">
-        Load a Wyn file from disk or use the sample map, preview it inside the Three.js viewer, and
-        then go ahead with updating metadata or locations before exporting JSON back out.
-      </p>
-      <div class="cta-row">
-        <button class="button primary" @click="loadSample" :disabled="busy">
-          Load sample archive
-        </button>
-      </div>
-    </header>
+  <div class="editor-shell" ref="editorRoot">
+    <EditorViewer
+      ref="viewerShell"
+      class="viewer-surface"
+      :status="status"
+      :interactive="interactive"
+      :show-primary-actions="!hasActiveArchive"
+      @load-file="loadArchiveFromFile"
+      @load-sample="loadSample"
+      @new-map="startNewMap"
+      @toggle-interaction="toggleInteraction"
+      @toggle-fullscreen="toggleEditorFullscreen"
+    />
 
-    <section class="workspace">
-      <div class="viewer-panel">
-        <EditorViewer
-          ref="viewerShell"
-          :status="status"
-          :interactive="interactive"
-          @load-file="loadArchiveFromFile"
-          @toggle-interaction="toggleInteraction"
-          @toggle-fullscreen="toggleEditorFullscreen"
-        />
-      </div>
-
-      <aside class="editor-panel">
-        <article class="card">
-          <div class="card-header">
-            <h2>Legend JSON</h2>
-            <div class="card-actions">
-              <button class="text-button" @click="applyLegend" :disabled="!legendJson">Apply</button>
-              <button class="text-button" @click="exportLegend" :disabled="!legendJson">
-                Export
-              </button>
-            </div>
+    <div class="panel-stack">
+      <article class="panel-card">
+        <div class="card-header">
+          <h2>Legend JSON</h2>
+          <div class="card-actions">
+            <button class="text-button" @click="applyLegend" :disabled="!legendJson">Apply</button>
+            <button class="text-button" @click="exportLegend" :disabled="!legendJson">
+              Export
+            </button>
           </div>
-          <textarea v-model="legendJson" spellcheck="false" />
-        </article>
+        </div>
+        <textarea v-model="legendJson" spellcheck="false" />
+      </article>
 
-        <article class="card">
-          <div class="card-header">
-            <h2>Locations JSON</h2>
-            <div class="card-actions">
-              <button class="text-button" @click="applyLocations" :disabled="!locationsJson">
-                Apply
-              </button>
-              <button class="text-button" @click="exportLocations" :disabled="!locationsJson">
-                Export
-              </button>
-            </div>
+      <article class="panel-card">
+        <div class="card-header">
+          <h2>Locations JSON</h2>
+          <div class="card-actions">
+            <button class="text-button" @click="applyLocations" :disabled="!locationsJson">
+              Apply
+            </button>
+            <button class="text-button" @click="exportLocations" :disabled="!locationsJson">
+              Export
+            </button>
           </div>
-          <textarea v-model="locationsJson" spellcheck="false" />
-        </article>
-      </aside>
-    </section>
+        </div>
+        <textarea v-model="locationsJson" spellcheck="false" />
+      </article>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   initTerrainViewer,
   type LayerToggleState,
@@ -85,6 +72,7 @@ const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
+const hasActiveArchive = computed(() => Boolean(datasetRef.value))
 
 function updateStatus(message: string) {
   status.value = message
@@ -281,6 +269,23 @@ async function loadArchiveFromFile(file: File) {
     console.error(err)
     updateStatus(`Failed to load ${file.name}.`)
   }
+}
+
+function startNewMap() {
+  disposeViewer()
+  cleanupDataset()
+  layerState.value = null
+  legendJson.value = ''
+  locationsJson.value = ''
+  locationsList.value = []
+  handle.value = null
+  persistedProject.value = null
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (err) {
+    console.warn('Failed to reset persisted project', err)
+  }
+  updateStatus('Create a new project by loading or importing a map.')
 }
 
 async function applyLegend() {

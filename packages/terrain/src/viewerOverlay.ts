@@ -66,6 +66,22 @@ const OVERLAY_CSS = `
   text-align: center;
 }
 
+.ctw-viewer-overlay__center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  pointer-events: none;
+}
+
+.ctw-viewer-overlay__center > * {
+  pointer-events: auto;
+}
+
 .ctw-viewer-overlay__progress {
   position: absolute;
   left: 0.75rem;
@@ -202,6 +218,7 @@ type ViewerOverlayButtonLocation =
   | 'bottom-left'
   | 'bottom-right'
   | 'bottom-center'
+  | 'center'
 
 export type ViewerOverlayCustomButton = {
   location: ViewerOverlayButtonLocation
@@ -301,6 +318,7 @@ export type ViewerOverlayHandle = {
   setStatus: (message: string) => void
   setViewMode: (mode: TerrainViewMode) => void
   setLoadingProgress: (state: ViewerOverlayLoadingState | null) => void
+  openFileDialog: () => void
   destroy: () => void
 }
 
@@ -369,6 +387,10 @@ export function createViewerOverlay(
   ])
   let bottomRowMounted = false
 
+  const centerSlot = doc.createElement('div')
+  centerSlot.className = 'ctw-viewer-overlay__center'
+  let centerSlotMounted = false
+
   const progressPanel = doc.createElement('div')
   progressPanel.className = 'ctw-viewer-overlay__progress'
   const progressLabel = doc.createElement('div')
@@ -383,7 +405,7 @@ export function createViewerOverlay(
   progressPanel.append(progressLabel, progressValue, progressBar)
   overlay.append(progressPanel)
 
-  const slotMap: Record<ViewerOverlayButtonLocation, HTMLDivElement> = {
+  const slotMap: Record<Exclude<ViewerOverlayButtonLocation, 'center'>, HTMLDivElement> = {
     'top-left': topLeftSlot,
     'top-center': topCenterSlot,
     'top-right': topRightSlot,
@@ -393,6 +415,14 @@ export function createViewerOverlay(
   }
 
   function appendToSlot(location: ViewerOverlayButtonLocation, element: HTMLElement) {
+    if (location === 'center') {
+      if (!centerSlotMounted) {
+        overlay.append(centerSlot)
+        centerSlotMounted = true
+      }
+      centerSlot.appendChild(element)
+      return
+    }
     if (bottomLocations.has(location) && !bottomRowMounted) {
       overlay.insertBefore(bottomRow, progressPanel)
       bottomRowMounted = true
@@ -410,6 +440,7 @@ export function createViewerOverlay(
   appendToSlot('top-right', buttonGroup)
 
   let fileInput: HTMLInputElement | null = null
+  let openFileDialogImpl: () => void = () => {}
   let dropOverlay: HTMLDivElement | null = null
   let dragEnter: ((event: DragEvent) => void) | null = null
   let dragOver: ((event: DragEvent) => void) | null = null
@@ -439,7 +470,9 @@ export function createViewerOverlay(
         options.selectFile.callback?.(file)
       }
 
-      loadBtn.addEventListener('click', () => fileInput?.click())
+      const openDialog = () => fileInput?.click()
+      openFileDialogImpl = openDialog
+      loadBtn.addEventListener('click', openDialog)
       fileInput.addEventListener('change', () => {
         handleFiles(fileInput?.files ?? null)
         if (fileInput) {
@@ -640,6 +673,9 @@ export function createViewerOverlay(
     },
     setLoadingProgress(state: ViewerOverlayLoadingState | null) {
       updateProgressPanel(state)
+    },
+    openFileDialog() {
+      openFileDialogImpl()
     },
     destroy() {
       hideProgressPanel()
