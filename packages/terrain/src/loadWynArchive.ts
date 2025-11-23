@@ -1,10 +1,7 @@
 import JSZip from 'jszip'
 
-import type {
-  TerrainDataset,
-  TerrainLegend,
-  TerrainLocation
-} from './terrainViewer'
+import type { TerrainProjectFileEntry } from './editor/projectStore'
+import type { TerrainDataset, TerrainLegend, TerrainLocation } from './terrainViewer'
 import type { TerrainThemeOverrides } from './theme'
 
 export type WynArchiveProgressEvent =
@@ -21,6 +18,7 @@ export type WynArchiveProgressEvent =
 
 export type LoadWynArchiveOptions = {
   onProgress?: (event: WynArchiveProgressEvent) => void
+  includeFiles?: boolean
 }
 
 function ensureFile(zip: JSZip, path: string) {
@@ -63,6 +61,7 @@ export type LoadedWynFile = {
   dataset: TerrainDataset
   legend: TerrainLegend
   locations?: TerrainLocation[]
+  files?: TerrainProjectFileEntry[]
 }
 
 function parseContentLength(header: string | null): number | undefined {
@@ -149,7 +148,41 @@ async function readFileWithProgress(
   })
 }
 
-async function parseWynZip(zip: JSZip): Promise<LoadedWynFile> {
+function guessMimeType(path: string): string | undefined {
+  const extension = path.split('.').pop()?.toLowerCase()
+  if (!extension) return undefined
+  if (extension === 'png') return 'image/png'
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'webp') return 'image/webp'
+  if (extension === 'gif') return 'image/gif'
+  if (extension === 'json') return 'application/json'
+  return undefined
+}
+
+const SKIP_FILE_TABLE = new Set(['legend.json', 'locations.json', 'theme.json'])
+
+async function extractProjectFiles(zip: JSZip): Promise<TerrainProjectFileEntry[]> {
+  const entries: TerrainProjectFileEntry[] = []
+  const fileEntries = Object.values(zip.files)
+  for (const entry of fileEntries) {
+    if (entry.dir) continue
+    if (!entry.name) continue
+    if (entry.name.startsWith('__MACOSX/')) continue
+    if (SKIP_FILE_TABLE.has(entry.name)) continue
+    const path = entry.name
+    const data = await entry.async('arraybuffer')
+    entries.push({
+      path,
+      data,
+      type: guessMimeType(path),
+      lastModified: entry.date?.getTime(),
+      sourceFileName: path.split('/').pop()
+    })
+  }
+  return entries
+}
+
+async function parseWynZip(zip: JSZip, options: LoadWynArchiveOptions = {}): Promise<LoadedWynFile> {
   const legendFile = ensureFile(zip, 'legend.json')
   const legendRaw = await legendFile.async('string')
   const legend = JSON.parse(legendRaw) as TerrainLegend
@@ -180,7 +213,8 @@ async function parseWynZip(zip: JSZip): Promise<LoadedWynFile> {
     cleanup,
     theme: themeOverrides
   }
-  return { dataset, legend, locations }
+  const files = options.includeFiles ? await extractProjectFiles(zip) : undefined
+  return { dataset, legend, locations, files }
 }
 
 export async function loadWynArchive(
@@ -193,12 +227,15 @@ export async function loadWynArchive(
   }
   const arrayBuffer = await readResponseWithProgress(response, options.onProgress)
   const zip = await JSZip.loadAsync(arrayBuffer)
-  return parseWynZip(zip)
+  return parseWynZip(zip, options)
 }
 
-export async function loadWynArchiveFromArrayBuffer(data: ArrayBuffer): Promise<LoadedWynFile> {
+export async function loadWynArchiveFromArrayBuffer(
+  data: ArrayBuffer,
+  options: LoadWynArchiveOptions = {}
+): Promise<LoadedWynFile> {
   const zip = await JSZip.loadAsync(data)
-  return parseWynZip(zip)
+  return parseWynZip(zip, options)
 }
 
 export async function loadWynArchiveFromFile(
@@ -206,5 +243,5 @@ export async function loadWynArchiveFromFile(
   options: LoadWynArchiveOptions = {}
 ): Promise<LoadedWynFile> {
   const buffer = await readFileWithProgress(file, options.onProgress)
-  return loadWynArchiveFromArrayBuffer(buffer)
+  return loadWynArchiveFromArrayBuffer(buffer, options)
 }

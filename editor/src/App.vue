@@ -22,6 +22,9 @@
             <button class="text-button" @click="exportLegend" :disabled="!legendJson">
               Export
             </button>
+            <button class="text-button" @click="exportArchive" :disabled="!hasActiveArchive">
+              Export WYN
+            </button>
           </div>
         </div>
         <textarea v-model="legendJson" spellcheck="false" />
@@ -52,6 +55,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
+  buildWynArchive,
+  createLayerBrowserStore,
+  createProjectStore,
   initTerrainViewer,
   type LayerToggleState,
   type TerrainDataset,
@@ -70,7 +76,10 @@ const locationsJson = ref('')
 const interactive = ref(false)
 const busy = ref(false)
 
-const layerState = ref<LayerToggleState | null>(null)
+const projectStore = createProjectStore()
+const projectSnapshot = ref(projectStore.getSnapshot())
+const layerBrowserStore = createLayerBrowserStore()
+const layerState = ref<LayerToggleState | null>(layerBrowserStore.getLayerToggles())
 const datasetRef = ref<TerrainDataset | null>(null)
 const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
@@ -91,13 +100,22 @@ function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
   viewerShell.value?.setOverlayLoading(state)
 }
 
-const STORAGE_KEY = 'ctw-editor-project-v1'
+projectStore.subscribe((snapshot) => {
+  projectSnapshot.value = snapshot
+  legendJson.value = snapshot.legend ? JSON.stringify(snapshot.legend, null, 2) : ''
+  locationsJson.value = snapshot.locations ? JSON.stringify(snapshot.locations, null, 2) : ''
+  locationsList.value = snapshot.locations ? [...snapshot.locations] : []
+})
+
+layerBrowserStore.subscribe(() => {
+  layerState.value = layerBrowserStore.getLayerToggles()
+})
+
+const STORAGE_KEY = 'ctw-editor-project-v2'
 
 type PersistedProject = {
   label: string
   archiveBase64: string
-  legendJson?: string
-  locationsJson?: string
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -121,27 +139,23 @@ function base64ToArrayBuffer(base64: string) {
   return bytes.buffer
 }
 
-function persistCurrentProject(patch: Partial<PersistedProject>, write = true) {
+async function persistCurrentProject(options: { base64?: string; label?: string } = {}) {
+  const snapshot = projectStore.getSnapshot()
+  if (!snapshot.legend) return
+  const base64 =
+    options.base64 ??
+    arrayBufferToBase64(await (await buildWynArchive(snapshot)).arrayBuffer())
   const next: PersistedProject = {
-    label: patch.label ?? persistedProject.value?.label ?? 'Untitled project',
-    archiveBase64: patch.archiveBase64 ?? persistedProject.value?.archiveBase64 ?? ''
+    label: options.label ?? snapshot.metadata.label ?? 'Untitled terrain',
+    archiveBase64: base64
   }
-  if (!next.archiveBase64) return
-  next.legendJson =
-    patch.legendJson ??
-    persistedProject.value?.legendJson ??
-    (legendJson.value ? legendJson.value : '')
-  next.locationsJson =
-    patch.locationsJson ??
-    persistedProject.value?.locationsJson ??
-    (locationsJson.value ? locationsJson.value : '')
   persistedProject.value = next
-  if (!write) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   } catch (err) {
     console.warn('Failed to persist project', err)
   }
+  projectStore.markPersisted()
 }
 
 function readPersistedProject(): PersistedProject | null {
@@ -169,13 +183,6 @@ function cleanupDataset() {
   datasetRef.value = null
 }
 
-function createLayerState(legend: TerrainLegend): LayerToggleState {
-  return {
-    biomes: Object.fromEntries(Object.keys(legend.biomes).map((key) => [key, true])),
-    overlays: Object.fromEntries(Object.keys(legend.overlays).map((key) => [key, true]))
-  }
-}
-
 async function mountViewer() {
   const viewerElement = viewerShell.value?.getViewerElement()
   if (!viewerElement || !datasetRef.value || !layerState.value) return
@@ -193,10 +200,6 @@ async function mountViewer() {
 type LoadArchiveOptions = {
   persist?: boolean
   base64?: string
-  overrides?: {
-    legendJson?: string
-    locationsJson?: string
-  }
 }
 
 async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options: LoadArchiveOptions = {}) {
@@ -207,47 +210,27 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   disposeViewer()
   cleanupDataset()
   try {
-    const archive = await loadWynArchiveFromArrayBuffer(buffer)
+    const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
     datasetRef.value = archive.dataset
     const legend = archive.legend
-    layerState.value = createLayerState(legend)
-    legendJson.value = JSON.stringify(legend, null, 2)
-    locationsList.value = archive.locations ?? []
-    locationsJson.value = JSON.stringify(locationsList.value, null, 2)
-
-    if (options.overrides?.legendJson) {
-      try {
-        const overrideLegend = JSON.parse(options.overrides.legendJson) as TerrainLegend
-        datasetRef.value.legend = overrideLegend
-        layerState.value = createLayerState(overrideLegend)
-        legendJson.value = options.overrides.legendJson
-      } catch (err) {
-        console.warn('Failed to apply persisted legend override', err)
-      }
-    }
-
-    if (options.overrides?.locationsJson) {
-      try {
-        const overrideLocations = JSON.parse(options.overrides.locationsJson) as TerrainLocation[]
-        locationsList.value = overrideLocations
-        locationsJson.value = options.overrides.locationsJson
-      } catch (err) {
-        console.warn('Failed to apply persisted location override', err)
-      }
-    }
+    layerBrowserStore.setLegend(legend)
+    projectStore.loadFromArchive({
+      legend,
+      locations: archive.locations,
+      theme: archive.dataset.theme,
+      files: archive.files,
+      metadata: { label }
+    })
 
     await mountViewer()
     updateStatus(`${label} loaded.`)
-    const base64 = options.base64 ?? arrayBufferToBase64(buffer)
-    persistCurrentProject(
-      {
+    if (options.persist ?? true) {
+      const base64 = options.base64 ?? arrayBufferToBase64(buffer)
+      await persistCurrentProject({
         label,
-        archiveBase64: base64,
-        legendJson: legendJson.value,
-        locationsJson: locationsJson.value
-      },
-      options.persist ?? true
-    )
+        base64
+      })
+    }
   } catch (err) {
     console.error(err)
     updateStatus(`Failed to load ${label}.`)
@@ -283,7 +266,8 @@ async function loadArchiveFromFile(file: File) {
 function startNewMap() {
   disposeViewer()
   cleanupDataset()
-  layerState.value = null
+  layerBrowserStore.setLegend(undefined)
+  projectStore.reset()
   legendJson.value = ''
   locationsJson.value = ''
   locationsList.value = []
@@ -302,32 +286,33 @@ async function applyLegend() {
   try {
     const parsed = JSON.parse(legendJson.value) as TerrainLegend
     datasetRef.value.legend = parsed
-    layerState.value = createLayerState(parsed)
+    layerBrowserStore.setLegend(parsed)
     await mountViewer()
+    projectStore.setLegend(parsed)
+    await persistCurrentProject()
     updateStatus('Legend applied.')
-    persistCurrentProject({ legendJson: legendJson.value })
   } catch (err) {
     console.error(err)
     updateStatus('Invalid legend JSON.')
   }
 }
 
-function applyLocations() {
+async function applyLocations() {
   if (!handle.value || !locationsJson.value) return
   try {
     const parsed = JSON.parse(locationsJson.value) as TerrainLocation[]
     locationsList.value = parsed
     handle.value.updateLocations(parsed)
+    projectStore.setLocations(parsed)
+    await persistCurrentProject()
     updateStatus('Locations applied.')
-    persistCurrentProject({ locationsJson: locationsJson.value })
   } catch (err) {
     console.error(err)
     updateStatus('Invalid locations JSON.')
   }
 }
 
-function downloadText(filename: string, contents: string) {
-  const blob = new Blob([contents], { type: 'application/json' })
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -338,12 +323,29 @@ function downloadText(filename: string, contents: string) {
 
 function exportLegend() {
   if (!legendJson.value) return
-  downloadText('legend.json', legendJson.value)
+  const blob = new Blob([legendJson.value], { type: 'application/json' })
+  downloadBlob('legend.json', blob)
 }
 
 function exportLocations() {
   if (!locationsJson.value) return
-  downloadText('locations.json', locationsJson.value)
+  const blob = new Blob([locationsJson.value], { type: 'application/json' })
+  downloadBlob('locations.json', blob)
+}
+
+async function exportArchive() {
+  const snapshot = projectStore.getSnapshot()
+  if (!snapshot.legend) return
+  try {
+    updateStatus('Building archive…')
+    const blob = await buildWynArchive(snapshot)
+    const label = snapshot.metadata.label ?? 'terrain'
+    downloadBlob(`${label}.wyn`, blob)
+    updateStatus('Archive exported.')
+  } catch (err) {
+    console.error(err)
+    updateStatus('Failed to export archive.')
+  }
 }
 
 function toggleInteraction() {
@@ -373,11 +375,7 @@ async function restorePersistedProject() {
     const buffer = base64ToArrayBuffer(saved.archiveBase64)
     await loadArchiveFromBytes(buffer, saved.label, {
       persist: false,
-      base64: saved.archiveBase64,
-      overrides: {
-        legendJson: saved.legendJson,
-        locationsJson: saved.locationsJson
-      }
+      base64: saved.archiveBase64
     })
     updateStatus(`${saved.label} restored from local storage.`)
   } catch (err) {

@@ -33,6 +33,10 @@ export type TerrainProjectStore = {
     files?: TerrainProjectFileEntry[]
     metadata?: TerrainProjectMetadata
   }) => void
+  setLegend: (legend: TerrainLegend) => void
+  setLocations: (locations?: TerrainLocation[]) => void
+  setTheme: (theme?: TerrainThemeOverrides) => void
+  updateMetadata: (metadata: Partial<TerrainProjectMetadata>) => void
   upsertFile: (entry: TerrainProjectFileEntry) => void
   removeFile: (path: string) => void
   reset: () => void
@@ -116,8 +120,8 @@ export function createProjectStore(
     state.theme = payload.theme
     state.metadata = {
       ...DEFAULT_METADATA,
-      source: 'archive',
-      label: payload.metadata?.label ?? 'Imported archive'
+      ...payload.metadata,
+      source: 'archive'
     }
     state.files.clear()
     payload.files?.forEach((entry) => {
@@ -129,6 +133,30 @@ export function createProjectStore(
 
   function upsertFile(entry: TerrainProjectFileEntry) {
     state.files.set(entry.path, cloneEntry(entry))
+    state.dirty = true
+    emit()
+  }
+
+  function setLegend(legend: TerrainLegend) {
+    state.legend = legend
+    state.dirty = true
+    emit()
+  }
+
+  function setLocations(locations?: TerrainLocation[]) {
+    state.locations = locations ? [...locations] : undefined
+    state.dirty = true
+    emit()
+  }
+
+  function setTheme(theme?: TerrainThemeOverrides) {
+    state.theme = theme
+    state.dirty = true
+    emit()
+  }
+
+  function updateMetadata(metadata: Partial<TerrainProjectMetadata>) {
+    state.metadata = { ...state.metadata, ...metadata }
     state.dirty = true
     emit()
   }
@@ -167,6 +195,10 @@ export function createProjectStore(
     getSnapshot,
     subscribe,
     loadFromArchive,
+    setLegend,
+    setLocations,
+    setTheme,
+    updateMetadata,
     upsertFile,
     removeFile,
     reset,

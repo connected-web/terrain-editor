@@ -17,7 +17,7 @@ export type LayerBrowserState = {
 export type LayerBrowserStore = {
   getState: () => LayerBrowserState
   subscribe: (listener: (state: LayerBrowserState) => void) => () => void
-  setLegend: (legend: TerrainLegend) => void
+  setLegend: (legend?: TerrainLegend) => void
   setVisibility: (id: string, visible: boolean) => void
   toggleVisibility: (id: string) => void
   setAll: (kind: 'biome' | 'overlay', visible: boolean) => void
@@ -39,10 +39,7 @@ function makeLayerId(kind: 'biome' | 'overlay', key: string) {
   return `${kind}:${key}`
 }
 
-function buildEntries(
-  legend: TerrainLegend | undefined,
-  visibility: VisibilityMap
-): LayerBrowserEntry[] {
+function buildEntries(legend: TerrainLegend | undefined, visibility: VisibilityMap): LayerBrowserEntry[] {
   if (!legend) return []
   const entries: LayerBrowserEntry[] = []
   for (const [key, layer] of Object.entries(legend.biomes ?? {})) {
@@ -117,10 +114,23 @@ export function createLayerBrowserStore(
     listeners.forEach((listener) => listener(snapshot))
   }
 
-  function setLegend(next: TerrainLegend) {
+  function setLegend(next?: TerrainLegend) {
     state.legend = next
+    if (!state.legend) {
+      visibility.clear()
+      state.entries = []
+      emit()
+      return
+    }
     updateVisibilityFromLegend(state.legend, visibility)
-    state.entries = buildEntries(state.legend, visibility)
+    const nextEntries = buildEntries(state.legend, visibility)
+    const validIds = new Set(nextEntries.map((entry) => entry.id))
+    for (const key of Array.from(visibility.keys())) {
+      if (!validIds.has(key)) {
+        visibility.delete(key)
+      }
+    }
+    state.entries = nextEntries
     emit()
   }
 
