@@ -74,7 +74,7 @@ function runCommand(command, args) {
 const CONTENT_CHECKS = new Map([
   ['/', '<title>Terrain Editor - Connected Web</title>'],
   ['/viewer-js/', 'Terrain Viewer Demo'],
-  ['/editor/', 'Editor Demo (Vue 3)'],
+  ['/editor/', 'Terrain Editor'],
   ['/maps/wynnal-terrain.wyn', 'PK']
 ])
 
