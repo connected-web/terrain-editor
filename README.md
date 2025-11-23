@@ -41,32 +41,9 @@ The website CTA buttons link directly to those ports during development so you a
 
 - `npm run test:smoke` – Launches Vite preview servers for the website and each demo, performing a basic HTTP fetch to ensure they respond successfully.
 
-Example use case:
+### Quick start
 
-```typescript
-import { TerrainViewer } from '@connected-web/terrain-editor'
-
-async function setup() {
-  const viewer = new TerrainViewer({
-    container: document.getElementById('terrain-container'),
-  });
-
-  await viewer.loadWynFile('path/to/terrain.wyn')
-}
-
-setup()
-  .then(() => console.log('Terrain loaded'))
-  .catch((err) => console.error('Error loading terrain:', err))
-```
-
-### Embedding the shared viewer UI
-
-The package now ships a self-contained overlay (status text, load button, pop-out/fullscreen controls, drag/drop prompt) and a host helper that moves the `<canvas>` between an embed slot and a modal pop-out. To wire them up:
-
-1. Render a single container element for the viewer and keep it mounted—hosts should not sprinkle bespoke buttons or additional DOM inside it.
-2. Call `createViewerOverlay(container, callbacks)` to inject the chrome and connect overlay callbacks (`onFileSelected`, `onRequestPopout`, `onRequestClosePopout`, `onRequestFullscreenToggle`) to your host logic.
-3. Call `createTerrainViewerHost({ viewerElement, embedTarget })` so the helper can move the renderer between the embed slot and the pop-out shell. Pass `onModeChange` back into the overlay handle so it can toggle button labels.
-4. Load `.wyn` archives through `loadWynArchive` / `loadWynArchiveFromFile` and pass the resulting dataset into `initTerrainViewer`.
+`@connected-web/terrain-editor` exposes `createTerrainViewerHost`, `createViewerOverlay`, `initTerrainViewer`, `loadWynArchive`, and `loadWynArchiveFromFile`. The viewer now assumes a single long-lived container plus an overlay helper that injects file inputs, drag/drop status, and pop-out/fullscreen buttons. Wire them together as shown below:
 
 ```ts
 import {
@@ -110,12 +87,27 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 
 This mirrors the TS viewer demo, so run `npm run build:viewer` if you want a reference implementation.
 
+### Embedding the shared viewer UI
+
+The package ships a self-contained overlay (status text, load button, pop-out/fullscreen controls, drag/drop prompt) plus a host helper that moves the `<canvas>` between an embed slot and a modal pop-out. Stick to the “single container div/ref” contract outlined in `AGENTS.md` so Vue/React/TS demos all share the same behavior.
+
 ## Editor
 
 To make construction of the terrain easier, a Vue 3 based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
 
 - [Website](https://connected-web.github.io/terrain-editor/)
 - [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
+
+### Editor architecture
+
+The Vue workspace is intentionally light on bespoke logic; most of the heavy lifting now lives in `packages/terrain/src/editor`:
+
+- `createProjectStore` – maintains the decompressed file table, legend/locations/theme metadata, and dirty flags so editors can persist/reload the current project.
+- `buildWynArchive` – repacks the canonical project graph back into a `.wyn` Blob (used by “Save/Export” flows).
+- `createLayerBrowserStore` – produces toggle state + metadata for biome/overlay layers based on a legend so multiple UIs share a consistent view of layer visibility.
+- `createMaskEditor` – pure canvas-free brush utilities (paint/erase strokes, undo/redo, drag/drop import) that emit reusable mask buffers.
+
+Vue components should compose these helpers and focus on layout/state presentation. When you need a new editing primitive, add it to the shared package first so future hosts (React, Web Components, etc.) get the functionality for free.
 
 ## License
 
@@ -150,7 +142,7 @@ Copyright 2025 Connected Web.
 ### Editor
 
 - ✅ Create basic editor application (Vue 3 + TS)
-- 🚧 Implement loading and unpacking of `.wyn` files into editor
+- ✅ Implement loading and unpacking of `.wyn` files into editor
 - 🚧 Implement basic editing of terrain data, e.g. JSON data
 - 🚧 Implement exporting of `.wyn` files
 - 🚧 Implement resizing of terrain layers (image manipulation)

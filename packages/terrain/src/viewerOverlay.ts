@@ -355,6 +355,7 @@ export function createViewerOverlay(
       setStatus: () => {},
       setViewMode: () => {},
       setLoadingProgress: () => {},
+      openFileDialog: () => {},
       destroy: () => {}
     }
   }

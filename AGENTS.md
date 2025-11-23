@@ -47,6 +47,12 @@
 - [ ] Scaffold a brush-based mask editor using an offscreen canvas so we can support paint/erase, opacity, and undo/redo history before hooking into more advanced tools.
 - [ ] Define data contracts for future tools (heightmap sculpting, river polylines) so each tool operates on a shared command history and can be repacked without format drift.
 
+### Shared helper modules (`packages/terrain/src/editor`)
+- `createProjectStore` manages the decompressed file table, metadata (legend, locations, theme), and dirty tracking. Every host (Vue editor, demos, tests) should rely on this store instead of ad-hoc refs.
+- `buildWynArchive` accepts the active project snapshot and emits a `.wyn` Blob via JSZip. Editor “Save/Export” flows must call this helper so behavior stays deterministic.
+- `createLayerBrowserStore` exposes the derived list of biome/overlay layers plus visibility toggles. Any UI listing layers should bind to this store rather than rebuilding the logic in Vue components.
+- `createMaskEditor` provides reusable brush primitives (paint/erase strokes, undo/redo, import/export mask buffers). Mask tooling belongs here so additional frameworks can share the painting logic.
+
 ## Completed / Guardrails
 - Theme system with per-state sprite/stem styling and `.wyn` overrides. **Guardrail:** keep JSON schema backward compatible; tests should cover default + map override merges.
 - Local `.wyn` loading (URL + file/drag-drop) and resource cleanup. **Guardrail:** never leak object URLs; always call `dataset.cleanup()` on viewer destroy/reload.
