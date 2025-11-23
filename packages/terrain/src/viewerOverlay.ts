@@ -230,6 +230,7 @@ type ViewerOverlayButtonLocation =
 export type ViewerOverlayCustomButton = {
   location: ViewerOverlayButtonLocation
   label: string
+  description?: string
   callback?: () => void
 }
 
@@ -571,6 +572,9 @@ export function createViewerOverlay(
       button.type = 'button'
       button.className = 'ctw-chip-button'
       button.textContent = custom.label
+      if (custom.description) {
+        button.title = custom.description
+      }
       button.addEventListener('click', () => custom.callback?.())
       appendToSlot(custom.location, button)
     } else {
