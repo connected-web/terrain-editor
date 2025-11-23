@@ -1,5 +1,6 @@
 <template>
   <aside
+    ref="rootRef"
     class="panel-dock"
     :class="{
       'panel-dock--collapsed': collapsed,
@@ -21,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{
   collapsed: boolean
@@ -32,11 +33,17 @@ defineEmits<{
   toggle: []
 }>()
 
+const rootRef = ref<HTMLElement | null>(null)
+
 const toggleIcon = computed(() => {
   if (props.collapsed) {
     return props.mobile ? 'angles-up' : 'angles-right'
   }
   return props.mobile ? 'angles-down' : 'angles-left'
+})
+
+defineExpose({
+  element: rootRef
 })
 </script>
 
@@ -46,12 +53,14 @@ const toggleIcon = computed(() => {
   display: flex;
   flex-direction: column;
   width: min(50%, 420px);
-  min-width: 280px;
+  min-width: 260px;
   max-width: 50%;
   transition: width 0.2s ease;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(6, 11, 20, 0.85);
-  backdrop-filter: blur(6px);
+  background: rgba(6, 11, 20, 0.92);
+  backdrop-filter: blur(8px);
+  height: 100%;
+  margin-left: 1.5rem;
 }
 
 .panel-dock--mobile {
@@ -63,9 +72,9 @@ const toggleIcon = computed(() => {
 }
 
 .panel-dock--collapsed {
-  width: 20px;
-  min-width: 20px;
-  max-width: 20px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
 }
 
 .panel-dock--mobile.panel-dock--collapsed {
@@ -91,6 +100,7 @@ const toggleIcon = computed(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  gap: 10px;
 }
 
 .panel-dock__nav {
@@ -106,6 +116,20 @@ const toggleIcon = computed(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+.panel-dock__content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panel-dock__content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.panel-dock__content::-webkit-scrollbar-thumb {
+  background: rgba(246, 231, 195, 0.35);
+  border-radius: 999px;
 }
 
 .panel-dock--collapsed .panel-dock__content {

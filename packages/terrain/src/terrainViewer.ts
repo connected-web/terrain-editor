@@ -62,6 +62,7 @@ export type TerrainLocation = {
   id: string
   name?: string
   icon?: string
+  showBorder?: boolean
   pixel: { x: number; y: number }
   uv?: { u: number; v: number }
   world?: { x: number; y: number; z: number }
@@ -388,6 +389,7 @@ function resolveSpriteState(
 
 type SpriteVisualOptions = {
   iconTexture?: THREE.Texture
+  showBorder?: boolean
 }
 
 function createIconSpriteTexture(iconTexture: THREE.Texture) {
@@ -478,13 +480,15 @@ function createMarkerSpriteResource(
     const boxHeight = fontSize + spriteTheme.paddingY * 2
     const boxX = (canvas.width - boxWidth) / 2
     const boxY = (canvas.height - boxHeight) / 2
-    ctx.fillStyle = style.backgroundColor
-    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, spriteTheme.borderRadius)
-    ctx.fill()
-    if (style.borderThickness > 0) {
-      ctx.strokeStyle = style.borderColor
-      ctx.lineWidth = style.borderThickness
-      ctx.stroke()
+    if (options?.showBorder ?? true) {
+      ctx.fillStyle = style.backgroundColor
+      drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, spriteTheme.borderRadius)
+      ctx.fill()
+      if (style.borderThickness > 0) {
+        ctx.strokeStyle = style.borderColor
+        ctx.lineWidth = style.borderThickness
+        ctx.stroke()
+      }
     }
     ctx.fillStyle = style.textColor
     ctx.fillText(text, canvas.width / 2, canvas.height / 2 + fontSize * 0.05)
@@ -1029,8 +1033,9 @@ const markerMap = new Map<
           if (!world) return
           locationWorldCache.set(id, world.clone())
           const glyph = formatMarkerGlyph(location)
-          const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
-            iconTexture: iconTextures[i] ?? undefined
+        const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
+            iconTexture: iconTextures[i] ?? undefined,
+            showBorder: location.showBorder !== false
           })
           const sprite = new THREE.Sprite(spriteVisuals.default.material)
           sprite.userData.locationId = location.id

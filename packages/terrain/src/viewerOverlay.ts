@@ -183,6 +183,7 @@ const OVERLAY_CSS = `
   transition: border-color 0.2s ease;
   line-height: 1.2rem;
   white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
   max-width: max(100px, 20vw);
 }

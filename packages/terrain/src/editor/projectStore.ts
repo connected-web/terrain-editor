@@ -11,6 +11,7 @@ export type TerrainProjectFileEntry = {
 
 export type TerrainProjectMetadata = {
   label?: string
+  author?: string
   source?: 'archive' | 'scratch'
 }
 
@@ -54,6 +55,7 @@ type InternalState = {
 
 const DEFAULT_METADATA: TerrainProjectMetadata = {
   label: 'Untitled terrain',
+  author: '',
   source: 'scratch'
 }
 

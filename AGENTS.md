@@ -22,6 +22,13 @@
 ## Backlog – Editor
 - [ ] Persist active project into local storage for offline editing.
 - [ ] Allow decompress/edit/repack of `.wyn` archives entirely in-browser.
+- [ ] Locations + icons: editable list of locations (name, description, coordinates) with drag/drop icon assets and live preview markers.
+- [ ] Map sizing / metadata: editor for legend size, author/title metadata, and validation that imported layers match the declared resolution.
+- [ ] Theme designer: UI for theme tokens (colors, sprite/stem states, overlay palettes) with live preview + JSON export.
+- [ ] Layer asset uploads: drag/drop + upload surface for each layer slot (heightmap, masks, overlays) that normalizes dimensions and updates the project store.
+- [ ] Location icon uploads: allow per-location icon assets via drag/drop and manage references inside the project store.
+- [ ] Viewer recentering: shift camera/canvas when dock/toolbar visibility changes so the terrain stays centered.
+- [ ] Toolbar/dock logic: unified action registry with context-aware buttons (load/export/layers) + collapsible dock panes for future tools.
 - [ ] Expand layer tooling: view, add, edit, and paint masks with undo/redo.
 - [ ] Implement point-based heightmap editor + JSON/PNG export path.
 - [ ] Author river polylines that respect terrain slope and widening rules.

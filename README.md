@@ -143,9 +143,12 @@ Copyright 2025 Connected Web.
 
 - ✅ Create basic editor application (Vue 3 + TS)
 - ✅ Implement loading and unpacking of `.wyn` files into editor
-- 🚧 Implement basic editing of terrain data, e.g. JSON data
-- 🚧 Implement exporting of `.wyn` files
-- 🚧 Implement resizing of terrain layers (image manipulation)
+- 🚧 Locations + icons editor with drag/drop asset support
+- 🚧 Map sizing + legend metadata management
+- 🚧 Theme designer with live preview + JSON export
+- 🚧 Layer asset uploads (drag/drop) with dimension normalization
+- 🚧 Location icon upload surface tied into legend/locations
+- 🚧 Viewer recentering when dock/toolbar visibility changes
+- 🚧 Toolbar/dock logic unification for future tools
 - 🚧 Implement mask editing tools (brushes, noise, etc.)
 - 🚧 Implement heightmap editing tools (point files, falloff, rivers, etc.)
-- 🚧 Implement location editing tools (add pins, edit pins)

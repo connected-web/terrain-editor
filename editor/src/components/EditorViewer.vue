@@ -142,6 +142,7 @@ defineExpose({
   min-height: 400px;
   background: #060b14;
   overflow: hidden;
+  border-radius: 0;
 }
 
 .editor-viewer__canvas {
@@ -155,9 +156,9 @@ defineExpose({
 
 .editor-viewer__toolbar {
   position: absolute;
-  top: 50%;
+  top: 10%;
   left: 1rem;
-  transform: translateY(-50%);
+  transform: translateY(-10%);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -196,5 +197,17 @@ defineExpose({
 
 .editor-viewer__toolbar-label {
   font-size: 0.85rem;
+}
+
+/* < 800px width */
+@media screen and (max-width: 799px) {
+  .editor-viewer__toolbar {
+    flex-direction: row;
+    top: auto;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
 }
 </style>

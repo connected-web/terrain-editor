@@ -1,20 +1,5 @@
 <template>
   <div class="editor-shell" ref="editorRoot">
-    <header class="editor-header">
-      <div class="editor-heading">
-        <p class="editor-kicker">Connected Web</p>
-        <h1>Terrain Editor</h1>
-        <p class="editor-subtitle">Load, inspect, and export Wyn archives directly in your browser.</p>
-      </div>
-      <button
-        type="button"
-        class="pill-button"
-        :disabled="!persistedProject"
-        @click="handleRestoreClick"
-      >
-        <Icon icon="clock-rotate-left">Restore last project</Icon>
-      </button>
-    </header>
     <div class="editor-layout">
       <EditorViewer
         ref="viewerShell"
@@ -25,7 +10,12 @@
         @load-file="loadArchiveFromFile"
         @toggle-fullscreen="toggleEditorFullscreen"
       />
-      <PanelDock :collapsed="isDockCollapsed" :mobile="isCompactViewport" @toggle="toggleDock">
+      <PanelDock
+        ref="dockRef"
+        :collapsed="isDockCollapsed"
+        :mobile="isCompactViewport"
+        @toggle="toggleDock"
+      >
         <template #nav>
           <button
             class="panel-dock__nav-button"
@@ -44,22 +34,71 @@
           >
             <Icon icon="layer-group">Layers</Icon>
           </button>
+          <button
+            class="panel-dock__nav-button"
+            :class="{ 'panel-dock__nav-button--active': activeDockPanel === 'locations' }"
+            type="button"
+            :disabled="!hasActiveArchive"
+            @click="setActivePanel('locations')"
+          >
+            <Icon icon="location-dot">Locations</Icon>
+          </button>
         </template>
 
-        <section v-if="activeDockPanel === 'workspace'" class="panel-card panel-card--placeholder">
-          <header class="panel-card__header">
-            <Icon icon="compass-drafting">Workspace</Icon>
+        <section v-if="activeDockPanel === 'workspace'" class="panel-card">
+          <header class="panel-card__header panel-card__header--split">
+            <div class="panel-card__header-main">
+              <Icon icon="compass-drafting">Workspace metadata</Icon>
+            </div>
+            <button class="pill-button pill-button--ghost" @click="resetWorkspaceForm" :disabled="!hasActiveArchive">
+              Reset
+            </button>
           </header>
-          <p v-if="hasActiveArchive">
-            Viewing <strong>{{ projectSnapshot.metadata.label ?? 'Unnamed terrain' }}</strong>. Use the toolbar to export
-            or close the archive. Collapse the dock for a pure viewer, or jump to “Layers” for visibility controls.
-          </p>
-          <p v-else>
-            Load a <code>.wyn</code> archive to unlock tools. The dock collapses when you only want the viewer.
-          </p>
+          <div class="workspace-form">
+            <label class="workspace-form__field">
+              <span>Project title</span>
+              <input type="text" v-model="workspaceForm.label" @change="updateProjectLabel(workspaceForm.label)" />
+            </label>
+            <label class="workspace-form__field">
+              <span>Author</span>
+              <input type="text" v-model="workspaceForm.author" @change="updateProjectAuthor(workspaceForm.author)" />
+            </label>
+            <div class="workspace-form__split">
+              <label class="workspace-form__field">
+                <span>Map width (px)</span>
+                <input
+                  type="number"
+                  min="64"
+                  v-model.number="workspaceForm.width"
+                  @change="applyMapSize"
+                />
+              </label>
+              <label class="workspace-form__field">
+                <span>Map height (px)</span>
+                <input
+                  type="number"
+                  min="64"
+                  v-model.number="workspaceForm.height"
+                  @change="applyMapSize"
+                />
+              </label>
+            </div>
+            <label class="workspace-form__field">
+              <span>Sea level</span>
+              <input
+                type="number"
+                step="0.01"
+                v-model.number="workspaceForm.seaLevel"
+                @change="applySeaLevel"
+              />
+            </label>
+            <p class="workspace-form__hint">
+              Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
+            </p>
+          </div>
         </section>
 
-        <section v-else class="panel-card">
+        <section v-else-if="activeDockPanel === 'layers'" class="panel-card">
           <header class="panel-card__header">
             <Icon icon="layer-group">Layers</Icon>
             <span class="panel-card__hint">Toggle biome + overlay visibility</span>
@@ -93,13 +132,131 @@
           </div>
           <p v-else class="panel-card__placeholder">Legend data not loaded yet.</p>
         </section>
+
+        <section v-else class="panel-card panel-card--locations">
+          <header class="panel-card__header panel-card__header--split">
+            <div class="panel-card__header-main">
+              <Icon icon="location-dot">Locations</Icon>
+              <span class="panel-card__hint">Edit labels + icons</span>
+            </div>
+            <button class="pill-button pill-button--ghost" @click="addLocation" :disabled="!projectSnapshot.legend">
+              <Icon icon="plus">Add location</Icon>
+            </button>
+          </header>
+          <p v-if="!locationsList.length" class="panel-card__placeholder">
+            No locations yet. Import a map with locations or add them manually.
+          </p>
+          <div
+            v-else
+            class="locations-panel"
+            :class="{ 'drag-active': locationsDragActive }"
+            @dragenter="onLocationsDragEnter"
+            @dragover="onLocationsDragEnter"
+            @dragleave="onLocationsDragLeave"
+            @drop="onLocationsDrop"
+          >
+            <article
+              v-for="location in locationsList"
+              :key="location.id"
+              class="locations-panel__item"
+              @dragover="handleIconDragOver"
+              @drop="handleIconDrop(location, $event)"
+            >
+              <div class="locations-panel__preview">
+                <div
+                  class="locations-panel__icon"
+                  :class="{ 'locations-panel__icon--ghost': location.showBorder === false }"
+                  :style="{ backgroundImage: getIconPreview(location.icon) ? `url('${getIconPreview(location.icon)}')` : undefined }"
+                >
+                  <span v-if="!getIconPreview(location.icon)">{{ location.name?.[0] ?? '?' }}</span>
+                </div>
+                <div class="locations-panel__preview-actions">
+                  <button type="button" class="pill-button" @click="openIconPicker(location)">
+                    <Icon icon="images">Choose icon</Icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost"
+                    @click="clearLocationIcon(location)"
+                    :disabled="!location.icon"
+                  >
+                    <Icon icon="ban">Clear icon</Icon>
+                  </button>
+                </div>
+              </div>
+              <label class="locations-panel__field">
+                <span>Name</span>
+                <input
+                  type="text"
+                  v-model="location.name"
+                  @blur="commitLocations"
+                  placeholder="Location name"
+                />
+              </label>
+              <label class="locations-panel__field">
+                <span>Icon reference</span>
+                <input
+                  type="text"
+                  v-model="location.icon"
+                  @blur="commitLocations"
+                  placeholder="e.g. icons/castle.png"
+                />
+              </label>
+              <div class="locations-panel__coords">
+                <label>
+                  <span>X</span>
+                  <input
+                    type="number"
+                    min="0"
+                    :max="workspaceForm.width"
+                    v-model.number="location.pixel.x"
+                    @change="clampLocationPixel(location)"
+                  />
+                </label>
+                <label>
+                  <span>Y</span>
+                  <input
+                    type="number"
+                    min="0"
+                    :max="workspaceForm.height"
+                    v-model.number="location.pixel.y"
+                    @change="clampLocationPixel(location)"
+                  />
+                </label>
+              </div>
+              <label class="locations-panel__toggle">
+                <input type="checkbox" v-model="location.showBorder" @change="commitLocations" />
+                <span>Show label border</span>
+              </label>
+              <button type="button" class="pill-button pill-button--danger" @click="removeLocation(location)">
+                <Icon icon="trash">Remove location</Icon>
+              </button>
+            </article>
+          </div>
+        </section>
       </PanelDock>
+      <input
+        type="file"
+        accept="image/*"
+        class="sr-only"
+        ref="iconLibraryInputRef"
+        @change="handleLibraryUpload"
+      />
+      <AssetDialog
+        v-if="iconPickerTarget"
+        :assets="projectAssets"
+        :get-preview="getIconPreview"
+        @select="selectIconFromLibrary"
+        @upload="triggerLibraryUpload"
+        @remove="removeAsset"
+        @close="closeIconPicker"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   buildWynArchive,
   createLayerBrowserStore,
@@ -110,22 +267,34 @@ import {
   type TerrainDataset,
   type TerrainHandle,
   type TerrainLocation,
+  type TerrainProjectFileEntry,
   loadWynArchiveFromArrayBuffer,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
+import AssetDialog from './components/AssetDialog.vue'
 import type { UIAction } from './types/uiActions'
 
 const STORAGE_KEY = 'ctw-editor-project-v2'
 const AUTO_RESTORE_KEY = 'ctw-editor-restore-enabled'
+
+type DockPanel = 'workspace' | 'layers' | 'locations'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
 const interactive = ref(false)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
-const activeDockPanel = ref<'workspace' | 'layers'>('workspace')
+const activeDockPanel = ref<DockPanel>('workspace')
+
+const workspaceForm = reactive({
+  label: '',
+  author: '',
+  width: 1024,
+  height: 1536,
+  seaLevel: 0
+})
 
 const projectStore = createProjectStore()
 const projectSnapshot = ref(projectStore.getSnapshot())
@@ -139,7 +308,14 @@ const persistedProject = ref<PersistedProject | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const hasActiveArchive = computed(() => Boolean(datasetRef.value))
 
+const projectAssets = computed(() => projectSnapshot.value.files ?? [])
 const layerEntries = computed(() => layerBrowserState.value.entries)
+const locationsDragActive = ref(false)
+const assetOverrides = new Map<string, string>()
+const iconPickerTarget = ref<string | null>(null)
+const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
+const iconPreviewCache = reactive<Record<string, string>>({})
+const iconPreviewOwnership = new Map<string, string>()
 
 const uiActions = computed<UIAction[]>(() => {
   const actions: UIAction[] = []
@@ -170,18 +346,14 @@ const uiActions = computed<UIAction[]>(() => {
   } else {
     actions.push(
       {
-        id: 'export',
-        icon: 'file-export',
-        label: 'Export WYN',
-        description: 'Download the current project as a Wyn archive.',
-        callback: () => void exportArchive()
-      },
-      {
-        id: 'close',
-        icon: 'circle-xmark',
-        label: 'Close map',
-        description: 'Unload the active archive without auto-restoring on refresh.',
-        callback: () => closeActiveArchive()
+        id: 'workspace',
+        icon: 'compass-drafting',
+        label: 'Workspace',
+        description: 'Jump to the workspace controls.',
+        callback: () => {
+          setActivePanel('workspace')
+          isDockCollapsed.value = false
+        }
       },
       {
         id: 'layers',
@@ -194,11 +366,28 @@ const uiActions = computed<UIAction[]>(() => {
         }
       },
       {
-        id: 'toggle-placement',
-        icon: interactive.value ? 'hand' : 'crosshairs',
-        label: interactive.value ? 'Disable placement' : 'Enable placement',
-        slot: 'bottom-right',
-        callback: () => toggleInteraction()
+        id: 'locations',
+        icon: 'location-dot',
+        label: 'Locations',
+        description: 'Edit location names + icons.',
+        callback: () => {
+          setActivePanel('locations')
+          isDockCollapsed.value = false
+        }
+      },
+      {
+        id: 'export',
+        icon: 'file-export',
+        label: 'Export WYN',
+        description: 'Download the current project as a Wyn archive.',
+        callback: () => void exportArchive()
+      },
+      {
+        id: 'close',
+        icon: 'circle-xmark',
+        label: 'Close map',
+        description: 'Unload the active archive without auto-restoring on refresh.',
+        callback: () => closeActiveArchive()
       }
     )
   }
@@ -207,7 +396,14 @@ const uiActions = computed<UIAction[]>(() => {
 
 projectStore.subscribe((snapshot) => {
   projectSnapshot.value = snapshot
-  locationsList.value = snapshot.locations ? [...snapshot.locations] : []
+  locationsList.value = snapshot.locations
+    ? snapshot.locations.map((location) => {
+        const copy = ensureLocationId({ ...location })
+        if (copy.showBorder === undefined) copy.showBorder = true
+        return copy
+      })
+    : []
+  refreshIconPreviewCache()
 })
 
 layerBrowserStore.subscribe((state) => {
@@ -222,6 +418,24 @@ watch(
       await handle.value.updateLayers(next)
     }
   }
+)
+
+watch(
+  () => locationsList.value.map((location) => location.icon),
+  () => refreshIconPreviewCache(),
+  { deep: true }
+)
+
+watch(
+  () => projectSnapshot.value,
+  (snapshot) => {
+    workspaceForm.label = snapshot.metadata.label ?? ''
+    workspaceForm.author = snapshot.metadata.author ?? ''
+    workspaceForm.width = snapshot.legend?.size?.[0] ?? 1024
+    workspaceForm.height = snapshot.legend?.size?.[1] ?? 1536
+    workspaceForm.seaLevel = snapshot.legend?.sea_level ?? 0
+  },
+  { immediate: true }
 )
 
 type PersistedProject = {
@@ -239,6 +453,44 @@ function updateStatus(message: string) {
 
 function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
   viewerShell.value?.setOverlayLoading(state)
+}
+
+function resetWorkspaceForm() {
+  workspaceForm.label = projectSnapshot.value.metadata.label ?? ''
+  workspaceForm.author = projectSnapshot.value.metadata.author ?? ''
+  workspaceForm.width = projectSnapshot.value.legend?.size?.[0] ?? 1024
+  workspaceForm.height = projectSnapshot.value.legend?.size?.[1] ?? 1536
+  workspaceForm.seaLevel = projectSnapshot.value.legend?.sea_level ?? 0
+}
+
+function updateProjectLabel(value: string) {
+  projectStore.updateMetadata({ label: value })
+  void persistCurrentProject()
+}
+
+function updateProjectAuthor(value: string) {
+  projectStore.updateMetadata({ author: value })
+  void persistCurrentProject()
+}
+
+function applyMapSize() {
+  const legend = projectSnapshot.value.legend
+  if (!legend) return
+  const width = Math.max(64, Math.floor(workspaceForm.width))
+  const height = Math.max(64, Math.floor(workspaceForm.height))
+  const nextLegend = { ...legend, size: [width, height] as [number, number] }
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  void persistCurrentProject()
+}
+
+function applySeaLevel() {
+  const legend = projectSnapshot.value.legend
+  if (!legend) return
+  const nextLegend = { ...legend, sea_level: Number(workspaceForm.seaLevel) }
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  void persistCurrentProject()
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -337,9 +589,10 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   setOverlayLoading({ label: loadingLabel, loadedBytes: 0 })
   disposeViewer()
   cleanupDataset()
+  clearAssetOverrides()
   try {
     const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
-    datasetRef.value = archive.dataset
+    datasetRef.value = wrapDatasetWithOverrides(archive.dataset)
     layerBrowserStore.setLegend(archive.legend)
     projectStore.loadFromArchive({
       legend: archive.legend,
@@ -360,6 +613,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
     updateStatus(`Failed to load ${label}.`)
   } finally {
     setOverlayLoading(null)
+    refreshIconPreviewCache()
   }
 }
 
@@ -395,6 +649,8 @@ function closeActiveArchive() {
   locationsList.value = []
   handle.value = null
   activeDockPanel.value = 'workspace'
+  clearAssetOverrides()
+  refreshIconPreviewCache()
   updateStatus('Viewer cleared. Load a map to continue.')
   try {
     localStorage.setItem(AUTO_RESTORE_KEY, '0')
@@ -413,6 +669,26 @@ function startNewMap() {
   } catch (err) {
     console.warn('Failed to reset persisted project', err)
   }
+}
+
+function addLocation() {
+  const legend = projectSnapshot.value.legend
+  const width = legend?.size?.[0] ?? 1024
+  const height = legend?.size?.[1] ?? 1536
+  const next: TerrainLocation = ensureLocationId({
+    id: '',
+    name: 'New location',
+    pixel: { x: Math.round(width / 2), y: Math.round(height / 2) },
+    showBorder: true
+  })
+  locationsList.value = [...locationsList.value, next]
+  commitLocations()
+}
+
+function removeLocation(location: TerrainLocation) {
+  if (!confirm(`Remove ${location.name ?? 'this location'}?`)) return
+  locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
+  commitLocations()
 }
 
 function downloadBlob(filename: string, blob: Blob) {
@@ -489,17 +765,266 @@ function toggleDock() {
   isDockCollapsed.value = !isDockCollapsed.value
 }
 
-function setActivePanel(panel: 'workspace' | 'layers') {
+function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
 
-function handleRestoreClick() {
-  if (!persistedProject.value) return
-  void restorePersistedProject(false)
+function ensureLocationId(location: TerrainLocation): TerrainLocation {
+  if (!location.id) {
+    location.id = `loc-${Math.random().toString(36).slice(2, 10)}`
+  }
+  return location
+}
+
+function openIconPicker(location: TerrainLocation) {
+  iconPickerTarget.value = ensureLocationId(location).id!
+}
+
+function closeIconPicker() {
+  iconPickerTarget.value = null
+}
+
+function selectIconFromLibrary(path: string) {
+  if (!iconPickerTarget.value) return
+  const target = locationsList.value.find(
+    (entry) => ensureLocationId(entry).id === iconPickerTarget.value
+  )
+  if (!target) return
+  target.icon = path
+  commitLocations()
+  closeIconPicker()
+}
+
+function triggerLibraryUpload() {
+  iconLibraryInputRef.value?.click()
+}
+
+async function handleLibraryUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  await importIconAsset(file, iconPickerTarget.value ?? undefined)
+  input.value = ''
+}
+
+async function handleIconDrop(location: TerrainLocation, event: DragEvent) {
+  swallowDragEvent(event)
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  await importLocationIcon(location, file)
+  locationsDragActive.value = false
+}
+
+function handleIconDragOver(event: DragEvent) {
+  swallowDragEvent(event)
+}
+
+async function importLocationIcon(location: TerrainLocation, file: File) {
+  await importIconAsset(file, ensureLocationId(location).id!)
+}
+
+function commitLocations() {
+  const cloned = locationsList.value.map((location) => {
+    const copy = ensureLocationId({ ...location })
+    if (copy.showBorder === undefined) copy.showBorder = true
+    return copy
+  })
+  projectStore.setLocations(cloned)
+  handle.value?.updateLocations(cloned)
+  void persistCurrentProject()
+}
+
+function clampLocationPixel(location: TerrainLocation) {
+  const width = workspaceForm.width
+  const height = workspaceForm.height
+  location.pixel.x = clampNumber(location.pixel.x ?? 0, 0, width)
+  location.pixel.y = clampNumber(location.pixel.y ?? 0, 0, height)
+  commitLocations()
+}
+
+function clearLocationIcon(location: TerrainLocation) {
+  location.icon = undefined
+  commitLocations()
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function normalizeAssetFileName(name: string) {
+  const trimmed = name.trim().toLowerCase()
+  const segments = trimmed.split('.')
+  const ext = segments.length > 1 ? segments.pop() ?? '' : ''
+  const base = segments.join('.').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const safeExt = ext.replace(/[^a-z0-9]+/g, '')
+  return safeExt ? `${base || 'asset'}.${safeExt}` : base || 'asset'
+}
+
+function buildIconPath(name: string) {
+  return `icons/${normalizeAssetFileName(name)}`
+}
+
+function setAssetOverride(path: string, file: File) {
+  const existing = assetOverrides.get(path)
+  if (existing) {
+    URL.revokeObjectURL(existing)
+  }
+  const url = URL.createObjectURL(file)
+  assetOverrides.set(path, url)
+  iconPreviewCache[path] = url
+  iconPreviewOwnership.set(path, url)
+}
+
+function clearAssetOverrides() {
+  assetOverrides.forEach((url) => URL.revokeObjectURL(url))
+  assetOverrides.clear()
+  refreshIconPreviewCache()
+}
+
+function onLocationsDragEnter(event: DragEvent) {
+  swallowDragEvent(event)
+  locationsDragActive.value = true
+}
+
+function onLocationsDragLeave(event: DragEvent) {
+  swallowDragEvent(event)
+  const target = event.relatedTarget as HTMLElement | null
+  if (!target || !event.currentTarget) {
+    locationsDragActive.value = false
+    return
+  }
+  const current = event.currentTarget as HTMLElement
+  if (!current.contains(target)) {
+    locationsDragActive.value = false
+  }
+}
+
+async function onLocationsDrop(event: DragEvent) {
+  swallowDragEvent(event)
+  locationsDragActive.value = false
+}
+
+function swallowDragEvent(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  event.stopImmediatePropagation?.()
+}
+
+async function importIconAsset(file: File, targetLocationId?: string) {
+  const path = buildIconPath(file.name)
+  const buffer = await file.arrayBuffer()
+  projectStore.upsertFile({
+    path,
+    data: buffer,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+  setAssetOverride(path, file)
+  refreshIconPreviewCache()
+  if (targetLocationId) {
+    const target = locationsList.value.find(
+      (location) => ensureLocationId(location).id === targetLocationId
+    )
+    if (target) {
+      target.icon = path
+      commitLocations()
+    }
+  }
+  return path
+}
+
+function removeAsset(path: string) {
+  if (!confirm(`Remove ${path}?`)) return
+  projectStore.removeFile(path)
+  if (assetOverrides.has(path)) {
+    const url = assetOverrides.get(path)
+    if (url) URL.revokeObjectURL(url)
+    assetOverrides.delete(path)
+  }
+  delete iconPreviewCache[path]
+  locationsList.value = locationsList.value.map((location) =>
+    location.icon === path ? { ...location, icon: undefined } : location
+  )
+  commitLocations()
+  refreshIconPreviewCache()
+  if (iconPickerTarget.value) {
+    iconPickerTarget.value = null
+  }
+}
+
+function refreshIconPreviewCache() {
+  const activePaths = new Set<string>()
+  ;(projectSnapshot.value.files ?? []).forEach((file) => {
+    activePaths.add(file.path)
+    preloadIconPreview(file.path, file)
+  })
+  locationsList.value.forEach((location) => {
+    if (location.icon) {
+      activePaths.add(location.icon)
+      preloadIconPreview(location.icon)
+    }
+  })
+  Object.keys(iconPreviewCache).forEach((path) => {
+    if (!activePaths.has(path) && !assetOverrides.has(path)) {
+      const ownedUrl = iconPreviewOwnership.get(path)
+      if (ownedUrl) {
+        URL.revokeObjectURL(ownedUrl)
+        iconPreviewOwnership.delete(path)
+      }
+      delete iconPreviewCache[path]
+    }
+  })
+}
+
+function getIconPreview(icon?: string) {
+  if (!icon) return ''
+  if (assetOverrides.has(icon)) return assetOverrides.get(icon)!
+  if (iconPreviewCache[icon]) return iconPreviewCache[icon]
+  preloadIconPreview(icon)
+  return ''
+}
+
+async function preloadIconPreview(path: string, file?: TerrainProjectFileEntry) {
+  if (iconPreviewCache[path]) return
+  if (assetOverrides.has(path)) {
+    iconPreviewCache[path] = assetOverrides.get(path)!
+    return
+  }
+  if (file) {
+    const blob = new Blob([file.data], { type: file.type ?? 'image/png' })
+    const url = URL.createObjectURL(blob)
+    iconPreviewCache[path] = url
+    iconPreviewOwnership.set(path, url)
+    return
+  }
+  const dataset = datasetRef.value
+  if (!dataset) return
+  try {
+    const resolved = await Promise.resolve(dataset.resolveAssetUrl(path))
+    iconPreviewCache[path] = resolved
+  } catch (err) {
+    console.warn('Failed to resolve icon preview', path, err)
+  }
+}
+
+function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
+  const baseResolve = dataset.resolveAssetUrl.bind(dataset)
+  return {
+    ...dataset,
+    resolveAssetUrl: (path: string) => {
+      if (assetOverrides.has(path)) {
+        return assetOverrides.get(path)!
+      }
+      return baseResolve(path)
+    }
+  }
 }
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
+  window.addEventListener('dragover', swallowDragEvent, true)
+  window.addEventListener('drop', swallowDragEvent, true)
   const saved = readPersistedProject()
   if (saved) {
     persistedProject.value = saved
@@ -513,5 +1038,9 @@ onBeforeUnmount(() => {
   disposeViewer()
   cleanupDataset()
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('dragover', swallowDragEvent, true)
+  window.removeEventListener('drop', swallowDragEvent, true)
+  iconPreviewOwnership.forEach((url) => URL.revokeObjectURL(url))
+  iconPreviewOwnership.clear()
 })
 </script>
