@@ -153,6 +153,10 @@ const OVERLAY_CSS = `
   padding: 0.35rem 0.9rem;
   backdrop-filter: blur(6px);
   line-height: 1.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: max(150px, 50%, 30vw);
+  text-overflow: ellipsis;
 }
 
 .ctw-viewer-overlay__buttons {
@@ -178,6 +182,9 @@ const OVERLAY_CSS = `
   cursor: pointer;
   transition: border-color 0.2s ease;
   line-height: 1.2rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: max(100px, 20vw);
 }
 
 .ctw-chip-button:disabled {

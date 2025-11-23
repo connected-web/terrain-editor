@@ -41,6 +41,10 @@
         </div>
         <textarea v-model="locationsJson" spellcheck="false" />
       </article>
+
+      <p v-if="isPanelHidden" class="panel-warning">
+        Expand the editor window (≥ 800 wide) to use the full editor features.
+      </p>
     </div>
   </div>
 </template>
@@ -73,6 +77,11 @@ const handle = ref<TerrainHandle | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const hasActiveArchive = computed(() => Boolean(datasetRef.value))
+const isPanelHidden = ref(window.innerWidth < 800)
+
+function handleResize() {
+  isPanelHidden.value = window.innerWidth < 800
+}
 
 function updateStatus(message: string) {
   status.value = message
@@ -377,11 +386,13 @@ async function restorePersistedProject() {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize)
   void restorePersistedProject()
 })
 
 onBeforeUnmount(() => {
   disposeViewer()
   cleanupDataset()
+  window.removeEventListener('resize', handleResize)
 })
 </script>

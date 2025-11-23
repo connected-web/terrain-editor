@@ -126,6 +126,8 @@ defineExpose({
   inset: 0;
   width: 100%;
   height: 100%;
+  min-width: 400px;
+  min-height: 400px;
   background: #060b14;
   overflow: hidden;
 }
