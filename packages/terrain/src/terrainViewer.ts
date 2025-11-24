@@ -44,7 +44,9 @@ const DEFAULT_STEM_SCALE = 0.01
 const BASE_FILL_COLOR = '#7b5c3a'
 const SPRITE_CANVAS_WIDTH = 240
 const SPRITE_CANVAS_HEIGHT = 160
+const ICON_TEXTURE_SIZE = 256
 const ICON_CANVAS_MARGIN = 18
+const ICON_SCALE_MULTIPLIER = 0.5
 const ICON_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i
 
 export type LayerToggleState = {
@@ -102,6 +104,8 @@ export type TerrainHandle = {
   setHoveredLocation: (id: string | null) => void
   setCameraOffset: (offset: number, focusId?: string) => void
   getViewState: () => LocationViewState
+  setTheme: (overrides?: TerrainThemeOverrides) => void
+  setSeaLevel: (level: number) => void
 }
 
 export type Cleanup = () => void
@@ -392,7 +396,11 @@ type SpriteVisualOptions = {
   showBorder?: boolean
 }
 
-function createIconSpriteTexture(iconTexture: THREE.Texture) {
+function createIconSpriteTexture(
+  iconTexture: THREE.Texture,
+  style: MarkerSpriteStateStyle,
+  showBorder: boolean
+) {
   const source = iconTexture.image as
     | HTMLImageElement
     | HTMLCanvasElement
@@ -405,8 +413,8 @@ function createIconSpriteTexture(iconTexture: THREE.Texture) {
     return fallback
   }
   const canvas = document.createElement('canvas')
-  canvas.width = SPRITE_CANVAS_WIDTH
-  canvas.height = SPRITE_CANVAS_HEIGHT
+  canvas.width = ICON_TEXTURE_SIZE
+  canvas.height = ICON_TEXTURE_SIZE
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     const fallback = iconTexture.clone()
@@ -414,18 +422,40 @@ function createIconSpriteTexture(iconTexture: THREE.Texture) {
     return fallback
   }
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.save()
+  if (showBorder) {
+    const borderRadius = 24
+    const inset = 12
+    ctx.fillStyle = style.backgroundColor
+    drawRoundedRect(
+      ctx,
+      inset,
+      inset,
+      canvas.width - inset * 2,
+      canvas.height - inset * 2,
+      borderRadius
+    )
+    ctx.fill()
+    if (style.borderThickness > 0) {
+      ctx.strokeStyle = style.borderColor
+      ctx.lineWidth = Math.max(1, style.borderThickness * 1.5)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
   const imageLike = source as any
   const rawWidth =
     imageLike?.naturalWidth ??
     imageLike?.width ??
-    SPRITE_CANVAS_WIDTH
+    ICON_TEXTURE_SIZE
   const rawHeight =
     imageLike?.naturalHeight ??
     imageLike?.height ??
-    SPRITE_CANVAS_HEIGHT
+    ICON_TEXTURE_SIZE
   const aspect = rawWidth > 0 && rawHeight > 0 ? rawWidth / rawHeight : 1
-  const maxWidth = canvas.width - ICON_CANVAS_MARGIN * 2
-  const maxHeight = canvas.height - ICON_CANVAS_MARGIN * 2
+  const margin = ICON_CANVAS_MARGIN + (showBorder ? 16 : 4)
+  const maxWidth = canvas.width - margin * 2
+  const maxHeight = canvas.height - margin * 2
   let drawWidth = maxWidth
   let drawHeight = drawWidth / aspect
   if (drawHeight > maxHeight) {
@@ -447,7 +477,11 @@ function createMarkerSpriteResource(
   options?: SpriteVisualOptions
 ): MarkerSpriteVisualResource {
   if (options?.iconTexture) {
-    const texture = createIconSpriteTexture(options.iconTexture)
+    const texture = createIconSpriteTexture(
+      options.iconTexture,
+      style,
+      options.showBorder ?? true
+    )
     texture.needsUpdate = true
     const material = new THREE.SpriteMaterial({
       map: texture,
@@ -720,7 +754,9 @@ export async function initTerrainViewer(
       navigateTo: noop,
       setHoveredLocation: noop,
       setCameraOffset: noop,
-      getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 })
+      getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 }),
+      setTheme: () => {},
+      setSeaLevel: () => {}
     }
   }
 
@@ -729,9 +765,11 @@ export async function initTerrainViewer(
   const disposables: Cleanup[] = []
 
   const legend = dataset.legend
-  const theme = resolveTerrainTheme(dataset.theme, options.theme)
-  const markerTheme = theme.locationMarkers
-  const seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
+  let themeOverrides = options.theme
+  let resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
+  let markerTheme = resolvedTheme.locationMarkers
+  let seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
+  const initialSeaLevel = seaLevel
   const [rawLegendWidth, rawLegendHeight] = legend.size
   const safeLegendWidth = Math.max(1, rawLegendWidth || DEFAULT_MAP_WIDTH)
   const safeLegendHeight = Math.max(1, rawLegendHeight || DEFAULT_MAP_HEIGHT)
@@ -745,15 +783,19 @@ export async function initTerrainViewer(
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
   const baseWidth = terrainWidth + EDGE_RIM * 2
   const baseDepth = terrainDepth + EDGE_RIM * 2
-  const rawStemScale = markerTheme.stem.scale
-  const stemScale =
-    typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
-      ? Math.max(0, rawStemScale)
-      : DEFAULT_STEM_SCALE
-  const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
-  const stemRadius = Number.isFinite(maxStemRadiusCandidate)
-    ? Math.min(markerTheme.stem.radius, Math.max(0, maxStemRadiusCandidate))
-    : markerTheme.stem.radius
+  function computeStemRadius(stemTheme: MarkerStemTheme) {
+    const rawStemScale = stemTheme.scale
+    const stemScale =
+      typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
+        ? Math.max(0, rawStemScale)
+        : DEFAULT_STEM_SCALE
+    const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
+    return Number.isFinite(maxStemRadiusCandidate)
+      ? Math.min(stemTheme.radius, Math.max(0, maxStemRadiusCandidate))
+      : stemTheme.radius
+  }
+
+  let stemRadius = computeStemRadius(markerTheme.stem)
   const layerImageCache = new Map<string, HTMLImageElement>()
   const maskCanvasCache = new Map<string, HTMLCanvasElement>()
 
@@ -777,13 +819,18 @@ export async function initTerrainViewer(
     100
   )
   const waterPercentNormalized = waterPercent / 100
-  const waterHeight = THREE.MathUtils.mapLinear(
-    waterPercentNormalized,
-    0,
-    1,
-    WATER_MIN * heightScale,
-    WATER_MAX * heightScale
-  )
+
+  function computeWaterHeight() {
+    return THREE.MathUtils.mapLinear(
+      waterPercentNormalized,
+      0,
+      1,
+      WATER_MIN * currentHeightScale,
+      WATER_MAX * currentHeightScale
+    )
+  }
+
+  let waterHeight = computeWaterHeight()
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(43, width / height, 0.1, 100)
@@ -883,6 +930,8 @@ const markerMap = new Map<
     stem: THREE.Mesh
     spriteVisuals: MarkerSpriteVisualSet
     stemStates: MarkerStemVisualSet
+    iconScale: number
+    stemBaseHeight: number
   }
 >()
   const markerInteractiveTargets: THREE.Object3D[] = []
@@ -991,11 +1040,16 @@ const markerMap = new Map<
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
     const baseScale = lerp / 80
 
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates }, id) => {
+    const zoomRange = controls.maxDistance - controls.minDistance
+    const normalizedZoom =
+      zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
+    const heightScaleFactor = THREE.MathUtils.lerp(0.35, 1, normalizedZoom)
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
-      sprite.scale.set(baseScale, baseScale, baseScale).multiplyScalar(emphasis)
+      const scaled = baseScale * (iconScale ?? 1) * emphasis
+      sprite.scale.set(scaled, scaled, scaled)
       const visualState: MarkerVisualState = isFocused ? 'focus' : isHovered ? 'hover' : 'default'
       const nextVisual = spriteVisuals[visualState]
       if (sprite.material !== nextVisual.material) {
@@ -1005,7 +1059,40 @@ const markerMap = new Map<
       const stemState = stemStates[visualState]
       stemMat.opacity = stemState.opacity
       stemMat.color.set(stemState.color)
+      const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
+      stem.scale.set(stemWidth, heightScaleFactor, stemWidth)
+      const adjustedHeight = stemBaseHeight * heightScaleFactor
+      stem.position.y = -(adjustedHeight / 4)
+      sprite.position.y = 0.05 + adjustedHeight / 4
     })
+  }
+
+  function rebuildRimMesh() {
+    if (!rimMesh) return
+    scene.remove(rimMesh)
+    rimMesh.geometry.dispose()
+    rimMesh = buildRimMesh(terrainGeometry, FLOOR_Y, rimMaterial)
+    rimMesh.receiveShadow = true
+    scene.add(rimMesh)
+  }
+
+  function rebuildOceanMesh() {
+    if (!heightSampler) return
+    if (ocean) {
+      scene.remove(ocean.mesh)
+      ocean.dispose()
+    }
+    waterHeight = computeWaterHeight()
+    ocean = createOceanMesh(
+      heightMap,
+      heightSampler,
+      currentHeightScale,
+      waterHeight,
+      seaLevel,
+      terrainWidth,
+      terrainDepth
+    )
+    scene.add(ocean.mesh)
   }
 
   function setLocationMarkers(locations: TerrainLocation[], focusedId?: string) {
@@ -1039,8 +1126,9 @@ const markerMap = new Map<
           if (!world) return
           locationWorldCache.set(id, world.clone())
           const glyph = formatMarkerGlyph(location)
-        const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
-            iconTexture: iconTextures[i] ?? undefined,
+          const iconTexture = iconTextures[i] ?? undefined
+          const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
+            iconTexture,
             showBorder: location.showBorder !== false
           })
           const sprite = new THREE.Sprite(spriteVisuals.default.material)
@@ -1066,7 +1154,16 @@ const markerMap = new Map<
           container.add(stem)
           container.add(sprite)
           markersGroup.add(container)
-          markerMap.set(location.id, { container, sprite, stem, spriteVisuals, stemStates })
+          const iconScale = iconTexture ? ICON_SCALE_MULTIPLIER : 1
+          markerMap.set(location.id, {
+            container,
+            sprite,
+            stem,
+            spriteVisuals,
+            stemStates,
+            iconScale,
+            stemBaseHeight: stemHeight
+          })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
           const spriteTextures = new Set<THREE.Texture>()
@@ -1086,6 +1183,28 @@ const markerMap = new Map<
         }
       })
       .catch((error) => console.error('[TerrainViewer] Failed to populate location markers', error))
+  }
+
+  function applyThemeUpdate(overrides?: TerrainThemeOverrides) {
+    themeOverrides = overrides
+    resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
+    markerTheme = resolvedTheme.locationMarkers
+    stemRadius = computeStemRadius(markerTheme.stem)
+    setLocationMarkers(currentLocations, currentFocusId)
+  }
+
+  function applySeaLevelUpdate(nextSeaLevel: number) {
+    if (!heightSampler) return
+    seaLevel = nextSeaLevel
+    applyHeightField(terrainGeometry, heightSampler, {
+      seaLevel,
+      heightScale: currentHeightScale
+    })
+    terrainGeometry.attributes.position.needsUpdate = true
+    terrainGeometry.computeVertexNormals()
+    rebuildRimMesh()
+    rebuildOceanMesh()
+    setLocationMarkers(currentLocations, currentFocusId)
   }
 
   const [heightMapSource, topoMapSource] = await Promise.all([
@@ -1145,28 +1264,27 @@ const markerMap = new Map<
   const base = createBaseSlice(baseWidth, baseDepth)
   scene.add(base.mesh)
 
-  const rimMesh = buildRimMesh(
-    terrainGeometry,
-    FLOOR_Y,
-    new THREE.MeshStandardMaterial({
-      color: 0x14121f,
-      roughness: 0.5,
-      metalness: 0.2,
-      side: THREE.DoubleSide
-    })
-  )
+  const rimMaterial = new THREE.MeshStandardMaterial({
+    color: 0x14121f,
+    roughness: 0.5,
+    metalness: 0.2,
+    side: THREE.DoubleSide
+  })
+  let rimMesh = buildRimMesh(terrainGeometry, FLOOR_Y, rimMaterial)
   rimMesh.receiveShadow = true
   scene.add(rimMesh)
 
-  const ocean = createOceanMesh(
-    heightMap,
-    sampler,
-    heightScale,
-    waterHeight,
-    seaLevel,
-    terrainWidth,
-    terrainDepth
-  )
+  const createOcean = () =>
+    createOceanMesh(
+      heightMap,
+      sampler,
+      heightScale,
+      waterHeight,
+      seaLevel,
+      terrainWidth,
+      terrainDepth
+    )
+  let ocean = createOcean()
   scene.add(ocean.mesh)
 
   disposables.push(() => {
@@ -1174,9 +1292,7 @@ const markerMap = new Map<
     terrainMaterial.dispose()
     base.dispose()
     rimMesh.geometry.dispose()
-    Array.isArray(rimMesh.material)
-      ? rimMesh.material.forEach((mat) => mat.dispose())
-      : rimMesh.material.dispose()
+    rimMaterial.dispose()
     ocean.dispose()
     heightMap.dispose()
     topoTexture.dispose()
@@ -1465,6 +1581,8 @@ const markerMap = new Map<
       distance: Math.max(camera.position.distanceTo(controls.target), 0.1),
       polar: controls.getPolarAngle(),
       azimuth: controls.getAzimuthalAngle()
-    })
+    }),
+    setTheme: applyThemeUpdate,
+    setSeaLevel: applySeaLevelUpdate
   }
 }

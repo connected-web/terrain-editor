@@ -393,6 +393,14 @@
                 <p>Set supporting rod tint + opacity.</p>
               </header>
               <label class="theme-form__field">
+                <span>Stem shape</span>
+                <select v-model="themeForm.stemShape" @change="scheduleThemeUpdate">
+                  <option v-for="shape in stemShapeOptions" :key="shape" :value="shape">
+                    {{ shape }}
+                  </option>
+                </select>
+              </label>
+              <label class="theme-form__field">
                 <span>Stem color</span>
                 <input type="color" v-model="themeForm.stemColor" @input="scheduleThemeUpdate" />
               </label>
@@ -650,6 +658,8 @@ import {
   loadWynArchiveFromArrayBuffer,
   resolveTerrainTheme,
   type MarkerSpriteStateStyle,
+  type MarkerStemStateStyle,
+  type MarkerStemGeometryShape,
   type LayerBrowserState,
   type LayerToggleState,
   type TerrainDataset,
@@ -701,6 +711,7 @@ type StemStateForm = {
 
 type SpriteStateKey = 'hover' | 'focus'
 type StemStateKey = 'hover' | 'focus'
+const stemShapeOptions: MarkerStemGeometryShape[] = ['cylinder', 'triangle', 'square', 'pentagon', 'hexagon']
 
 function createThemeStateForm(overrides?: Partial<ThemeStateForm>): ThemeStateForm {
   return {
@@ -729,7 +740,7 @@ function createStemStateForm(overrides?: Partial<StemStateForm>): StemStateForm 
   }
 }
 
-function assignStemState(target: StemStateForm, source: StemStateForm) {
+function assignStemState(target: StemStateForm, source: StemStateForm | MarkerStemStateStyle) {
   target.color = source.color
   target.opacity = source.opacity
 }
@@ -742,6 +753,7 @@ const themeForm = reactive({
   opacity: 1,
   stemColor: '#f6e7c3',
   stemOpacity: 0.85,
+  stemShape: 'cylinder' as MarkerStemGeometryShape,
   fontFamily: 'Inter, sans-serif',
   fontWeight: '600',
   maxFontSize: 16,
@@ -1067,6 +1079,7 @@ function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
   const stemDefault = resolved.locationMarkers.stem.states.default
   themeForm.stemColor = stemDefault.color
   themeForm.stemOpacity = stemDefault.opacity
+  themeForm.stemShape = resolved.locationMarkers.stem.shape
   themeForm.fontFamily = sprite.fontFamily
   themeForm.fontWeight = sprite.fontWeight
   themeForm.maxFontSize = sprite.maxFontSize
@@ -1104,12 +1117,13 @@ function resetThemeForm() {
   if (!hasActiveArchive.value) return
   if (baseThemeRef.value) {
     projectStore.setTheme(cloneValue(baseThemeRef.value))
+    handle.value?.setTheme(cloneValue(baseThemeRef.value))
   } else {
     projectStore.setTheme(undefined)
+    handle.value?.setTheme(undefined)
   }
   syncThemeFormFromSnapshot()
   cancelThemeUpdate()
-  requestViewerRemount()
   void persistCurrentProject()
 }
 
@@ -1176,6 +1190,7 @@ function commitThemeOverrides() {
         }
       },
       stem: {
+        shape: themeForm.stemShape,
         states: {
           default: {
             color: themeForm.stemColor,
@@ -1202,7 +1217,7 @@ function commitThemeOverrides() {
     }
   }
   projectStore.setTheme(overrides)
-  requestViewerRemount()
+  handle.value?.setTheme(overrides)
   void persistCurrentProject()
 }
 
@@ -1216,7 +1231,7 @@ function applyMapSize() {
   layerBrowserStore.setLegend(nextLegend)
   if (datasetRef.value) {
     datasetRef.value.legend = nextLegend
-    requestViewerRemount()
+    handle.value?.setSeaLevel(seaLevel)
   }
   void persistCurrentProject()
 }

@@ -103,7 +103,8 @@ To make construction of the terrain easier, a Vue 3 based editor application is 
 - **Panel dock + toolbar** – a single docked column hosts workspace/layers/theme/locations panels, while the shared toolbar injects context-aware UI actions (load, export, open panel). Collapsing the dock hides toolbar labels so the viewer keeps its footprint.
 - **Workspace panel** – edit project title, author, width, height, and sea level with validation. Legend changes remount the viewer immediately so the mesh always matches the declared resolution.
 - **Locations panel** – browse locations, select one to edit, upload or drag/drop icon assets, toggle label borders, and click “Pick on map” to place a marker interactively. The asset dialog handles caching + replacement for shared icons.
-- **Theme panel** – tweak marker text/background/border colors, border thickness, opacity, and stem colors/opacity. Changes propagate to the viewer instantly, while the reset button restores the archive’s palette.
+- **Theme panel** – tweak marker text/background/border colors, border thickness, opacity, stem colors/opacity, and even the stem geometry shape. Hover/focus overrides and reset buttons keep experimentation safe.
+- **Marker rendering** – icons preserve their aspect ratios, optional label borders, and responsive scaling (about 50% smaller by default), while stems change width as you zoom and location creation now waits for a map click before committing.
 - **Asset + confirm dialogs** – destructive operations now use a reusable confirm dialog, and the asset library surfaces thumbnails, metadata, and remove/select flows so other panels can reuse the same UX.
 
 ### Editor architecture

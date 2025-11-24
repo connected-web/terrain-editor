@@ -4,7 +4,8 @@
 - [x] Ship the panel dock + toolbar contract so every embed exposes a single active panel controlled via shared UI actions.
 - [x] Add a workspace panel for map metadata (title/author/width/height/sea level) with live viewer remounting.
 - [x] Deliver a single-panel locations tool (list + inspector) with drag/drop icon uploads, asset library picker, and “pick on map” placement.
-- [x] Expose a lightweight theme editor (label + stem colors/opacity/thickness) that re-renders markers immediately.
+- [x] Expose a lightweight theme editor (label + stem colors/opacity/thickness/shape) that re-renders markers immediately.
+- [x] Tweak marker rendering so icons keep their aspect ratio/scale, image borders respect `showBorder`, stems react to zoom, and icon placement waits for a map click.
 - [ ] Wire layer asset uploads (heightmap + overlays) into the project store with dimension validation.
 - [ ] Recenter the viewer/camera + overlay controls as dock/toolbar state changes.
 
@@ -19,9 +20,9 @@
 ### Immediate editor priorities
 1. **Locations + icons** – done: dock hosts a single locations panel with picker, drag/drop, asset dialog, and map placement. Follow-ups: inline marker editing tools + snapping.
 2. **Map sizing / metadata** – done: workspace panel updates legend size + metadata and remounts viewer instantly.
-3. **Theme** – done: palette controls for label/stem colors, opacity, and border thickness with one-click reset to archive defaults.
+3. **Theme** – done: palette controls for label/stem colors, opacity, border thickness, hover/focus overrides, and stem shape with one-click reset to archive defaults.
 4. **Layer assets** – TODO: add drop zones + normalization for heightmap/overlay layers and plumb them into `projectStore`.
-5. **Location icon assets** – done: shared asset dialog with replacement semantics, caching, and override injection.
+5. **Location icon assets** – done: shared asset dialog with replacement semantics, caching, override injection, and proper icon rendering rules in the viewer.
 6. **Recentering** – TODO: camera offset helper that reacts to dock collapse/fullscreen to keep the terrain centered.
 7. **Toolbar / dock logic** – done: UI actions live in `EditorViewer`, drive the dock, and collapse labels when the dock is open.
 
