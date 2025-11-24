@@ -735,8 +735,8 @@ export async function initTerrainViewer(
   const [rawLegendWidth, rawLegendHeight] = legend.size
   const safeLegendWidth = Math.max(1, rawLegendWidth || DEFAULT_MAP_WIDTH)
   const safeLegendHeight = Math.max(1, rawLegendHeight || DEFAULT_MAP_HEIGHT)
-  const mapWidth = Math.max(1, safeLegendWidth - 1)
-  const mapHeight = Math.max(1, safeLegendHeight - 1)
+  const mapWidth = Math.max(1, safeLegendWidth)
+  const mapHeight = Math.max(1, safeLegendHeight)
   const mapRatio =
     safeLegendWidth > 0 ? safeLegendHeight / safeLegendWidth : DEFAULT_MAP_RATIO
   const terrainWidth = DEFAULT_TERRAIN_WIDTH
@@ -761,6 +761,12 @@ export async function initTerrainViewer(
     const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
     const v = THREE.MathUtils.clamp(pixel.y, 0, mapHeight) / mapHeight
     return { u, v }
+  }
+
+  function uvToPixel(u: number, v: number) {
+    const x = THREE.MathUtils.clamp(u * safeLegendWidth, 0, safeLegendWidth)
+    const y = THREE.MathUtils.clamp((1 - v) * safeLegendHeight, 0, safeLegendHeight)
+    return { x, y }
   }
 
   const heightScale = options.heightScale ?? HEIGHT_SCALE_DEFAULT
@@ -1309,10 +1315,9 @@ const markerMap = new Map<
       if (!hit || !hit.uv) return
       const u = hit.uv.x
       const v = hit.uv.y
-      const pixelX = Math.round(u * mapWidth)
-      const pixelY = Math.round((1 - v) * mapHeight)
+      const pixel = uvToPixel(u, v)
       options.onLocationPick?.({
-        pixel: { x: pixelX, y: pixelY },
+        pixel,
         uv: { u, v },
         world: { x: hit.point.x, y: hit.point.y, z: hit.point.z }
       })
@@ -1334,11 +1339,9 @@ const markerMap = new Map<
     const hit = intersectTerrain()
     if (!hit) return
     const worldPoint = hit.point.clone()
+    const pixel = hit.uv ? uvToPixel(hit.uv.x, hit.uv.y) : { x: worldPoint.x, y: worldPoint.z }
     navigateToLocation({
-      pixel: {
-        x: Math.round(hit.uv?.x ? hit.uv.x * mapWidth : worldPoint.x),
-        y: Math.round(hit.uv?.y ? (1 - hit.uv.y) * mapHeight : worldPoint.z)
-      },
+      pixel,
       world: worldPoint
     })
   }

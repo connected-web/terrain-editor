@@ -116,6 +116,7 @@ defineExpose({
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  max-height: 95vh;
 }
 
 .panel-dock__content::-webkit-scrollbar {

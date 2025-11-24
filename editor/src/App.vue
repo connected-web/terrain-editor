@@ -124,62 +124,277 @@
             </button>
           </header>
           <div class="theme-form">
-            <label class="theme-form__field">
-              <span>Label text color</span>
-              <input type="color" v-model="themeForm.textColor" @input="applyThemeForm" />
-            </label>
-            <label class="theme-form__field">
-              <span>Label background</span>
-              <input type="color" v-model="themeForm.backgroundColor" @input="applyThemeForm" />
-            </label>
-            <label class="theme-form__field">
-              <span>Label border</span>
-              <input type="color" v-model="themeForm.borderColor" @input="applyThemeForm" />
-            </label>
-            <div class="theme-form__split">
+            <section class="theme-form__section">
+              <header>
+                <h4>Label styling</h4>
+                <p>Adjust sprite colors + border thickness.</p>
+              </header>
               <label class="theme-form__field">
-                <span>Border thickness</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="4"
-                  step="0.25"
-                  v-model.number="themeForm.borderThickness"
-                  @input="applyThemeForm"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="4"
-                  step="0.25"
-                  v-model.number="themeForm.borderThickness"
-                  @change="applyThemeForm"
-                />
+                <span>Text color</span>
+                <input type="color" v-model="themeForm.textColor" @input="scheduleThemeUpdate" />
               </label>
               <label class="theme-form__field">
-                <span>Label opacity</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  v-model.number="themeForm.opacity"
-                  @input="applyThemeForm"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  v-model.number="themeForm.opacity"
-                  @change="applyThemeForm"
-                />
+                <span>Background</span>
+                <input type="color" v-model="themeForm.backgroundColor" @input="scheduleThemeUpdate" />
               </label>
-            </div>
-            <div class="theme-form__split">
+              <label class="theme-form__field">
+                <span>Border</span>
+                <input type="color" v-model="themeForm.borderColor" @input="scheduleThemeUpdate" />
+              </label>
+              <div class="theme-form__split">
+                <label class="theme-form__field">
+                  <span>Border thickness</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    v-model.number="themeForm.borderThickness"
+                    @input="scheduleThemeUpdate"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    v-model.number="themeForm.borderThickness"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Opacity</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="themeForm.opacity"
+                    @input="scheduleThemeUpdate"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="themeForm.opacity"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+              </div>
+            </section>
+            <section class="theme-form__section">
+              <header>
+                <h4>Typography & spacing</h4>
+                <p>Control font + padding used across label states.</p>
+              </header>
+              <label class="theme-form__field">
+                <span>Font family</span>
+                <input type="text" v-model="themeForm.fontFamily" @change="scheduleThemeUpdate" />
+              </label>
+              <div class="theme-form__split">
+                <label class="theme-form__field">
+                  <span>Font weight</span>
+                  <input type="text" v-model="themeForm.fontWeight" @change="scheduleThemeUpdate" />
+                </label>
+                <label class="theme-form__field">
+                  <span>Min font size</span>
+                  <input
+                    type="number"
+                    min="4"
+                    max="64"
+                    step="1"
+                    v-model.number="themeForm.minFontSize"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Max font size</span>
+                  <input
+                    type="number"
+                    min="4"
+                    max="96"
+                    step="1"
+                    v-model.number="themeForm.maxFontSize"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+              </div>
+              <div class="theme-form__split">
+                <label class="theme-form__field">
+                  <span>Padding X</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    v-model.number="themeForm.paddingX"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Padding Y</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    v-model.number="themeForm.paddingY"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Border radius</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    v-model.number="themeForm.borderRadius"
+                    @change="scheduleThemeUpdate"
+                  />
+                </label>
+              </div>
+            </section>
+            <section class="theme-form__section">
+              <header class="theme-form__section-header">
+                <div class="theme-form__section-text">
+                  <h4>Hover state</h4>
+                  <p class="theme-form__state-hint" v-if="!themeForm.hoverEnabled">
+                    Inherits the default label styling until you edit a field.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="pill-button pill-button--ghost"
+                  @click="resetSpriteState('hover')"
+                  :disabled="!themeForm.hoverEnabled"
+                >
+                  Use default
+                </button>
+              </header>
+              <div class="theme-form__state-grid">
+                <label class="theme-form__field">
+                  <span>Text</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.hover.textColor"
+                    @input="handleSpriteStateInput('hover')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Background</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.hover.backgroundColor"
+                    @input="handleSpriteStateInput('hover')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Border</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.hover.borderColor"
+                    @input="handleSpriteStateInput('hover')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Thickness</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    v-model.number="themeForm.hover.borderThickness"
+                    @input="handleSpriteStateInput('hover')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Opacity</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="themeForm.hover.opacity"
+                    @input="handleSpriteStateInput('hover')"
+                  />
+                </label>
+              </div>
+            </section>
+            <section class="theme-form__section">
+              <header class="theme-form__section-header">
+                <div class="theme-form__section-text">
+                  <h4>Focus state</h4>
+                  <p class="theme-form__state-hint" v-if="!themeForm.focusEnabled">
+                    Inherits the default label styling until you edit a field.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="pill-button pill-button--ghost"
+                  @click="resetSpriteState('focus')"
+                  :disabled="!themeForm.focusEnabled"
+                >
+                  Use default
+                </button>
+              </header>
+              <div class="theme-form__state-grid">
+                <label class="theme-form__field">
+                  <span>Text</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.focus.textColor"
+                    @input="handleSpriteStateInput('focus')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Background</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.focus.backgroundColor"
+                    @input="handleSpriteStateInput('focus')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Border</span>
+                  <input
+                    type="color"
+                    v-model="themeForm.focus.borderColor"
+                    @input="handleSpriteStateInput('focus')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Thickness</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    v-model.number="themeForm.focus.borderThickness"
+                    @input="handleSpriteStateInput('focus')"
+                  />
+                </label>
+                <label class="theme-form__field">
+                  <span>Opacity</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="themeForm.focus.opacity"
+                    @input="handleSpriteStateInput('focus')"
+                  />
+                </label>
+              </div>
+            </section>
+            <section class="theme-form__section">
+              <header>
+                <h4>Marker stem</h4>
+                <p>Set supporting rod tint + opacity.</p>
+              </header>
               <label class="theme-form__field">
                 <span>Stem color</span>
-                <input type="color" v-model="themeForm.stemColor" @input="applyThemeForm" />
+                <input type="color" v-model="themeForm.stemColor" @input="scheduleThemeUpdate" />
               </label>
               <label class="theme-form__field">
                 <span>Stem opacity</span>
@@ -189,7 +404,7 @@
                   max="1"
                   step="0.05"
                   v-model.number="themeForm.stemOpacity"
-                  @input="applyThemeForm"
+                  @input="scheduleThemeUpdate"
                 />
                 <input
                   type="number"
@@ -197,12 +412,80 @@
                   max="1"
                   step="0.05"
                   v-model.number="themeForm.stemOpacity"
-                  @change="applyThemeForm"
+                  @change="scheduleThemeUpdate"
                 />
               </label>
-            </div>
+              <div class="theme-form__state-block">
+                <div class="theme-form__state-header">
+                  <h5>Hover stem</h5>
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost"
+                    @click="resetStemState('hover')"
+                    :disabled="!themeForm.stemHoverEnabled"
+                  >
+                    Use default
+                  </button>
+                </div>
+                <div class="theme-form__state-grid">
+                  <label class="theme-form__field">
+                    <span>Color</span>
+                    <input
+                      type="color"
+                      v-model="themeForm.stemHover.color"
+                      @input="handleStemStateInput('hover')"
+                    />
+                  </label>
+                  <label class="theme-form__field">
+                    <span>Opacity</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="themeForm.stemHover.opacity"
+                      @input="handleStemStateInput('hover')"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div class="theme-form__state-block">
+                <div class="theme-form__state-header">
+                  <h5>Focus stem</h5>
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost"
+                    @click="resetStemState('focus')"
+                    :disabled="!themeForm.stemFocusEnabled"
+                  >
+                    Use default
+                  </button>
+                </div>
+                <div class="theme-form__state-grid">
+                  <label class="theme-form__field">
+                    <span>Color</span>
+                    <input
+                      type="color"
+                      v-model="themeForm.stemFocus.color"
+                      @input="handleStemStateInput('focus')"
+                    />
+                  </label>
+                  <label class="theme-form__field">
+                    <span>Opacity</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="themeForm.stemFocus.opacity"
+                      @input="handleStemStateInput('focus')"
+                    />
+                  </label>
+                </div>
+              </div>
+            </section>
             <p class="theme-form__hint">
-              Theme changes update marker sprites + stems immediately so you can preview styles before exporting.
+              Theme changes debounce automatically so rapid color tweaks don’t stall the viewer.
             </p>
           </div>
         </section>
@@ -216,21 +499,24 @@
               <Icon icon="plus">Add location</Icon>
             </button>
           </header>
-          <p v-if="!locationsList.length" class="panel-card__placeholder">
-            No locations yet. Import a map with locations or add them manually.
-          </p>
-          <div v-else class="locations-panel__browser">
+          <div class="locations-panel__selector">
             <button
-              v-for="location in locationsList"
-              :key="location.id"
+              class="pill-button locations-panel__selector-button"
               type="button"
-              class="pill-button panel-card__pill"
-              :class="{ 'panel-card__pill--active': location.id === selectedLocationId }"
-              @click="setActiveLocation(location.id!)"
+              :disabled="!locationsList.length"
+              @click="openLocationPicker"
             >
-              <Icon icon="location-dot" />
-              {{ location.name || location.id }}
+              <Icon icon="location-crosshairs" />
+              <div class="locations-panel__selector-text">
+                <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
+                <small v-if="activeLocation">
+                  {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
+                </small>
+              </div>
             </button>
+            <p v-if="!locationsList.length" class="panel-card__placeholder locations-panel__placeholder">
+              No locations yet. Import a map with locations or add them manually.
+            </p>
           </div>
           <div
             v-if="activeLocation"
@@ -292,6 +578,7 @@
                     type="number"
                     min="0"
                     :max="workspaceForm.width"
+                    :step="locationStepX"
                     v-model.number="activeLocation.pixel.x"
                     @change="clampLocationPixel(activeLocation)"
                   />
@@ -302,6 +589,7 @@
                     type="number"
                     min="0"
                     :max="workspaceForm.height"
+                    :step="locationStepY"
                     v-model.number="activeLocation.pixel.y"
                     @change="clampLocationPixel(activeLocation)"
                   />
@@ -335,6 +623,13 @@
         @remove="removeAsset"
         @close="closeIconPicker"
       />
+      <LocationPickerDialog
+        v-if="locationPickerOpen"
+        :locations="locationsList"
+        :active-id="selectedLocationId || undefined"
+        @select="handleLocationSelect"
+        @close="closeLocationPicker"
+      />
       <ConfirmDialog
         v-if="confirmState"
         :message="confirmState.message"
@@ -354,6 +649,7 @@ import {
   initTerrainViewer,
   loadWynArchiveFromArrayBuffer,
   resolveTerrainTheme,
+  type MarkerSpriteStateStyle,
   type LayerBrowserState,
   type LayerToggleState,
   type TerrainDataset,
@@ -367,6 +663,7 @@ import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import LocationPickerDialog from './components/LocationPickerDialog.vue'
 import type { UIAction } from './types/uiActions'
 
 const STORAGE_KEY = 'ctw-editor-project-v2'
@@ -389,6 +686,54 @@ const workspaceForm = reactive({
   seaLevel: 0
 })
 
+type ThemeStateForm = {
+  textColor: string
+  backgroundColor: string
+  borderColor: string
+  borderThickness: number
+  opacity: number
+}
+
+type StemStateForm = {
+  color: string
+  opacity: number
+}
+
+type SpriteStateKey = 'hover' | 'focus'
+type StemStateKey = 'hover' | 'focus'
+
+function createThemeStateForm(overrides?: Partial<ThemeStateForm>): ThemeStateForm {
+  return {
+    textColor: '#f2ede0',
+    backgroundColor: '#0d1320',
+    borderColor: '#f6e7c3',
+    borderThickness: 1,
+    opacity: 1,
+    ...overrides
+  }
+}
+
+function assignThemeState(target: ThemeStateForm, source: ThemeStateForm | MarkerSpriteStateStyle) {
+  target.textColor = source.textColor
+  target.backgroundColor = source.backgroundColor
+  target.borderColor = source.borderColor
+  target.borderThickness = source.borderThickness
+  target.opacity = source.opacity
+}
+
+function createStemStateForm(overrides?: Partial<StemStateForm>): StemStateForm {
+  return {
+    color: '#f6e7c3',
+    opacity: 0.85,
+    ...overrides
+  }
+}
+
+function assignStemState(target: StemStateForm, source: StemStateForm) {
+  target.color = source.color
+  target.opacity = source.opacity
+}
+
 const themeForm = reactive({
   textColor: '#f2ede0',
   backgroundColor: '#0d1320',
@@ -396,8 +741,92 @@ const themeForm = reactive({
   borderThickness: 1,
   opacity: 1,
   stemColor: '#f6e7c3',
-  stemOpacity: 0.85
+  stemOpacity: 0.85,
+  fontFamily: 'Inter, sans-serif',
+  fontWeight: '600',
+  maxFontSize: 16,
+  minFontSize: 10,
+  paddingX: 12,
+  paddingY: 6,
+  borderRadius: 12,
+  hoverEnabled: false,
+  focusEnabled: false,
+  hover: createThemeStateForm(),
+  focus: createThemeStateForm(),
+  stemHoverEnabled: false,
+  stemFocusEnabled: false,
+  stemHover: createStemStateForm(),
+  stemFocus: createStemStateForm()
 })
+
+function getSpriteStateRef(key: SpriteStateKey) {
+  return key === 'hover' ? themeForm.hover : themeForm.focus
+}
+
+function getSpriteFlagKey(key: SpriteStateKey) {
+  return key === 'hover' ? 'hoverEnabled' : 'focusEnabled'
+}
+
+function getCurrentDefaultState(): ThemeStateForm {
+  return createThemeStateForm({
+    textColor: themeForm.textColor,
+    backgroundColor: themeForm.backgroundColor,
+    borderColor: themeForm.borderColor,
+    borderThickness: themeForm.borderThickness,
+    opacity: themeForm.opacity
+  })
+}
+
+function handleSpriteStateInput(state: SpriteStateKey) {
+  const flag = getSpriteFlagKey(state)
+  if (!themeForm[flag]) {
+    themeForm[flag] = true
+    assignThemeState(getSpriteStateRef(state), getCurrentDefaultState())
+  }
+  scheduleThemeUpdate()
+}
+
+function resetSpriteState(state: SpriteStateKey) {
+  const flag = getSpriteFlagKey(state)
+  if (themeForm[flag]) {
+    themeForm[flag] = false
+  }
+  assignThemeState(getSpriteStateRef(state), getCurrentDefaultState())
+  scheduleThemeUpdate()
+}
+
+function getStemStateRef(key: StemStateKey) {
+  return key === 'hover' ? themeForm.stemHover : themeForm.stemFocus
+}
+
+function getStemFlagKey(key: StemStateKey) {
+  return key === 'hover' ? 'stemHoverEnabled' : 'stemFocusEnabled'
+}
+
+function getCurrentStemState(): StemStateForm {
+  return createStemStateForm({
+    color: themeForm.stemColor,
+    opacity: themeForm.stemOpacity
+  })
+}
+
+function handleStemStateInput(state: StemStateKey) {
+  const flag = getStemFlagKey(state)
+  if (!themeForm[flag]) {
+    themeForm[flag] = true
+    assignStemState(getStemStateRef(state), getCurrentStemState())
+  }
+  scheduleThemeUpdate()
+}
+
+function resetStemState(state: StemStateKey) {
+  const flag = getStemFlagKey(state)
+  if (themeForm[flag]) {
+    themeForm[flag] = false
+  }
+  assignStemState(getStemStateRef(state), getCurrentStemState())
+  scheduleThemeUpdate()
+}
 
 const projectStore = createProjectStore()
 const projectSnapshot = ref(projectStore.getSnapshot())
@@ -419,13 +848,20 @@ const iconPickerTarget = ref<string | null>(null)
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const iconPreviewCache = reactive<Record<string, string>>({})
 const iconPreviewOwnership = new Map<string, string>()
+const missingIconWarnings = new Set<string>()
 const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 const selectedLocationId = ref<string | null>(null)
+const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
 const pendingLocationId = ref<string | null>(null)
+const pendingLocationDraft = ref<TerrainLocation | null>(null)
+const locationPickerOpen = ref(false)
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const activeLocation = computed(() =>
   locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
 let viewerRemountHandle: number | null = null
+let themeUpdateHandle: number | null = null
+const locationStepX = computed(() => getPlacementStep(workspaceForm.width))
+const locationStepY = computed(() => getPlacementStep(workspaceForm.height))
 
 function requestConfirm(message: string, onConfirm: () => void) {
   confirmState.value = { message, onConfirm }
@@ -585,6 +1021,15 @@ watch(
   }
 )
 
+watch(
+  () => locationsList.value.length,
+  (count) => {
+    if (count === 0) {
+      locationPickerOpen.value = false
+    }
+  }
+)
+
 type PersistedProject = {
   label: string
   archiveBase64: string
@@ -622,6 +1067,27 @@ function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
   const stemDefault = resolved.locationMarkers.stem.states.default
   themeForm.stemColor = stemDefault.color
   themeForm.stemOpacity = stemDefault.opacity
+  themeForm.fontFamily = sprite.fontFamily
+  themeForm.fontWeight = sprite.fontWeight
+  themeForm.maxFontSize = sprite.maxFontSize
+  themeForm.minFontSize = sprite.minFontSize
+  themeForm.paddingX = sprite.paddingX
+  themeForm.paddingY = sprite.paddingY
+  themeForm.borderRadius = sprite.borderRadius
+  const sourceSprite = snapshot.theme?.locationMarkers?.sprite
+  const hoverSource = sourceSprite?.states?.hover
+  const focusSource = sourceSprite?.states?.focus
+  themeForm.hoverEnabled = Boolean(hoverSource)
+  themeForm.focusEnabled = Boolean(focusSource)
+  assignThemeState(themeForm.hover, hoverSource ?? spriteDefault)
+  assignThemeState(themeForm.focus, focusSource ?? spriteDefault)
+  const sourceStem = snapshot.theme?.locationMarkers?.stem
+  const stemHoverSource = sourceStem?.states?.hover
+  const stemFocusSource = sourceStem?.states?.focus
+  themeForm.stemHoverEnabled = Boolean(stemHoverSource)
+  themeForm.stemFocusEnabled = Boolean(stemFocusSource)
+  assignStemState(themeForm.stemHover, stemHoverSource ?? stemDefault)
+  assignStemState(themeForm.stemFocus, stemFocusSource ?? stemDefault)
 }
 
 function updateProjectLabel(value: string) {
@@ -642,15 +1108,41 @@ function resetThemeForm() {
     projectStore.setTheme(undefined)
   }
   syncThemeFormFromSnapshot()
+  cancelThemeUpdate()
   requestViewerRemount()
   void persistCurrentProject()
 }
 
-function applyThemeForm() {
+function scheduleThemeUpdate() {
+  if (!hasActiveArchive.value) return
+  if (themeUpdateHandle) {
+    window.clearTimeout(themeUpdateHandle)
+  }
+  themeUpdateHandle = window.setTimeout(() => {
+    themeUpdateHandle = null
+    commitThemeOverrides()
+  }, 250)
+}
+
+function cancelThemeUpdate() {
+  if (themeUpdateHandle) {
+    window.clearTimeout(themeUpdateHandle)
+    themeUpdateHandle = null
+  }
+}
+
+function commitThemeOverrides() {
   if (!hasActiveArchive.value) return
   const overrides: TerrainThemeOverrides = {
     locationMarkers: {
       sprite: {
+        fontFamily: themeForm.fontFamily,
+        fontWeight: themeForm.fontWeight,
+        maxFontSize: themeForm.maxFontSize,
+        minFontSize: themeForm.minFontSize,
+        paddingX: themeForm.paddingX,
+        paddingY: themeForm.paddingY,
+        borderRadius: themeForm.borderRadius,
         states: {
           default: {
             textColor: themeForm.textColor,
@@ -658,7 +1150,29 @@ function applyThemeForm() {
             borderColor: themeForm.borderColor,
             borderThickness: themeForm.borderThickness,
             opacity: themeForm.opacity
-          }
+          },
+          ...(themeForm.hoverEnabled
+            ? {
+                hover: {
+                  textColor: themeForm.hover.textColor,
+                  backgroundColor: themeForm.hover.backgroundColor,
+                  borderColor: themeForm.hover.borderColor,
+                  borderThickness: themeForm.hover.borderThickness,
+                  opacity: themeForm.hover.opacity
+                }
+              }
+            : {}),
+          ...(themeForm.focusEnabled
+            ? {
+                focus: {
+                  textColor: themeForm.focus.textColor,
+                  backgroundColor: themeForm.focus.backgroundColor,
+                  borderColor: themeForm.focus.borderColor,
+                  borderThickness: themeForm.focus.borderThickness,
+                  opacity: themeForm.focus.opacity
+                }
+              }
+            : {})
         }
       },
       stem: {
@@ -666,7 +1180,23 @@ function applyThemeForm() {
           default: {
             color: themeForm.stemColor,
             opacity: themeForm.stemOpacity
-          }
+          },
+          ...(themeForm.stemHoverEnabled
+            ? {
+                hover: {
+                  color: themeForm.stemHover.color,
+                  opacity: themeForm.stemHover.opacity
+                }
+              }
+            : {}),
+          ...(themeForm.stemFocusEnabled
+            ? {
+                focus: {
+                  color: themeForm.stemFocus.color,
+                  opacity: themeForm.stemFocus.opacity
+                }
+              }
+            : {})
         }
       }
     }
@@ -802,25 +1332,38 @@ async function mountViewer() {
     interactive: interactive.value,
     theme: projectSnapshot.value.theme,
     onLocationPick: (payload) => {
+        const snapped = {
+          x: snapLocationValue(clampNumber(payload.pixel.x, 0, workspaceForm.width), workspaceForm.width),
+          y: snapLocationValue(clampNumber(payload.pixel.y, 0, workspaceForm.height), workspaceForm.height)
+        }
+        if (pendingLocationId.value === NEW_LOCATION_PLACEHOLDER && pendingLocationDraft.value) {
+          const draft = ensureLocationId({ ...pendingLocationDraft.value, pixel: snapped })
+          pendingLocationDraft.value = null
+          pendingLocationId.value = null
+          interactive.value = false
+          handle.value?.setInteractiveMode(false)
+          locationsList.value = [...locationsList.value, draft]
+          commitLocations()
+          setActiveLocation(draft.id!)
+          updateStatus(`Added ${draft.name ?? draft.id} at (${draft.pixel.x}, ${draft.pixel.y}).`)
+          return
+        }
         if (pendingLocationId.value) {
           const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
           if (target) {
-            target.pixel = {
-              x: clampNumber(Math.round(payload.pixel.x), 0, workspaceForm.width),
-              y: clampNumber(Math.round(payload.pixel.y), 0, workspaceForm.height)
-            }
+            target.pixel = snapped
             pendingLocationId.value = null
             interactive.value = false
             handle.value?.setInteractiveMode(false)
             commitLocations()
             setActiveLocation(target.id!)
             updateStatus(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
+            return
           }
-        } else {
-          updateStatus(`Picked pixel (${payload.pixel.x}, ${payload.pixel.y})`)
         }
+        updateStatus(`Picked pixel (${snapped.x}, ${snapped.y})`)
     },
-    onLocationClick: (locationId) => setActiveLocation(locationId)
+    onLocationClick: (locationId) => setActiveLocation(locationId, { fromViewer: true })
   })
 }
 
@@ -836,6 +1379,9 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   disposeViewer()
   cleanupDataset()
   clearAssetOverrides()
+  missingIconWarnings.clear()
+  pendingLocationDraft.value = null
+  pendingLocationId.value = null
   try {
     const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
     datasetRef.value = wrapDatasetWithOverrides(archive.dataset)
@@ -903,7 +1449,12 @@ function closeActiveArchive() {
   baseThemeRef.value = undefined
   activeDockPanel.value = 'workspace'
   interactive.value = false
+  locationPickerOpen.value = false
+  pendingLocationDraft.value = null
+  pendingLocationId.value = null
   clearAssetOverrides()
+  missingIconWarnings.clear()
+  cancelThemeUpdate()
   refreshIconPreviewCache()
   updateStatus('Viewer cleared. Load a map to continue.')
   try {
@@ -932,20 +1483,22 @@ function startNewMap() {
 
 function addLocation() {
   const legend = projectSnapshot.value.legend
-  const width = legend?.size?.[0] ?? 1024
-  const height = legend?.size?.[1] ?? 1536
-  const next: TerrainLocation = ensureLocationId({
+  if (!legend) return
+  const draft: TerrainLocation = ensureLocationId({
     id: '',
-    name: 'New location',
-    pixel: { x: Math.round(width / 2), y: Math.round(height / 2) },
+    name: `New location ${locationsList.value.length + 1}`,
+    pixel: { x: 0, y: 0 },
     showBorder: true
   })
-  locationsList.value = [...locationsList.value, next]
-  commitLocations()
+  pendingLocationDraft.value = draft
+  pendingLocationId.value = NEW_LOCATION_PLACEHOLDER
+  selectedLocationId.value = null
+  interactive.value = true
+  handle.value?.setInteractiveMode(true)
   setActivePanel('locations')
   isDockCollapsed.value = false
-  setActiveLocation(next.id!)
-  startPlacement(next)
+  locationPickerOpen.value = false
+  updateStatus('Click anywhere on the map to place the new location.')
 }
 
 function confirmRemoveLocation(location: TerrainLocation) {
@@ -1041,8 +1594,12 @@ function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
 
-function setActiveLocation(id: string | null) {
+function setActiveLocation(id: string | null, options: { fromViewer?: boolean } = {}) {
   selectedLocationId.value = id
+  if (id && options.fromViewer) {
+    setActivePanel('locations')
+    isDockCollapsed.value = false
+  }
 }
 
 function ensureActiveLocationSelection() {
@@ -1058,6 +1615,7 @@ function ensureActiveLocationSelection() {
 
 function startPlacement(location: TerrainLocation) {
   if (!handle.value) return
+  pendingLocationDraft.value = null
   const id = ensureLocationId(location).id!
   selectedLocationId.value = id
   pendingLocationId.value = id
@@ -1092,6 +1650,20 @@ function openIconPicker(location: TerrainLocation) {
 
 function closeIconPicker() {
   iconPickerTarget.value = null
+}
+
+function openLocationPicker() {
+  if (!locationsList.value.length) return
+  locationPickerOpen.value = true
+}
+
+function closeLocationPicker() {
+  locationPickerOpen.value = false
+}
+
+function handleLocationSelect(id: string) {
+  setActiveLocation(id)
+  closeLocationPicker()
 }
 
 function selectIconFromLibrary(path: string) {
@@ -1137,8 +1709,8 @@ function commitLocations() {
 function clampLocationPixel(location: TerrainLocation) {
   const width = workspaceForm.width
   const height = workspaceForm.height
-  location.pixel.x = clampNumber(location.pixel.x ?? 0, 0, width)
-  location.pixel.y = clampNumber(location.pixel.y ?? 0, 0, height)
+  location.pixel.x = snapLocationValue(clampNumber(location.pixel.x ?? 0, 0, width), width)
+  location.pixel.y = snapLocationValue(clampNumber(location.pixel.y ?? 0, 0, height), height)
   commitLocations()
 }
 
@@ -1149,6 +1721,24 @@ function clearLocationIcon(location: TerrainLocation) {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function getPlacementStep(dimension: number) {
+  if (!Number.isFinite(dimension) || dimension <= 0) return 0.001
+  const normalized = dimension / 1000
+  if (normalized >= 1) {
+    return Math.max(1, Math.round(normalized))
+  }
+  return Math.max(0.001, Number(normalized.toFixed(3)))
+}
+
+function snapLocationValue(value: number, dimension: number) {
+  const step = getPlacementStep(dimension)
+  if (!Number.isFinite(step) || step <= 0) return value
+  const snapped = Math.round(value / step) * step
+  const decimals = step >= 1 ? 0 : Math.min(6, Math.ceil(-Math.log10(step)))
+  const precisionFactor = Math.pow(10, decimals)
+  return Math.round(snapped * precisionFactor) / precisionFactor
 }
 
 function normalizeAssetFileName(name: string) {
@@ -1176,6 +1766,7 @@ function setAssetOverride(path: string, file: File) {
   assetOverrides.set(path, url)
   iconPreviewCache[path] = url
   iconPreviewOwnership.set(path, url)
+  missingIconWarnings.delete(path)
 }
 
 function clearAssetOverrides() {
@@ -1318,6 +1909,7 @@ function resolveAssetReference(reference?: string) {
 function getIconPreview(icon?: string) {
   const resolved = resolveAssetReference(icon)
   if (!resolved) return ''
+  if (missingIconWarnings.has(resolved)) return ''
   if (assetOverrides.has(resolved)) return assetOverrides.get(resolved)!
   if (iconPreviewCache[resolved]) return iconPreviewCache[resolved]
   preloadIconPreview(resolved)
@@ -1326,6 +1918,7 @@ function getIconPreview(icon?: string) {
 
 async function preloadIconPreview(path: string, file?: TerrainProjectFileEntry) {
   if (iconPreviewCache[path]) return
+  if (missingIconWarnings.has(path)) return
   if (assetOverrides.has(path)) {
     iconPreviewCache[path] = assetOverrides.get(path)!
     return
@@ -1335,6 +1928,7 @@ async function preloadIconPreview(path: string, file?: TerrainProjectFileEntry) 
     const url = URL.createObjectURL(blob)
     iconPreviewCache[path] = url
     iconPreviewOwnership.set(path, url)
+    missingIconWarnings.delete(path)
     return
   }
   const dataset = datasetRef.value
@@ -1342,8 +1936,12 @@ async function preloadIconPreview(path: string, file?: TerrainProjectFileEntry) 
   try {
     const resolved = await Promise.resolve(dataset.resolveAssetUrl(path))
     iconPreviewCache[path] = resolved
+    missingIconWarnings.delete(path)
   } catch (err) {
-    console.warn('Failed to resolve icon preview', path, err)
+    if (!missingIconWarnings.has(path)) {
+      missingIconWarnings.add(path)
+      console.warn(`Icon preview missing for ${path}`)
+    }
   }
 }
 
@@ -1381,6 +1979,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('drop', handleWindowDragEvent, true)
   iconPreviewOwnership.forEach((url) => URL.revokeObjectURL(url))
   iconPreviewOwnership.clear()
+  cancelThemeUpdate()
   if (viewerRemountHandle !== null) {
     window.clearTimeout(viewerRemountHandle)
     viewerRemountHandle = null
