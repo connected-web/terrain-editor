@@ -1,15 +1,12 @@
 # Terrain Editor Task List
 
 ## Active Sprint (19 Nov 2025)
-- [x] Re-export `initTerrainViewer` from `terrainViewer.ts` and ensure public API uses the new path. *Touch files:* `packages/terrain/src/index.ts`, `terrainViewer.ts`. *Test:* `npm run build:lib`.
-- [x] Embed shared viewer chrome inside the package:
-  - [x] Inject overlay DOM (status text, load button, pop-out/full-screen, drag/drop prompt) when the viewer mounts. *Files:* `packages/terrain/src/viewerOverlay.ts`, `terrainViewer.ts`.
-  - [x] Inject the required stylesheet into the document head to keep demos minimal.
-  - [x] Wire overlay controls to host helper + local `.wyn` loader so hosts only pass callbacks. *Ensure `loadWynArchive` utilities remain the single entry point.*
-- [x] Update the viewer demo to the “single container div/ref” contract:
-  - [x] Remove bespoke buttons/markup; each demo now provides a container + overlay helper.
-  - [x] Verify the demo supports URL load, file upload, drag/drop, pop-out, and fullscreen. *Tests:* `npm run build:viewer`, `npm run test:smoke`.
-- [x] Document the new embed API in README/AGENTS so other agents know how to bootstrap the viewer.
+- [x] Ship the panel dock + toolbar contract so every embed exposes a single active panel controlled via shared UI actions.
+- [x] Add a workspace panel for map metadata (title/author/width/height/sea level) with live viewer remounting.
+- [x] Deliver a single-panel locations tool (list + inspector) with drag/drop icon uploads, asset library picker, and “pick on map” placement.
+- [x] Expose a lightweight theme editor (label + stem colors/opacity/thickness) that re-renders markers immediately.
+- [ ] Wire layer asset uploads (heightmap + overlays) into the project store with dimension validation.
+- [ ] Recenter the viewer/camera + overlay controls as dock/toolbar state changes.
 
 ### Viewer embed contract
 
@@ -19,16 +16,20 @@
 4. **Archive loading:** always load maps via `loadWynArchive` / `loadWynArchiveFromFile`, then pass the resulting dataset into `initTerrainViewer(viewerRoot, dataset, options)`. Use the legend to build your default layer state, and remember to destroy the previous `TerrainHandle` + call `dataset.cleanup()` before loading another archive.
 5. **Host responsibilities:** hosts provide status text (via overlay handle), supply callbacks for file inputs/drag-drop, and expose pop-out/fullscreen UI through the overlay rather than reinventing buttons in the embed slot.
 
+### Immediate editor priorities
+1. **Locations + icons** – done: dock hosts a single locations panel with picker, drag/drop, asset dialog, and map placement. Follow-ups: inline marker editing tools + snapping.
+2. **Map sizing / metadata** – done: workspace panel updates legend size + metadata and remounts viewer instantly.
+3. **Theme** – done: palette controls for label/stem colors, opacity, and border thickness with one-click reset to archive defaults.
+4. **Layer assets** – TODO: add drop zones + normalization for heightmap/overlay layers and plumb them into `projectStore`.
+5. **Location icon assets** – done: shared asset dialog with replacement semantics, caching, and override injection.
+6. **Recentering** – TODO: camera offset helper that reacts to dock collapse/fullscreen to keep the terrain centered.
+7. **Toolbar / dock logic** – done: UI actions live in `EditorViewer`, drive the dock, and collapse labels when the dock is open.
+
 ## Backlog – Editor
-- [ ] Persist active project into local storage for offline editing.
-- [ ] Allow decompress/edit/repack of `.wyn` archives entirely in-browser.
-- [ ] Locations + icons: editable list of locations (name, description, coordinates) with drag/drop icon assets and live preview markers.
-- [ ] Map sizing / metadata: editor for legend size, author/title metadata, and validation that imported layers match the declared resolution.
-- [ ] Theme designer: UI for theme tokens (colors, sprite/stem states, overlay palettes) with live preview + JSON export.
+- [x] Persist active project into local storage for offline editing.
+- [x] Allow decompress/edit/repack of `.wyn` archives entirely in-browser (see `buildWynArchive` + `projectStore`).
 - [ ] Layer asset uploads: drag/drop + upload surface for each layer slot (heightmap, masks, overlays) that normalizes dimensions and updates the project store.
-- [ ] Location icon uploads: allow per-location icon assets via drag/drop and manage references inside the project store.
 - [ ] Viewer recentering: shift camera/canvas when dock/toolbar visibility changes so the terrain stays centered.
-- [ ] Toolbar/dock logic: unified action registry with context-aware buttons (load/export/layers) + collapsible dock panes for future tools.
 - [ ] Expand layer tooling: view, add, edit, and paint masks with undo/redo.
 - [ ] Implement point-based heightmap editor + JSON/PNG export path.
 - [ ] Author river polylines that respect terrain slope and widening rules.

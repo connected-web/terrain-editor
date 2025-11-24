@@ -11,44 +11,15 @@
         @toggle-fullscreen="toggleEditorFullscreen"
       />
       <PanelDock
-        ref="dockRef"
         :collapsed="isDockCollapsed"
         :mobile="isCompactViewport"
         @toggle="toggleDock"
       >
-        <template #nav>
-          <button
-            class="panel-dock__nav-button"
-            :class="{ 'panel-dock__nav-button--active': activeDockPanel === 'workspace' }"
-            type="button"
-            @click="setActivePanel('workspace')"
-          >
-            <Icon icon="compass-drafting">Workspace</Icon>
-          </button>
-          <button
-            class="panel-dock__nav-button"
-            :class="{ 'panel-dock__nav-button--active': activeDockPanel === 'layers' }"
-            type="button"
-            :disabled="!hasActiveArchive"
-            @click="setActivePanel('layers')"
-          >
-            <Icon icon="layer-group">Layers</Icon>
-          </button>
-          <button
-            class="panel-dock__nav-button"
-            :class="{ 'panel-dock__nav-button--active': activeDockPanel === 'locations' }"
-            type="button"
-            :disabled="!hasActiveArchive"
-            @click="setActivePanel('locations')"
-          >
-            <Icon icon="location-dot">Locations</Icon>
-          </button>
-        </template>
 
         <section v-if="activeDockPanel === 'workspace'" class="panel-card">
           <header class="panel-card__header panel-card__header--split">
             <div class="panel-card__header-main">
-              <Icon icon="compass-drafting">Workspace metadata</Icon>
+              <Icon icon="compass-drafting">Workspace</Icon>
             </div>
             <button class="pill-button pill-button--ghost" @click="resetWorkspaceForm" :disabled="!hasActiveArchive">
               Reset
@@ -68,7 +39,7 @@
                 <span>Map width (px)</span>
                 <input
                   type="number"
-                  min="64"
+                  min="1"
                   v-model.number="workspaceForm.width"
                   @change="applyMapSize"
                 />
@@ -77,7 +48,7 @@
                 <span>Map height (px)</span>
                 <input
                   type="number"
-                  min="64"
+                  min="1"
                   v-model.number="workspaceForm.height"
                   @change="applyMapSize"
                 />
@@ -85,12 +56,22 @@
             </div>
             <label class="workspace-form__field">
               <span>Sea level</span>
-              <input
-                type="number"
-                step="0.01"
-                v-model.number="workspaceForm.seaLevel"
-                @change="applySeaLevel"
-              />
+              <div class="workspace-form__range">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  v-model.number="workspaceForm.seaLevel"
+                  @input="applySeaLevel"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  v-model.number="workspaceForm.seaLevel"
+                  @change="applySeaLevel"
+                />
+              </div>
             </label>
             <p class="workspace-form__hint">
               Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
@@ -133,11 +114,103 @@
           <p v-else class="panel-card__placeholder">Legend data not loaded yet.</p>
         </section>
 
+        <section v-else-if="activeDockPanel === 'theme'" class="panel-card panel-card--theme">
+          <header class="panel-card__header panel-card__header--split">
+            <div class="panel-card__header-main">
+              <Icon icon="palette">Theme</Icon>
+            </div>
+            <button class="pill-button pill-button--ghost" @click="resetThemeForm" :disabled="!hasActiveArchive">
+              Reset
+            </button>
+          </header>
+          <div class="theme-form">
+            <label class="theme-form__field">
+              <span>Label text color</span>
+              <input type="color" v-model="themeForm.textColor" @input="applyThemeForm" />
+            </label>
+            <label class="theme-form__field">
+              <span>Label background</span>
+              <input type="color" v-model="themeForm.backgroundColor" @input="applyThemeForm" />
+            </label>
+            <label class="theme-form__field">
+              <span>Label border</span>
+              <input type="color" v-model="themeForm.borderColor" @input="applyThemeForm" />
+            </label>
+            <div class="theme-form__split">
+              <label class="theme-form__field">
+                <span>Border thickness</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="4"
+                  step="0.25"
+                  v-model.number="themeForm.borderThickness"
+                  @input="applyThemeForm"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="4"
+                  step="0.25"
+                  v-model.number="themeForm.borderThickness"
+                  @change="applyThemeForm"
+                />
+              </label>
+              <label class="theme-form__field">
+                <span>Label opacity</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  v-model.number="themeForm.opacity"
+                  @input="applyThemeForm"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  v-model.number="themeForm.opacity"
+                  @change="applyThemeForm"
+                />
+              </label>
+            </div>
+            <div class="theme-form__split">
+              <label class="theme-form__field">
+                <span>Stem color</span>
+                <input type="color" v-model="themeForm.stemColor" @input="applyThemeForm" />
+              </label>
+              <label class="theme-form__field">
+                <span>Stem opacity</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  v-model.number="themeForm.stemOpacity"
+                  @input="applyThemeForm"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  v-model.number="themeForm.stemOpacity"
+                  @change="applyThemeForm"
+                />
+              </label>
+            </div>
+            <p class="theme-form__hint">
+              Theme changes update marker sprites + stems immediately so you can preview styles before exporting.
+            </p>
+          </div>
+        </section>
+
         <section v-else class="panel-card panel-card--locations">
           <header class="panel-card__header panel-card__header--split">
             <div class="panel-card__header-main">
               <Icon icon="location-dot">Locations</Icon>
-              <span class="panel-card__hint">Edit labels + icons</span>
             </div>
             <button class="pill-button pill-button--ghost" @click="addLocation" :disabled="!projectSnapshot.legend">
               <Icon icon="plus">Add location</Icon>
@@ -146,8 +219,21 @@
           <p v-if="!locationsList.length" class="panel-card__placeholder">
             No locations yet. Import a map with locations or add them manually.
           </p>
+          <div v-else class="locations-panel__browser">
+            <button
+              v-for="location in locationsList"
+              :key="location.id"
+              type="button"
+              class="pill-button panel-card__pill"
+              :class="{ 'panel-card__pill--active': location.id === selectedLocationId }"
+              @click="setActiveLocation(location.id!)"
+            >
+              <Icon icon="location-dot" />
+              {{ location.name || location.id }}
+            </button>
+          </div>
           <div
-            v-else
+            v-if="activeLocation"
             class="locations-panel"
             :class="{ 'drag-active': locationsDragActive }"
             @dragenter="onLocationsDragEnter"
@@ -155,32 +241,29 @@
             @dragleave="onLocationsDragLeave"
             @drop="onLocationsDrop"
           >
-            <article
-              v-for="location in locationsList"
-              :key="location.id"
-              class="locations-panel__item"
-              @dragover="handleIconDragOver"
-              @drop="handleIconDrop(location, $event)"
-            >
+            <article class="locations-panel__item">
               <div class="locations-panel__preview">
                 <div
                   class="locations-panel__icon"
-                  :class="{ 'locations-panel__icon--ghost': location.showBorder === false }"
-                  :style="{ backgroundImage: getIconPreview(location.icon) ? `url('${getIconPreview(location.icon)}')` : undefined }"
+                  :class="{ 'locations-panel__icon--ghost': activeLocation.showBorder === false }"
+                  :style="{ backgroundImage: getIconPreview(activeLocation.icon) ? `url('${getIconPreview(activeLocation.icon)}')` : undefined }"
                 >
-                  <span v-if="!getIconPreview(location.icon)">{{ location.name?.[0] ?? '?' }}</span>
+                  <span v-if="!getIconPreview(activeLocation.icon)">{{ activeLocation.name?.[0] ?? '?' }}</span>
                 </div>
                 <div class="locations-panel__preview-actions">
-                  <button type="button" class="pill-button" @click="openIconPicker(location)">
+                  <button type="button" class="pill-button" @click="openIconPicker(activeLocation)">
                     <Icon icon="images">Choose icon</Icon>
                   </button>
                   <button
                     type="button"
                     class="pill-button pill-button--ghost"
-                    @click="clearLocationIcon(location)"
-                    :disabled="!location.icon"
+                    @click="clearLocationIcon(activeLocation)"
+                    :disabled="!activeLocation.icon"
                   >
                     <Icon icon="ban">Clear icon</Icon>
+                  </button>
+                  <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
+                    <Icon icon="crosshairs">Pick on map</Icon>
                   </button>
                 </div>
               </div>
@@ -188,7 +271,7 @@
                 <span>Name</span>
                 <input
                   type="text"
-                  v-model="location.name"
+                  v-model="activeLocation.name"
                   @blur="commitLocations"
                   placeholder="Location name"
                 />
@@ -197,7 +280,7 @@
                 <span>Icon reference</span>
                 <input
                   type="text"
-                  v-model="location.icon"
+                  v-model="activeLocation.icon"
                   @blur="commitLocations"
                   placeholder="e.g. icons/castle.png"
                 />
@@ -209,8 +292,8 @@
                     type="number"
                     min="0"
                     :max="workspaceForm.width"
-                    v-model.number="location.pixel.x"
-                    @change="clampLocationPixel(location)"
+                    v-model.number="activeLocation.pixel.x"
+                    @change="clampLocationPixel(activeLocation)"
                   />
                 </label>
                 <label>
@@ -219,20 +302,21 @@
                     type="number"
                     min="0"
                     :max="workspaceForm.height"
-                    v-model.number="location.pixel.y"
-                    @change="clampLocationPixel(location)"
+                    v-model.number="activeLocation.pixel.y"
+                    @change="clampLocationPixel(activeLocation)"
                   />
                 </label>
               </div>
               <label class="locations-panel__toggle">
-                <input type="checkbox" v-model="location.showBorder" @change="commitLocations" />
+                <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
                 <span>Show label border</span>
               </label>
-              <button type="button" class="pill-button pill-button--danger" @click="removeLocation(location)">
+              <button type="button" class="pill-button pill-button--danger" @click="confirmRemoveLocation(activeLocation)">
                 <Icon icon="trash">Remove location</Icon>
               </button>
             </article>
           </div>
+          <p v-else-if="locationsList.length" class="panel-card__placeholder">Select a location to edit.</p>
         </section>
       </PanelDock>
       <input
@@ -251,6 +335,12 @@
         @remove="removeAsset"
         @close="closeIconPicker"
       />
+      <ConfirmDialog
+        v-if="confirmState"
+        :message="confirmState.message"
+        @confirm="handleConfirmDialog"
+        @cancel="dismissConfirmDialog"
+      />
     </div>
   </div>
 </template>
@@ -262,24 +352,27 @@ import {
   createLayerBrowserStore,
   createProjectStore,
   initTerrainViewer,
+  loadWynArchiveFromArrayBuffer,
+  resolveTerrainTheme,
   type LayerBrowserState,
   type LayerToggleState,
   type TerrainDataset,
   type TerrainHandle,
   type TerrainLocation,
   type TerrainProjectFileEntry,
-  loadWynArchiveFromArrayBuffer,
+  type TerrainThemeOverrides,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import type { UIAction } from './types/uiActions'
 
 const STORAGE_KEY = 'ctw-editor-project-v2'
 const AUTO_RESTORE_KEY = 'ctw-editor-restore-enabled'
 
-type DockPanel = 'workspace' | 'layers' | 'locations'
+type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
@@ -294,6 +387,16 @@ const workspaceForm = reactive({
   width: 1024,
   height: 1536,
   seaLevel: 0
+})
+
+const themeForm = reactive({
+  textColor: '#f2ede0',
+  backgroundColor: '#0d1320',
+  borderColor: '#f6e7c3',
+  borderThickness: 1,
+  opacity: 1,
+  stemColor: '#f6e7c3',
+  stemOpacity: 0.85
 })
 
 const projectStore = createProjectStore()
@@ -316,6 +419,27 @@ const iconPickerTarget = ref<string | null>(null)
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const iconPreviewCache = reactive<Record<string, string>>({})
 const iconPreviewOwnership = new Map<string, string>()
+const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
+const selectedLocationId = ref<string | null>(null)
+const pendingLocationId = ref<string | null>(null)
+const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
+const activeLocation = computed(() =>
+  locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
+let viewerRemountHandle: number | null = null
+
+function requestConfirm(message: string, onConfirm: () => void) {
+  confirmState.value = { message, onConfirm }
+}
+
+function handleConfirmDialog() {
+  const action = confirmState.value?.onConfirm
+  confirmState.value = null
+  action?.()
+}
+
+function dismissConfirmDialog() {
+  confirmState.value = null
+}
 
 const uiActions = computed<UIAction[]>(() => {
   const actions: UIAction[] = []
@@ -366,6 +490,16 @@ const uiActions = computed<UIAction[]>(() => {
         }
       },
       {
+        id: 'theme',
+        icon: 'palette',
+        label: 'Theme',
+        description: 'Edit label + marker styling.',
+        callback: () => {
+          setActivePanel('theme')
+          isDockCollapsed.value = false
+        }
+      },
+      {
         id: 'locations',
         icon: 'location-dot',
         label: 'Locations',
@@ -387,7 +521,7 @@ const uiActions = computed<UIAction[]>(() => {
         icon: 'circle-xmark',
         label: 'Close map',
         description: 'Unload the active archive without auto-restoring on refresh.',
-        callback: () => closeActiveArchive()
+        callback: () => promptCloseArchive()
       }
     )
   }
@@ -404,6 +538,7 @@ projectStore.subscribe((snapshot) => {
       })
     : []
   refreshIconPreviewCache()
+  ensureActiveLocationSelection()
 })
 
 layerBrowserStore.subscribe((state) => {
@@ -434,8 +569,20 @@ watch(
     workspaceForm.width = snapshot.legend?.size?.[0] ?? 1024
     workspaceForm.height = snapshot.legend?.size?.[1] ?? 1536
     workspaceForm.seaLevel = snapshot.legend?.sea_level ?? 0
+    syncThemeFormFromSnapshot(snapshot)
   },
   { immediate: true }
+)
+
+watch(
+  () => selectedLocationId.value,
+  (id) => {
+    if (id) {
+      focusLocationInViewer(id)
+    } else if (handle.value) {
+      handle.value.updateLocations(getViewerLocations())
+    }
+  }
 )
 
 type PersistedProject = {
@@ -463,6 +610,20 @@ function resetWorkspaceForm() {
   workspaceForm.seaLevel = projectSnapshot.value.legend?.sea_level ?? 0
 }
 
+function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
+  const resolved = resolveTerrainTheme(snapshot.theme)
+  const sprite = resolved.locationMarkers.sprite
+  const spriteDefault = sprite.states.default
+  themeForm.textColor = spriteDefault.textColor
+  themeForm.backgroundColor = spriteDefault.backgroundColor
+  themeForm.borderColor = spriteDefault.borderColor
+  themeForm.borderThickness = spriteDefault.borderThickness
+  themeForm.opacity = spriteDefault.opacity
+  const stemDefault = resolved.locationMarkers.stem.states.default
+  themeForm.stemColor = stemDefault.color
+  themeForm.stemOpacity = stemDefault.opacity
+}
+
 function updateProjectLabel(value: string) {
   projectStore.updateMetadata({ label: value })
   void persistCurrentProject()
@@ -473,23 +634,75 @@ function updateProjectAuthor(value: string) {
   void persistCurrentProject()
 }
 
+function resetThemeForm() {
+  if (!hasActiveArchive.value) return
+  if (baseThemeRef.value) {
+    projectStore.setTheme(cloneValue(baseThemeRef.value))
+  } else {
+    projectStore.setTheme(undefined)
+  }
+  syncThemeFormFromSnapshot()
+  requestViewerRemount()
+  void persistCurrentProject()
+}
+
+function applyThemeForm() {
+  if (!hasActiveArchive.value) return
+  const overrides: TerrainThemeOverrides = {
+    locationMarkers: {
+      sprite: {
+        states: {
+          default: {
+            textColor: themeForm.textColor,
+            backgroundColor: themeForm.backgroundColor,
+            borderColor: themeForm.borderColor,
+            borderThickness: themeForm.borderThickness,
+            opacity: themeForm.opacity
+          }
+        }
+      },
+      stem: {
+        states: {
+          default: {
+            color: themeForm.stemColor,
+            opacity: themeForm.stemOpacity
+          }
+        }
+      }
+    }
+  }
+  projectStore.setTheme(overrides)
+  requestViewerRemount()
+  void persistCurrentProject()
+}
+
 function applyMapSize() {
   const legend = projectSnapshot.value.legend
   if (!legend) return
-  const width = Math.max(64, Math.floor(workspaceForm.width))
-  const height = Math.max(64, Math.floor(workspaceForm.height))
+  const width = Math.max(1, Math.floor(workspaceForm.width))
+  const height = Math.max(1, Math.floor(workspaceForm.height))
   const nextLegend = { ...legend, size: [width, height] as [number, number] }
   projectStore.setLegend(nextLegend)
   layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    datasetRef.value.legend = nextLegend
+    requestViewerRemount()
+  }
   void persistCurrentProject()
 }
 
 function applySeaLevel() {
   const legend = projectSnapshot.value.legend
   if (!legend) return
-  const nextLegend = { ...legend, sea_level: Number(workspaceForm.seaLevel) }
+  const seaLevel = clampNumber(Number(workspaceForm.seaLevel), -1, 1)
+  workspaceForm.seaLevel = seaLevel
+  const nextLegend = { ...legend, sea_level: seaLevel }
   projectStore.setLegend(nextLegend)
   layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    datasetRef.value.legend = nextLegend
+    requestViewerRemount()
+  }
   void persistCurrentProject()
 }
 
@@ -510,6 +723,10 @@ function base64ToArrayBuffer(base64: string) {
     bytes[i] = binary.charCodeAt(i)
   }
   return bytes.buffer
+}
+
+function cloneValue<T>(value: T): T {
+  return value ? (JSON.parse(JSON.stringify(value)) as T) : value
 }
 
 async function persistCurrentProject(options: { base64?: string; label?: string } = {}) {
@@ -564,17 +781,46 @@ function cleanupDataset() {
   datasetRef.value = null
 }
 
+function requestViewerRemount() {
+  if (!datasetRef.value) return
+  if (viewerRemountHandle !== null) {
+    window.clearTimeout(viewerRemountHandle)
+  }
+  viewerRemountHandle = window.setTimeout(() => {
+    viewerRemountHandle = null
+    void mountViewer()
+  }, 80)
+}
+
 async function mountViewer() {
   const viewerElement = viewerShell.value?.getViewerElement()
   if (!viewerElement || !datasetRef.value || !layerState.value) return
   disposeViewer()
   handle.value = await initTerrainViewer(viewerElement, datasetRef.value, {
     layers: layerState.value,
-    locations: locationsList.value,
+    locations: getViewerLocations(),
     interactive: interactive.value,
+    theme: projectSnapshot.value.theme,
     onLocationPick: (payload) => {
-      updateStatus(`Picked pixel (${payload.pixel.x}, ${payload.pixel.y})`)
-    }
+        if (pendingLocationId.value) {
+          const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
+          if (target) {
+            target.pixel = {
+              x: clampNumber(Math.round(payload.pixel.x), 0, workspaceForm.width),
+              y: clampNumber(Math.round(payload.pixel.y), 0, workspaceForm.height)
+            }
+            pendingLocationId.value = null
+            interactive.value = false
+            handle.value?.setInteractiveMode(false)
+            commitLocations()
+            setActiveLocation(target.id!)
+            updateStatus(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
+          }
+        } else {
+          updateStatus(`Picked pixel (${payload.pixel.x}, ${payload.pixel.y})`)
+        }
+    },
+    onLocationClick: (locationId) => setActiveLocation(locationId)
   })
 }
 
@@ -593,6 +839,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   try {
     const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
     datasetRef.value = wrapDatasetWithOverrides(archive.dataset)
+    baseThemeRef.value = cloneValue(archive.dataset.theme)
     layerBrowserStore.setLegend(archive.legend)
     projectStore.loadFromArchive({
       legend: archive.legend,
@@ -647,8 +894,15 @@ function closeActiveArchive() {
   projectStore.reset()
   layerState.value = layerBrowserStore.getLayerToggles()
   locationsList.value = []
+  selectedLocationId.value = null
+  pendingLocationId.value = null
+  confirmState.value = null
+  iconPickerTarget.value = null
+  locationsDragActive.value = false
   handle.value = null
+  baseThemeRef.value = undefined
   activeDockPanel.value = 'workspace'
+  interactive.value = false
   clearAssetOverrides()
   refreshIconPreviewCache()
   updateStatus('Viewer cleared. Load a map to continue.')
@@ -657,6 +911,11 @@ function closeActiveArchive() {
   } catch (err) {
     console.warn('Failed to clear persistence flags', err)
   }
+}
+
+function promptCloseArchive() {
+  if (!hasActiveArchive.value) return
+  requestConfirm('Unload the current map? Unsaved changes may be lost.', () => closeActiveArchive())
 }
 
 function startNewMap() {
@@ -683,12 +942,25 @@ function addLocation() {
   })
   locationsList.value = [...locationsList.value, next]
   commitLocations()
+  setActivePanel('locations')
+  isDockCollapsed.value = false
+  setActiveLocation(next.id!)
+  startPlacement(next)
 }
 
-function removeLocation(location: TerrainLocation) {
-  if (!confirm(`Remove ${location.name ?? 'this location'}?`)) return
-  locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
-  commitLocations()
+function confirmRemoveLocation(location: TerrainLocation) {
+  requestConfirm(`Remove ${location.name ?? 'this location'}?`, () => {
+    locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
+    commitLocations()
+    if (selectedLocationId.value === location.id) {
+      setActiveLocation(locationsList.value[0]?.id ?? null)
+    }
+    if (pendingLocationId.value === location.id) {
+      pendingLocationId.value = null
+      interactive.value = false
+      handle.value?.setInteractiveMode(false)
+    }
+  })
 }
 
 function downloadBlob(filename: string, blob: Blob) {
@@ -769,6 +1041,44 @@ function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
 
+function setActiveLocation(id: string | null) {
+  selectedLocationId.value = id
+}
+
+function ensureActiveLocationSelection() {
+  if (!locationsList.value.length) {
+    selectedLocationId.value = null
+    return
+  }
+  const ensured = locationsList.value.map((location) => ensureLocationId(location))
+  if (!selectedLocationId.value || !ensured.some((location) => location.id === selectedLocationId.value)) {
+    selectedLocationId.value = ensured[0].id ?? null
+  }
+}
+
+function startPlacement(location: TerrainLocation) {
+  if (!handle.value) return
+  const id = ensureLocationId(location).id!
+  selectedLocationId.value = id
+  pendingLocationId.value = id
+  interactive.value = true
+  handle.value.setInteractiveMode(true)
+  updateStatus(`Click anywhere on the map to place ${location.name ?? 'this location'}.`)
+}
+
+function focusLocationInViewer(id: string) {
+  if (!handle.value) return
+  const target = locationsList.value.find((location) => ensureLocationId(location).id === id)
+  if (!target) return
+  handle.value.updateLocations(getViewerLocations(), id)
+  const pixel =
+    target.pixel ?? {
+      x: Math.round(workspaceForm.width / 2),
+      y: Math.round(workspaceForm.height / 2)
+    }
+  handle.value.navigateTo({ pixel, locationId: id })
+}
+
 function ensureLocationId(location: TerrainLocation): TerrainLocation {
   if (!location.id) {
     location.id = `loc-${Math.random().toString(36).slice(2, 10)}`
@@ -807,18 +1117,6 @@ async function handleLibraryUpload(event: Event) {
   input.value = ''
 }
 
-async function handleIconDrop(location: TerrainLocation, event: DragEvent) {
-  swallowDragEvent(event)
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  await importLocationIcon(location, file)
-  locationsDragActive.value = false
-}
-
-function handleIconDragOver(event: DragEvent) {
-  swallowDragEvent(event)
-}
-
 async function importLocationIcon(location: TerrainLocation, file: File) {
   await importIconAsset(file, ensureLocationId(location).id!)
 }
@@ -829,8 +1127,10 @@ function commitLocations() {
     if (copy.showBorder === undefined) copy.showBorder = true
     return copy
   })
+  locationsList.value = cloned
   projectStore.setLocations(cloned)
-  handle.value?.updateLocations(cloned)
+  handle.value?.updateLocations(getViewerLocations(cloned), selectedLocationId.value ?? undefined)
+  ensureActiveLocationSelection()
   void persistCurrentProject()
 }
 
@@ -855,7 +1155,10 @@ function normalizeAssetFileName(name: string) {
   const trimmed = name.trim().toLowerCase()
   const segments = trimmed.split('.')
   const ext = segments.length > 1 ? segments.pop() ?? '' : ''
-  const base = segments.join('.').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const base = segments
+    .join('.')
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^[_-]+|[_-]+$/g, '')
   const safeExt = ext.replace(/[^a-z0-9]+/g, '')
   return safeExt ? `${base || 'asset'}.${safeExt}` : base || 'asset'
 }
@@ -882,6 +1185,7 @@ function clearAssetOverrides() {
 }
 
 function onLocationsDragEnter(event: DragEvent) {
+  if (!event.dataTransfer?.types?.includes('Files')) return
   swallowDragEvent(event)
   locationsDragActive.value = true
 }
@@ -902,12 +1206,28 @@ function onLocationsDragLeave(event: DragEvent) {
 async function onLocationsDrop(event: DragEvent) {
   swallowDragEvent(event)
   locationsDragActive.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (!file || !activeLocation.value) return
+  await importLocationIcon(activeLocation.value, file)
 }
 
 function swallowDragEvent(event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
   event.stopImmediatePropagation?.()
+}
+
+function handleWindowDragEvent(event: DragEvent) {
+  const target = event.target as HTMLElement | null
+  if (
+    target &&
+    (target.closest('.panel-dock') ||
+      target.closest('.asset-dialog') ||
+      target.closest('.confirm-dialog'))
+  ) {
+    return
+  }
+  swallowDragEvent(event)
 }
 
 async function importIconAsset(file: File, targetLocationId?: string) {
@@ -935,22 +1255,23 @@ async function importIconAsset(file: File, targetLocationId?: string) {
 }
 
 function removeAsset(path: string) {
-  if (!confirm(`Remove ${path}?`)) return
-  projectStore.removeFile(path)
-  if (assetOverrides.has(path)) {
-    const url = assetOverrides.get(path)
-    if (url) URL.revokeObjectURL(url)
-    assetOverrides.delete(path)
-  }
-  delete iconPreviewCache[path]
-  locationsList.value = locationsList.value.map((location) =>
-    location.icon === path ? { ...location, icon: undefined } : location
-  )
-  commitLocations()
-  refreshIconPreviewCache()
-  if (iconPickerTarget.value) {
-    iconPickerTarget.value = null
-  }
+  requestConfirm(`Remove ${path}?`, () => {
+    projectStore.removeFile(path)
+    if (assetOverrides.has(path)) {
+      const url = assetOverrides.get(path)
+      if (url) URL.revokeObjectURL(url)
+      assetOverrides.delete(path)
+    }
+    delete iconPreviewCache[path]
+    locationsList.value = locationsList.value.map((location) =>
+      location.icon === path ? { ...location, icon: undefined } : location
+    )
+    commitLocations()
+    refreshIconPreviewCache()
+    if (iconPickerTarget.value) {
+      iconPickerTarget.value = null
+    }
+  })
 }
 
 function refreshIconPreviewCache() {
@@ -977,11 +1298,29 @@ function refreshIconPreviewCache() {
   })
 }
 
+function getViewerLocations(list = locationsList.value) {
+  return list.map((location) => ({
+    ...location,
+    icon: resolveAssetReference(location.icon)
+  }))
+}
+
+function resolveAssetReference(reference?: string) {
+  if (!reference) return undefined
+  if (assetOverrides.has(reference)) return reference
+  if (projectAssets.value.some((file) => file.path === reference)) return reference
+  const alias = projectAssets.value.find(
+    (file) => file.sourceFileName === reference || file.path.endsWith(`/${reference}`)
+  )
+  return alias?.path ?? reference
+}
+
 function getIconPreview(icon?: string) {
-  if (!icon) return ''
-  if (assetOverrides.has(icon)) return assetOverrides.get(icon)!
-  if (iconPreviewCache[icon]) return iconPreviewCache[icon]
-  preloadIconPreview(icon)
+  const resolved = resolveAssetReference(icon)
+  if (!resolved) return ''
+  if (assetOverrides.has(resolved)) return assetOverrides.get(resolved)!
+  if (iconPreviewCache[resolved]) return iconPreviewCache[resolved]
+  preloadIconPreview(resolved)
   return ''
 }
 
@@ -1023,8 +1362,8 @@ function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)
-  window.addEventListener('dragover', swallowDragEvent, true)
-  window.addEventListener('drop', swallowDragEvent, true)
+  window.addEventListener('dragover', handleWindowDragEvent, true)
+  window.addEventListener('drop', handleWindowDragEvent, true)
   const saved = readPersistedProject()
   if (saved) {
     persistedProject.value = saved
@@ -1038,9 +1377,13 @@ onBeforeUnmount(() => {
   disposeViewer()
   cleanupDataset()
   window.removeEventListener('resize', handleResize)
-  window.removeEventListener('dragover', swallowDragEvent, true)
-  window.removeEventListener('drop', swallowDragEvent, true)
+  window.removeEventListener('dragover', handleWindowDragEvent, true)
+  window.removeEventListener('drop', handleWindowDragEvent, true)
   iconPreviewOwnership.forEach((url) => URL.revokeObjectURL(url))
   iconPreviewOwnership.clear()
+  if (viewerRemountHandle !== null) {
+    window.clearTimeout(viewerRemountHandle)
+    viewerRemountHandle = null
+  }
 })
 </script>

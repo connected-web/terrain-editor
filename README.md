@@ -98,6 +98,14 @@ To make construction of the terrain easier, a Vue 3 based editor application is 
 - [Website](https://connected-web.github.io/terrain-editor/)
 - [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
 
+#### Workspace features
+
+- **Panel dock + toolbar** – a single docked column hosts workspace/layers/theme/locations panels, while the shared toolbar injects context-aware UI actions (load, export, open panel). Collapsing the dock hides toolbar labels so the viewer keeps its footprint.
+- **Workspace panel** – edit project title, author, width, height, and sea level with validation. Legend changes remount the viewer immediately so the mesh always matches the declared resolution.
+- **Locations panel** – browse locations, select one to edit, upload or drag/drop icon assets, toggle label borders, and click “Pick on map” to place a marker interactively. The asset dialog handles caching + replacement for shared icons.
+- **Theme panel** – tweak marker text/background/border colors, border thickness, opacity, and stem colors/opacity. Changes propagate to the viewer instantly, while the reset button restores the archive’s palette.
+- **Asset + confirm dialogs** – destructive operations now use a reusable confirm dialog, and the asset library surfaces thumbnails, metadata, and remove/select flows so other panels can reuse the same UX.
+
 ### Editor architecture
 
 The Vue workspace is intentionally light on bespoke logic; most of the heavy lifting now lives in `packages/terrain/src/editor`:
@@ -143,12 +151,12 @@ Copyright 2025 Connected Web.
 
 - ✅ Create basic editor application (Vue 3 + TS)
 - ✅ Implement loading and unpacking of `.wyn` files into editor
-- 🚧 Locations + icons editor with drag/drop asset support
-- 🚧 Map sizing + legend metadata management
-- 🚧 Theme designer with live preview + JSON export
+- ✅ Locations + icons editor with drag/drop asset support
+- ✅ Map sizing + legend metadata management
+- ✅ Theme designer (marker palette) with live preview + JSON export via archive build
 - 🚧 Layer asset uploads (drag/drop) with dimension normalization
-- 🚧 Location icon upload surface tied into legend/locations
+- ✅ Location icon upload surface tied into legend/locations
 - 🚧 Viewer recentering when dock/toolbar visibility changes
-- 🚧 Toolbar/dock logic unification for future tools
+- ✅ Toolbar/dock logic unification for future tools
 - 🚧 Implement mask editing tools (brushes, noise, etc.)
 - 🚧 Implement heightmap editing tools (point files, falloff, rivers, etc.)

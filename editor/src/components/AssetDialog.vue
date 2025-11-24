@@ -20,10 +20,10 @@
           </div>
           <div class="asset-dialog__actions">
             <button class="pill-button pill-button--ghost" @click="$emit('select', asset.path)">
-              Use asset
+              <Icon icon="check">Use asset</Icon>
             </button>
             <button class="pill-button pill-button--danger" @click="$emit('remove', asset.path)">
-              Remove
+              <Icon icon="trash">Remove</Icon>
             </button>
           </div>
         </article>
@@ -70,7 +70,7 @@ const filteredAssets = computed(() => props.assets ?? [])
   width: min(420px, 90vw);
   background: rgba(5, 8, 17, 0.95);
   border-radius: 18px;
-  padding: 1rem;
+  padding: 0.75rem 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -89,7 +89,8 @@ const filteredAssets = computed(() => props.assets ?? [])
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding-right: 0.3rem;
+  padding-right: 0.5rem;
+  padding-top: 0.25rem;
 }
 
 .asset-dialog__grid::-webkit-scrollbar {
@@ -108,7 +109,7 @@ const filteredAssets = computed(() => props.assets ?? [])
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.5rem;
-  margin-right: 0.2rem;
+  margin-right: 0.4rem;
 }
 
 .asset-dialog__thumb {

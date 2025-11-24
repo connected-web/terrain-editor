@@ -121,6 +121,11 @@ body {
   border-radius: 999px;
 }
 
+.panel-dock__nav:empty {
+  display: none;
+  padding: 0;
+}
+
 .panel-dock__content {
   flex: 1;
   padding: 0 1rem 1rem;
@@ -253,6 +258,9 @@ body {
 
 .panel-card__pill {
   justify-content: flex-start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .panel-card__pill-swatch {
@@ -291,6 +299,54 @@ body {
   font-size: 0.9rem;
 }
 
+.theme-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.theme-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: rgba(242, 237, 224, 0.75);
+}
+
+.theme-form__field input[type='color'] {
+  width: 100%;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0;
+}
+
+.theme-form__field input[type='number'] {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.theme-form__field input[type='range'] {
+  width: 100%;
+}
+
+.theme-form__split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.theme-form__hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+
 .panel-card--locations .locations-panel {
   display: flex;
   flex-direction: column;
@@ -301,6 +357,24 @@ body {
 
 .panel-card--locations.drag-active .locations-panel {
   border-color: rgba(246, 231, 195, 0.4);
+}
+
+.locations-panel__browser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+.locations-panel__browser::-webkit-scrollbar {
+  width: 6px;
+}
+
+.locations-panel__browser::-webkit-scrollbar-thumb {
+  background: rgba(246, 231, 195, 0.35);
+  border-radius: 999px;
 }
 
 .locations-panel__item {
@@ -391,8 +465,9 @@ body {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: none;
+  margin-bottom: 0.5rem;
 }
 
 .locations-panel__coords {
