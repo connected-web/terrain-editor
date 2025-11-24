@@ -1035,6 +1035,7 @@ const markerMap = new Map<
     return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
   }
 
+
   function updateMarkerVisuals() {
     const distance = camera.position.distanceTo(controls.target)
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
@@ -1196,6 +1197,8 @@ const markerMap = new Map<
   function applySeaLevelUpdate(nextSeaLevel: number) {
     if (!heightSampler) return
     seaLevel = nextSeaLevel
+    legend.sea_level = nextSeaLevel
+    dataset.legend.sea_level = nextSeaLevel
     applyHeightField(terrainGeometry, heightSampler, {
       seaLevel,
       heightScale: currentHeightScale

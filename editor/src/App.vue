@@ -1231,7 +1231,7 @@ function applyMapSize() {
   layerBrowserStore.setLegend(nextLegend)
   if (datasetRef.value) {
     datasetRef.value.legend = nextLegend
-    handle.value?.setSeaLevel(seaLevel)
+    requestViewerRemount()
   }
   void persistCurrentProject()
 }
@@ -1246,7 +1246,7 @@ function applySeaLevel() {
   layerBrowserStore.setLegend(nextLegend)
   if (datasetRef.value) {
     datasetRef.value.legend = nextLegend
-    requestViewerRemount()
+    handle.value?.setSeaLevel(seaLevel)
   }
   void persistCurrentProject()
 }
