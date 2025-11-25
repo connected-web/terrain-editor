@@ -41,6 +41,11 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
   roads: 0.85
 }
 const DEFAULT_STEM_SCALE = 0.01
+const MARKER_HEIGHT_RATIO = 0.11
+const MARKER_MIN_HEIGHT = 0.35
+const MARKER_MAX_HEIGHT = 0.85
+const MARKER_SPRITE_GAP = 0.08
+const MARKER_SURFACE_OFFSET = 0.01
 const BASE_FILL_COLOR = '#7b5c3a'
 const SPRITE_CANVAS_WIDTH = 240
 const SPRITE_CANVAS_HEIGHT = 160
@@ -781,6 +786,13 @@ export async function initTerrainViewer(
   const terrainDepth = terrainWidth * mapRatio
   const terrainSegmentsZ = Math.max(1, Math.round(SEGMENTS_X * mapRatio))
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
+  const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
+  function computeMarkerStemHeight() {
+    const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO
+    return THREE.MathUtils.clamp(rawHeight, MARKER_MIN_HEIGHT, MARKER_MAX_HEIGHT)
+  }
+  const markerStemHeight = computeMarkerStemHeight()
+  let terrainHeightRange = { min: FLOOR_Y, max: 0 }
   const baseWidth = terrainWidth + EDGE_RIM * 2
   const baseDepth = terrainDepth + EDGE_RIM * 2
   function computeStemRadius(stemTheme: MarkerStemTheme) {
@@ -811,6 +823,12 @@ export async function initTerrainViewer(
     return { x, y }
   }
 
+  function pixelToWorld(pixel: { x: number; y: number }) {
+    if (!heightSampler) return null
+    const { u, v } = pixelToUV(pixel)
+    return uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel, terrainDimensions)
+  }
+
   const heightScale = options.heightScale ?? HEIGHT_SCALE_DEFAULT
   let currentHeightScale = heightScale
   const waterPercent = THREE.MathUtils.clamp(
@@ -838,7 +856,9 @@ export async function initTerrainViewer(
 
   const raycaster = new THREE.Raycaster()
   const pointer = new THREE.Vector2()
-  const upAxis = new THREE.Vector3(0, 1, 0)
+  const downAxis = new THREE.Vector3(0, -1, 0)
+  const surfaceRaycaster = new THREE.Raycaster()
+  const surfaceRayOrigin = new THREE.Vector3()
   let interactiveEnabled = options.interactive ?? false
   let heightSampler: HeightSampler | null = null
   let currentLocations: TerrainLocation[] = options.locations ?? []
@@ -931,7 +951,7 @@ const markerMap = new Map<
     spriteVisuals: MarkerSpriteVisualSet
     stemStates: MarkerStemVisualSet
     iconScale: number
-    stemBaseHeight: number
+    spriteOffset: number
   }
 >()
   const markerInteractiveTargets: THREE.Object3D[] = []
@@ -946,6 +966,15 @@ const markerMap = new Map<
     duration: number
   } | null = null
   let terrain: THREE.Mesh | null = null
+  function projectWorldToSurface(world: THREE.Vector3 | null) {
+    if (!world) return null
+    if (!terrain) return world.clone()
+    const originY = (terrainHeightRange.max ?? 0) + 2
+    surfaceRayOrigin.set(world.x, originY, world.z)
+    surfaceRaycaster.set(surfaceRayOrigin, downAxis)
+    const hit = surfaceRaycaster.intersectObject(terrain, true)
+    return hit[0]?.point.clone() ?? world.clone()
+  }
   function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3) {
     cameraTween = {
       startPos: camera.position.clone(),
@@ -1041,11 +1070,7 @@ const markerMap = new Map<
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
     const baseScale = lerp / 80
 
-    const zoomRange = controls.maxDistance - controls.minDistance
-    const normalizedZoom =
-      zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
-    const heightScaleFactor = THREE.MathUtils.lerp(0.35, 1, normalizedZoom)
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight }, id) => {
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, spriteOffset }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
@@ -1061,10 +1086,8 @@ const markerMap = new Map<
       stemMat.opacity = stemState.opacity
       stemMat.color.set(stemState.color)
       const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
-      stem.scale.set(stemWidth, heightScaleFactor, stemWidth)
-      const adjustedHeight = stemBaseHeight * heightScaleFactor
-      stem.position.y = -(adjustedHeight / 4)
-      sprite.position.y = 0.05 + adjustedHeight / 4
+      stem.scale.set(stemWidth, 1, stemWidth)
+      sprite.position.y = spriteOffset
     })
   }
 
@@ -1125,7 +1148,10 @@ const markerMap = new Map<
             terrainDimensions
           )
           if (!world) return
-          locationWorldCache.set(id, world.clone())
+          const surfacePoint = projectWorldToSurface(world)
+          if (!surfacePoint) return
+          locationWorldCache.set(id, surfacePoint.clone())
+          location.world = { x: surfacePoint.x, y: surfacePoint.y, z: surfacePoint.z }
           const glyph = formatMarkerGlyph(location)
           const iconTexture = iconTextures[i] ?? undefined
           const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
@@ -1135,7 +1161,8 @@ const markerMap = new Map<
           const sprite = new THREE.Sprite(spriteVisuals.default.material)
           sprite.userData.locationId = location.id
           sprite.renderOrder = 10
-          const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
+          const stemHeight = markerStemHeight
+          const spriteOffset = stemHeight + MARKER_SPRITE_GAP
           const stemStates = createMarkerStemVisuals(markerTheme.stem)
           const stemMaterial = new THREE.MeshStandardMaterial({
             color: stemStates.default.color,
@@ -1146,11 +1173,12 @@ const markerMap = new Map<
           const stemGeometry = createStemGeometry(markerTheme.stem.shape, stemRadius, stemHeight)
           const stem = new THREE.Mesh(stemGeometry, stemMaterial)
           stem.renderOrder = 9
-          stem.position.y = -(stemHeight / 4)
-          sprite.position.set(0, 0.05 + stemHeight / 4, 0)
+          stem.position.set(0, stemHeight / 2, 0)
+          sprite.position.set(0, spriteOffset, 0)
           stem.userData.locationId = location.id
           const container = new THREE.Group()
-          container.position.copy(world)
+          container.position.copy(surfacePoint)
+          container.position.y += MARKER_SURFACE_OFFSET
           container.userData.locationId = location.id
           container.add(stem)
           container.add(sprite)
@@ -1163,7 +1191,7 @@ const markerMap = new Map<
             spriteVisuals,
             stemStates,
             iconScale,
-            stemBaseHeight: stemHeight
+            spriteOffset
           })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
@@ -1199,10 +1227,11 @@ const markerMap = new Map<
     seaLevel = nextSeaLevel
     legend.sea_level = nextSeaLevel
     dataset.legend.sea_level = nextSeaLevel
-    applyHeightField(terrainGeometry, heightSampler, {
+    const stats = applyHeightField(terrainGeometry, heightSampler, {
       seaLevel,
       heightScale: currentHeightScale
     })
+    terrainHeightRange = { min: stats.minY, max: stats.maxY }
     terrainGeometry.attributes.position.needsUpdate = true
     terrainGeometry.computeVertexNormals()
     rebuildRimMesh()
@@ -1238,7 +1267,8 @@ const markerMap = new Map<
     terrainSegmentsZ
   )
   terrainGeometry.rotateX(-Math.PI / 2)
-  applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
+  const heightStats = applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
+  terrainHeightRange = { min: heightStats.minY, max: heightStats.maxY }
 
   let legendTexture = await composeLegendTexture(
     legend,
@@ -1524,14 +1554,8 @@ const markerMap = new Map<
     let world =
       normalizeWorld(worldOverride) ||
       (locationId && locationWorldCache.get(locationId)?.clone()) ||
-      uvToWorld(
-        pixelToUV(pixel).u,
-        pixelToUV(pixel).v,
-        heightSampler,
-        currentHeightScale,
-        seaLevel,
-        terrainDimensions
-      )
+      pixelToWorld(pixel)
+    world = projectWorldToSurface(world)
     if (!world) return
     const distance =
       view?.distance ?? Math.max(camera.position.distanceTo(controls.target), 0.1)
