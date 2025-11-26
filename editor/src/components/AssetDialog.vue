@@ -8,6 +8,15 @@
           <Icon icon="xmark" />
         </button>
       </header>
+      <label class="asset-dialog__search">
+        <Icon icon="magnifying-glass" />
+        <input
+          type="search"
+          placeholder="Search assets"
+          v-model="filterModel"
+          spellcheck="false"
+        />
+      </label>
       <div class="asset-dialog__grid">
         <article v-for="asset in filteredAssets" :key="asset.path" class="asset-dialog__item">
           <div
@@ -21,6 +30,9 @@
           <div class="asset-dialog__actions">
             <button class="pill-button pill-button--ghost" @click="$emit('select', asset.path)">
               <Icon icon="check">Use asset</Icon>
+            </button>
+            <button class="pill-button pill-button--ghost" @click="$emit('replace', asset)">
+              <Icon icon="upload">Replace asset</Icon>
             </button>
             <button class="pill-button pill-button--danger" @click="$emit('remove', asset.path)">
               <Icon icon="trash">Remove</Icon>
@@ -44,9 +56,32 @@ import type { TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 const props = defineProps<{
   assets: TerrainProjectFileEntry[]
   getPreview: (path: string) => string
+  filterText?: string
 }>()
 
-const filteredAssets = computed(() => props.assets ?? [])
+const emit = defineEmits<{
+  (e: 'select', path: string): void
+  (e: 'remove', path: string): void
+  (e: 'upload'): void
+  (e: 'close'): void
+  (e: 'replace', asset: TerrainProjectFileEntry): void
+  (e: 'update:filterText', value: string): void
+}>()
+
+const filterModel = computed({
+  get: () => props.filterText ?? '',
+  set: (value: string) => emit('update:filterText', value)
+})
+
+const filteredAssets = computed(() => {
+  const list = props.assets ?? []
+  const query = filterModel.value.trim().toLowerCase()
+  if (!query) return list
+  return list.filter((asset) => {
+    const haystack = `${asset.sourceFileName ?? asset.path} ${asset.type ?? ''}`.toLowerCase()
+    return haystack.includes(query)
+  })
+})
 </script>
 
 <style scoped>
@@ -81,6 +116,34 @@ const filteredAssets = computed(() => props.assets ?? [])
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.asset-dialog__header h2 {
+  margin: 0;
+}
+
+.asset-dialog__search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.asset-dialog__search input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+
+.asset-dialog__search input:focus {
+  outline: none;
 }
 
 .asset-dialog__grid {

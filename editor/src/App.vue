@@ -626,8 +626,11 @@
         v-if="iconPickerTarget"
         :assets="projectAssets"
         :get-preview="getIconPreview"
+        :filter-text="assetDialogFilter"
+        @update:filter-text="(value) => (assetDialogFilter.value = value)"
         @select="selectIconFromLibrary"
-        @upload="triggerLibraryUpload"
+        @replace="beginAssetReplacement"
+        @upload="() => triggerLibraryUpload()"
         @remove="removeAsset"
         @close="closeIconPicker"
       />
@@ -857,6 +860,7 @@ const layerEntries = computed(() => layerBrowserState.value.entries)
 const locationsDragActive = ref(false)
 const assetOverrides = new Map<string, string>()
 const iconPickerTarget = ref<string | null>(null)
+const assetDialogFilter = ref('')
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const iconPreviewCache = reactive<Record<string, string>>({})
 const iconPreviewOwnership = new Map<string, string>()
@@ -868,6 +872,7 @@ const pendingLocationId = ref<string | null>(null)
 const pendingLocationDraft = ref<TerrainLocation | null>(null)
 const locationPickerOpen = ref(false)
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
+const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
 const activeLocation = computed(() =>
   locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
 let viewerRemountHandle: number | null = null
@@ -1660,11 +1665,13 @@ function ensureLocationId(location: TerrainLocation): TerrainLocation {
 }
 
 function openIconPicker(location: TerrainLocation) {
+  assetDialogFilter.value = 'icon'
   iconPickerTarget.value = ensureLocationId(location).id!
 }
 
 function closeIconPicker() {
   iconPickerTarget.value = null
+  assetDialogFilter.value = ''
 }
 
 function openLocationPicker() {
@@ -1692,7 +1699,22 @@ function selectIconFromLibrary(path: string) {
   closeIconPicker()
 }
 
-function triggerLibraryUpload() {
+function beginAssetReplacement(asset: TerrainProjectFileEntry) {
+  triggerLibraryUpload({
+    replacePath: asset.path,
+    originalName: asset.sourceFileName ?? asset.path
+  })
+}
+
+function triggerLibraryUpload(options?: { replacePath?: string; originalName?: string }) {
+  if (options?.replacePath) {
+    pendingAssetReplacement.value = {
+      path: options.replacePath,
+      originalName: options.originalName
+    }
+  } else {
+    pendingAssetReplacement.value = null
+  }
   iconLibraryInputRef.value?.click()
 }
 
@@ -1700,8 +1722,31 @@ async function handleLibraryUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const replacementTarget = pendingAssetReplacement.value
+  pendingAssetReplacement.value = null
+  const resetInput = () => {
+    input.value = ''
+  }
+  if (replacementTarget) {
+    const performReplacement = async () => {
+      await replaceAssetWithFile(replacementTarget.path, file)
+      resetInput()
+    }
+    const existingName = normalizeAssetFileName(
+      replacementTarget.originalName ?? replacementTarget.path
+    )
+    const incomingName = normalizeAssetFileName(file.name)
+    if (existingName !== incomingName) {
+      requestConfirm('Asset name differs, are you sure you want to replace this asset?', () => {
+        void performReplacement()
+      })
+      return
+    }
+    await performReplacement()
+    return
+  }
   await importIconAsset(file, iconPickerTarget.value ?? undefined)
-  input.value = ''
+  resetInput()
 }
 
 async function importLocationIcon(location: TerrainLocation, file: File) {
@@ -1858,6 +1903,19 @@ async function importIconAsset(file: File, targetLocationId?: string) {
     }
   }
   return path
+}
+
+async function replaceAssetWithFile(path: string, file: File) {
+  const buffer = await file.arrayBuffer()
+  projectStore.upsertFile({
+    path,
+    data: buffer,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+  setAssetOverride(path, file)
+  refreshIconPreviewCache()
 }
 
 function removeAsset(path: string) {
