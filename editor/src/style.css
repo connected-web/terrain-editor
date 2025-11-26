@@ -721,6 +721,12 @@ code {
   gap: 0.75rem;
 }
 
+.workspace-form__starter {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .workspace-form__field {
   display: flex;
   flex-direction: column;
@@ -749,4 +755,10 @@ code {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.45);
+}
+
+.workspace-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }

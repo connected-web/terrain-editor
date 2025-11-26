@@ -7,6 +7,7 @@
         type="button"
         class="editor-viewer__toolbar-button"
         :title="action.description || action.label"
+        :aria-label="action.label"
         :disabled="action.disabled"
         @click="action.callback()"
       >

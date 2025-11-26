@@ -27,6 +27,24 @@
               Reset
             </button>
           </header>
+          <div v-if="!hasActiveArchive" class="workspace-form__starter">
+            <button
+              type="button"
+              class="pill-button"
+              aria-label="Workspace panel: load sample map"
+              @click="loadSample"
+            >
+              <Icon icon="mountain-sun">Load sample map</Icon>
+            </button>
+            <button
+              type="button"
+              class="pill-button pill-button--ghost"
+              aria-label="Workspace panel: load map"
+              @click="viewerShell?.triggerFileSelect()"
+            >
+              <Icon icon="folder-open">Load map</Icon>
+            </button>
+          </div>
           <div class="workspace-form">
             <label class="workspace-form__field">
               <span>Project title</span>
@@ -78,6 +96,11 @@
             <p class="workspace-form__hint">
               Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
             </p>
+            <div class="workspace-form__actions" v-if="hasActiveArchive">
+              <button class="pill-button pill-button--ghost" type="button" @click="exportArchive">
+                <Icon icon="file-export">Export WYN</Icon>
+              </button>
+            </div>
           </div>
         </section>
 
