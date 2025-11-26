@@ -334,7 +334,7 @@ export type ViewerOverlayHandle = {
   setStatusFade: (fade: boolean) => void
   setViewMode: (mode: TerrainViewMode) => void
   setLoadingProgress: (state: ViewerOverlayLoadingState | null) => void
-  openFileDialog: () => void
+  openFileDialog?: () => void
   destroy: () => void
 }
 

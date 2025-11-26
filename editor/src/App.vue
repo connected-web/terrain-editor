@@ -1,5 +1,6 @@
 <template>
   <div class="editor-shell" ref="editorRoot">
+    <h1 class="sr-only">Terrain Editor</h1>
     <div class="editor-layout">
       <EditorViewer
         ref="viewerShell"
@@ -1518,8 +1519,8 @@ function promptCloseArchive() {
 }
 
 function createScratchLegend(): TerrainLegend {
-  const width = Math.max(1, Math.floor(workspaceForm.width) || 1024)
-  const height = Math.max(1, Math.floor(workspaceForm.height) || 1536)
+  const width = Math.max(1, Math.floor(workspaceForm.width) || 512)
+  const height = Math.max(1, Math.floor(workspaceForm.height) || 512)
   const seaLevel = clampNumber(Number.isFinite(workspaceForm.seaLevel) ? Number(workspaceForm.seaLevel) : 0, -1, 1)
   return {
     size: [width, height] as [number, number],
