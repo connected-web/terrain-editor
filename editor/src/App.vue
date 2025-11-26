@@ -627,7 +627,7 @@
         :assets="projectAssets"
         :get-preview="getIconPreview"
         :filter-text="assetDialogFilter"
-        @update:filter-text="(value) => (assetDialogFilter.value = value)"
+        @update:filter-text="setAssetDialogFilter"
         @select="selectIconFromLibrary"
         @replace="beginAssetReplacement"
         @upload="() => triggerLibraryUpload()"
@@ -861,6 +861,9 @@ const locationsDragActive = ref(false)
 const assetOverrides = new Map<string, string>()
 const iconPickerTarget = ref<string | null>(null)
 const assetDialogFilter = ref('')
+function setAssetDialogFilter(value: string) {
+  assetDialogFilter.value = value
+}
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const iconPreviewCache = reactive<Record<string, string>>({})
 const iconPreviewOwnership = new Map<string, string>()
@@ -1665,13 +1668,14 @@ function ensureLocationId(location: TerrainLocation): TerrainLocation {
 }
 
 function openIconPicker(location: TerrainLocation) {
-  assetDialogFilter.value = 'icon'
+  setAssetDialogFilter('icon')
   iconPickerTarget.value = ensureLocationId(location).id!
 }
 
 function closeIconPicker() {
   iconPickerTarget.value = null
-  assetDialogFilter.value = ''
+  setAssetDialogFilter('')
+  pendingAssetReplacement.value = null
 }
 
 function openLocationPicker() {
@@ -1721,7 +1725,10 @@ function triggerLibraryUpload(options?: { replacePath?: string; originalName?: s
 async function handleLibraryUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file) return
+  if (!file) {
+    input.value = ''
+    return
+  }
   const replacementTarget = pendingAssetReplacement.value
   pendingAssetReplacement.value = null
   const resetInput = () => {
@@ -1732,21 +1739,34 @@ async function handleLibraryUpload(event: Event) {
       await replaceAssetWithFile(replacementTarget.path, file)
       resetInput()
     }
-    const existingName = normalizeAssetFileName(
-      replacementTarget.originalName ?? replacementTarget.path
-    )
+    const existingLabel = replacementTarget.originalName ?? replacementTarget.path
+    const existingName = normalizeAssetFileName(existingLabel)
     const incomingName = normalizeAssetFileName(file.name)
     if (existingName !== incomingName) {
-      requestConfirm('Asset name differs, are you sure you want to replace this asset?', () => {
+      requestConfirm(`Replace ${existingLabel} with ${file.name}?`, () => {
         void performReplacement()
       })
+      resetInput()
       return
     }
     await performReplacement()
     return
   }
-  await importIconAsset(file, iconPickerTarget.value ?? undefined)
-  resetInput()
+  const defaultPath = buildIconPath(file.name)
+  const importAsset = async () => {
+    await importIconAsset(file, iconPickerTarget.value ?? undefined, defaultPath)
+    resetInput()
+  }
+  const existingAsset = projectAssets.value.find((asset) => asset.path === defaultPath)
+  if (existingAsset) {
+    const existingLabel = existingAsset.sourceFileName ?? existingAsset.path
+    requestConfirm(`Uploading ${file.name} will replace ${existingLabel}. Continue?`, () => {
+      void importAsset()
+    })
+    resetInput()
+    return
+  }
+  await importAsset()
 }
 
 async function importLocationIcon(location: TerrainLocation, file: File) {
@@ -1881,8 +1901,8 @@ function handleWindowDragEvent(event: DragEvent) {
   swallowDragEvent(event)
 }
 
-async function importIconAsset(file: File, targetLocationId?: string) {
-  const path = buildIconPath(file.name)
+async function importIconAsset(file: File, targetLocationId?: string, overridePath?: string) {
+  const path = overridePath ?? buildIconPath(file.name)
   const buffer = await file.arrayBuffer()
   projectStore.upsertFile({
     path,

@@ -102,7 +102,7 @@ const filteredAssets = computed(() => {
   top: 1.5rem;
   right: 1.5rem;
   bottom: 1.5rem;
-  width: min(420px, 90vw);
+  width: min(500px, 90vw);
   background: rgba(5, 8, 17, 0.95);
   border-radius: 18px;
   padding: 0.75rem 0.75rem 0.85rem;
