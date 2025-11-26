@@ -42,10 +42,12 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
 }
 const DEFAULT_STEM_SCALE = 0.01
 const MARKER_HEIGHT_RATIO = 0.11
+const MARKER_HEIGHT_SCALE = 0.25
 const MARKER_MIN_HEIGHT = 0.35
 const MARKER_MAX_HEIGHT = 0.85
 const MARKER_SPRITE_GAP = 0.08
-const MARKER_SURFACE_OFFSET = 0.01
+const MARKER_LABEL_EXTRA_OFFSET = -0.08
+const MARKER_SURFACE_OFFSET = 0.00
 const BASE_FILL_COLOR = '#7b5c3a'
 const SPRITE_CANVAS_WIDTH = 240
 const SPRITE_CANVAS_HEIGHT = 160
@@ -788,8 +790,10 @@ export async function initTerrainViewer(
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
   const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
   function computeMarkerStemHeight() {
-    const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO
-    return THREE.MathUtils.clamp(rawHeight, MARKER_MIN_HEIGHT, MARKER_MAX_HEIGHT)
+    const scaledMin = MARKER_MIN_HEIGHT * MARKER_HEIGHT_SCALE
+    const scaledMax = MARKER_MAX_HEIGHT * MARKER_HEIGHT_SCALE
+    const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO * MARKER_HEIGHT_SCALE
+    return THREE.MathUtils.clamp(rawHeight, scaledMin, scaledMax)
   }
   const markerStemHeight = computeMarkerStemHeight()
   let terrainHeightRange = { min: FLOOR_Y, max: 0 }
@@ -951,7 +955,8 @@ const markerMap = new Map<
     spriteVisuals: MarkerSpriteVisualSet
     stemStates: MarkerStemVisualSet
     iconScale: number
-    spriteOffset: number
+    stemBaseHeight: number
+    spriteGap: number
   }
 >()
   const markerInteractiveTargets: THREE.Object3D[] = []
@@ -1069,8 +1074,12 @@ const markerMap = new Map<
     const distance = camera.position.distanceTo(controls.target)
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
     const baseScale = lerp / 80
+    const zoomRange = controls.maxDistance - controls.minDistance
+    const normalizedZoom =
+      zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
+    const heightScaleFactor = THREE.MathUtils.lerp(0.55, 1.1, normalizedZoom)
 
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, spriteOffset }, id) => {
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
@@ -1086,8 +1095,13 @@ const markerMap = new Map<
       stemMat.opacity = stemState.opacity
       stemMat.color.set(stemState.color)
       const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
-      stem.scale.set(stemWidth, 1, stemWidth)
-      sprite.position.y = spriteOffset
+      const stemScale = heightScaleFactor
+      stem.scale.set(stemWidth, stemScale, stemWidth)
+      const currentStemHeight = stemBaseHeight * stemScale
+      stem.position.y = currentStemHeight / 2
+      const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
+      const spriteHeight = scaled
+      sprite.position.y = spriteBase + spriteHeight / 2
     })
   }
 
@@ -1162,7 +1176,8 @@ const markerMap = new Map<
           sprite.userData.locationId = location.id
           sprite.renderOrder = 10
           const stemHeight = markerStemHeight
-          const spriteOffset = stemHeight + MARKER_SPRITE_GAP
+          const spriteGap = MARKER_SPRITE_GAP
+          const spriteBaseOffset = stemHeight + spriteGap
           const stemStates = createMarkerStemVisuals(markerTheme.stem)
           const stemMaterial = new THREE.MeshStandardMaterial({
             color: stemStates.default.color,
@@ -1174,7 +1189,7 @@ const markerMap = new Map<
           const stem = new THREE.Mesh(stemGeometry, stemMaterial)
           stem.renderOrder = 9
           stem.position.set(0, stemHeight / 2, 0)
-          sprite.position.set(0, spriteOffset, 0)
+          sprite.position.set(0, spriteBaseOffset, 0)
           stem.userData.locationId = location.id
           const container = new THREE.Group()
           container.position.copy(surfacePoint)
@@ -1191,7 +1206,8 @@ const markerMap = new Map<
             spriteVisuals,
             stemStates,
             iconScale,
-            spriteOffset
+            stemBaseHeight: stemHeight,
+            spriteGap
           })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
