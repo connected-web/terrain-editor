@@ -778,9 +778,7 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   clearPersistedProject,
-  persistLocalSettings,
   persistProjectSnapshot,
-  readLocalSettings,
   readPersistedProject,
   setAutoRestoreEnabled,
   shouldAutoRestoreProject,
@@ -800,6 +798,8 @@ import {
 } from './utils/theme'
 import { buildIconPath, normalizeAssetFileName } from './utils/assets'
 import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
+import { useAssetLibrary } from './composables/useAssetLibrary'
+import { useLocalSettings } from './composables/useLocalSettings'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
@@ -827,17 +827,7 @@ const workspaceForm = reactive({
   seaLevel: 0
 })
 
-type LocalSettings = {
-  cameraTracking: boolean
-  openLocationsOnSelect: boolean
-}
-
-const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
-  cameraTracking: true,
-  openLocationsOnSelect: true
-}
-
-const localSettings = reactive<LocalSettings>({ ...DEFAULT_LOCAL_SETTINGS })
+const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
 
 const themeForm = createThemeFormState()
 
@@ -869,19 +859,40 @@ const persistedProject = ref<PersistedProject | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(projectSnapshot.value.legend))
 
-const projectAssets = computed(() => projectSnapshot.value.files ?? [])
+const {
+  assetOverrides,
+  iconPreviewCache,
+  iconPreviewOwnership,
+  missingIconWarnings,
+  projectAssets,
+  setAssetOverride,
+  clearAssetOverrides,
+  resolveAssetReference,
+  getIconPreview,
+  preloadIconPreview,
+  refreshIconPreviewCache,
+  importIconAsset: importIconAssetHelper,
+  replaceAssetWithFile: replaceAssetWithFileHelper,
+  removeAsset: removeAssetFromStore,
+  disposeAssetPreviewUrls,
+  normalizeAssetFileName
+} = useAssetLibrary({
+  projectStore,
+  projectSnapshot,
+  datasetRef,
+  locationsList,
+  handle,
+  commitLocations
+})
+
 const layerEntries = computed(() => layerBrowserState.value.entries)
 const locationsDragActive = ref(false)
-const assetOverrides = new Map<string, string>()
 const iconPickerTarget = ref<string | null>(null)
 const assetDialogFilter = ref('')
 function setAssetDialogFilter(value: string) {
   assetDialogFilter.value = value
 }
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
-const iconPreviewCache = reactive<Record<string, string>>({})
-const iconPreviewOwnership = new Map<string, string>()
-const missingIconWarnings = new Set<string>()
 const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 const selectedLocationId = ref<string | null>(null)
 const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
@@ -1079,7 +1090,7 @@ watch(
     cameraTracking: localSettings.cameraTracking,
     openLocationsOnSelect: localSettings.openLocationsOnSelect
   }),
-  () => persistLocalSettings(localSettings)
+  () => persistSettings()
 )
 
 watch(
@@ -1826,7 +1837,7 @@ async function handleLibraryUpload(event: Event) {
   }
   if (replacementTarget) {
     const performReplacement = async () => {
-      await replaceAssetWithFile(replacementTarget.path, file)
+      await replaceAssetWithFileHelper(replacementTarget.path, file)
       resetInput()
     }
     const existingLabel = replacementTarget.originalName ?? replacementTarget.path
@@ -1844,7 +1855,7 @@ async function handleLibraryUpload(event: Event) {
   }
   const defaultPath = buildIconPath(file.name)
   const importAsset = async () => {
-    await importIconAsset(file, iconPickerTarget.value ?? undefined, defaultPath)
+    await importIconAssetHelper(file, iconPickerTarget.value ?? undefined, defaultPath)
     resetInput()
   }
   const existingAsset = projectAssets.value.find((asset) => asset.path === defaultPath)
@@ -1860,7 +1871,7 @@ async function handleLibraryUpload(event: Event) {
 }
 
 async function importLocationIcon(location: TerrainLocation, file: File) {
-  await importIconAsset(file, ensureLocationId(location).id!)
+  await importIconAssetHelper(file, ensureLocationId(location).id!)
 }
 
 function commitLocations() {
@@ -1887,25 +1898,6 @@ function clampLocationPixel(location: TerrainLocation) {
 function clearLocationIcon(location: TerrainLocation) {
   location.icon = undefined
   commitLocations()
-}
-
-function setAssetOverride(path: string, file: File) {
-  const existing = assetOverrides.get(path)
-  if (existing) {
-    URL.revokeObjectURL(existing)
-  }
-  const url = URL.createObjectURL(file)
-  assetOverrides.set(path, url)
-  iconPreviewCache[path] = url
-  iconPreviewOwnership.set(path, url)
-  missingIconWarnings.delete(path)
-  handle.value?.invalidateIconTextures?.([path])
-}
-
-function clearAssetOverrides() {
-  assetOverrides.forEach((url) => URL.revokeObjectURL(url))
-  assetOverrides.clear()
-  refreshIconPreviewCache()
 }
 
 function onLocationsDragEnter(event: DragEvent) {
@@ -1955,82 +1947,18 @@ function handleWindowDragEvent(event: DragEvent) {
 }
 
 async function importIconAsset(file: File, targetLocationId?: string, overridePath?: string) {
-  const path = overridePath ?? buildIconPath(file.name)
-  const buffer = await file.arrayBuffer()
-  projectStore.upsertFile({
-    path,
-    data: buffer,
-    type: file.type,
-    lastModified: file.lastModified,
-    sourceFileName: file.name
-  })
-  setAssetOverride(path, file)
-  refreshIconPreviewCache()
-  if (targetLocationId) {
-    const target = locationsList.value.find(
-      (location) => ensureLocationId(location).id === targetLocationId
-    )
-    if (target) {
-      target.icon = path
-      commitLocations()
-    }
-  }
-  return path
+  await importIconAsset(file, targetLocationId, overridePath)
 }
 
 async function replaceAssetWithFile(path: string, file: File) {
-  const buffer = await file.arrayBuffer()
-  projectStore.upsertFile({
-    path,
-    data: buffer,
-    type: file.type,
-    lastModified: file.lastModified,
-    sourceFileName: file.name
-  })
-  setAssetOverride(path, file)
-  refreshIconPreviewCache()
+  await replaceAssetWithFile(path, file)
 }
 
 function removeAsset(path: string) {
   requestConfirm(`Remove ${path}?`, () => {
-    projectStore.removeFile(path)
-    if (assetOverrides.has(path)) {
-      const url = assetOverrides.get(path)
-      if (url) URL.revokeObjectURL(url)
-      assetOverrides.delete(path)
-    }
-    delete iconPreviewCache[path]
-    locationsList.value = locationsList.value.map((location) =>
-      location.icon === path ? { ...location, icon: undefined } : location
-    )
-    commitLocations()
-    refreshIconPreviewCache()
+    removeAssetFromStore(path)
     if (iconPickerTarget.value) {
       iconPickerTarget.value = null
-    }
-  })
-}
-
-function refreshIconPreviewCache() {
-  const activePaths = new Set<string>()
-  ;(projectSnapshot.value.files ?? []).forEach((file) => {
-    activePaths.add(file.path)
-    preloadIconPreview(file.path, file)
-  })
-  locationsList.value.forEach((location) => {
-    if (location.icon) {
-      activePaths.add(location.icon)
-      preloadIconPreview(location.icon)
-    }
-  })
-  Object.keys(iconPreviewCache).forEach((path) => {
-    if (!activePaths.has(path) && !assetOverrides.has(path)) {
-      const ownedUrl = iconPreviewOwnership.get(path)
-      if (ownedUrl) {
-        URL.revokeObjectURL(ownedUrl)
-        iconPreviewOwnership.delete(path)
-      }
-      delete iconPreviewCache[path]
     }
   })
 }
@@ -2040,55 +1968,6 @@ function getViewerLocations(list = locationsList.value) {
     ...location,
     icon: resolveAssetReference(location.icon)
   }))
-}
-
-function resolveAssetReference(reference?: string) {
-  if (!reference) return undefined
-  if (assetOverrides.has(reference)) return reference
-  if (projectAssets.value.some((file) => file.path === reference)) return reference
-  const alias = projectAssets.value.find(
-    (file) => file.sourceFileName === reference || file.path.endsWith(`/${reference}`)
-  )
-  return alias?.path ?? reference
-}
-
-function getIconPreview(icon?: string) {
-  const resolved = resolveAssetReference(icon)
-  if (!resolved) return ''
-  if (missingIconWarnings.has(resolved)) return ''
-  if (assetOverrides.has(resolved)) return assetOverrides.get(resolved)!
-  if (iconPreviewCache[resolved]) return iconPreviewCache[resolved]
-  preloadIconPreview(resolved)
-  return ''
-}
-
-async function preloadIconPreview(path: string, file?: TerrainProjectFileEntry) {
-  if (iconPreviewCache[path]) return
-  if (missingIconWarnings.has(path)) return
-  if (assetOverrides.has(path)) {
-    iconPreviewCache[path] = assetOverrides.get(path)!
-    return
-  }
-  if (file) {
-    const blob = new Blob([file.data], { type: file.type ?? 'image/png' })
-    const url = URL.createObjectURL(blob)
-    iconPreviewCache[path] = url
-    iconPreviewOwnership.set(path, url)
-    missingIconWarnings.delete(path)
-    return
-  }
-  const dataset = datasetRef.value
-  if (!dataset) return
-  try {
-    const resolved = await Promise.resolve(dataset.resolveAssetUrl(path))
-    iconPreviewCache[path] = resolved
-    missingIconWarnings.delete(path)
-  } catch (err) {
-    if (!missingIconWarnings.has(path)) {
-      missingIconWarnings.add(path)
-      console.warn(`Icon preview missing for ${path}`)
-    }
-  }
 }
 
 function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
@@ -2108,13 +1987,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('dragover', handleWindowDragEvent, true)
   window.addEventListener('drop', handleWindowDragEvent, true)
-  const savedSettings = readLocalSettings<Partial<LocalSettings>>()
-  if (savedSettings) {
-    localSettings.cameraTracking =
-      savedSettings.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
-    localSettings.openLocationsOnSelect =
-      savedSettings.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
-  }
+  loadLocalSettings()
   const saved = readPersistedProject()
   if (saved) {
     persistedProject.value = saved
@@ -2130,8 +2003,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('dragover', handleWindowDragEvent, true)
   window.removeEventListener('drop', handleWindowDragEvent, true)
-  iconPreviewOwnership.forEach((url) => URL.revokeObjectURL(url))
-  iconPreviewOwnership.clear()
+  disposeAssetPreviewUrls()
   cancelThemeUpdate()
   if (viewerRemountHandle !== null) {
     window.clearTimeout(viewerRemountHandle)
