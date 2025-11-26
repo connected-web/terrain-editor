@@ -1262,15 +1262,45 @@ function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
   const focusSource = sourceSprite?.states?.focus
   themeForm.hoverEnabled = Boolean(hoverSource)
   themeForm.focusEnabled = Boolean(focusSource)
-  assignThemeState(themeForm.hover, hoverSource ?? spriteDefault)
-  assignThemeState(themeForm.focus, focusSource ?? spriteDefault)
+  assignThemeState(
+    themeForm.hover,
+    {
+      textColor: hoverSource?.textColor ?? spriteDefault.textColor,
+      backgroundColor: hoverSource?.backgroundColor ?? spriteDefault.backgroundColor,
+      borderColor: hoverSource?.borderColor ?? spriteDefault.borderColor,
+      borderThickness: hoverSource?.borderThickness ?? spriteDefault.borderThickness,
+      opacity: hoverSource?.opacity ?? spriteDefault.opacity
+    }
+  )
+  assignThemeState(
+    themeForm.focus,
+    {
+      textColor: focusSource?.textColor ?? spriteDefault.textColor,
+      backgroundColor: focusSource?.backgroundColor ?? spriteDefault.backgroundColor,
+      borderColor: focusSource?.borderColor ?? spriteDefault.borderColor,
+      borderThickness: focusSource?.borderThickness ?? spriteDefault.borderThickness,
+      opacity: focusSource?.opacity ?? spriteDefault.opacity
+    }
+  )
   const sourceStem = snapshot.theme?.locationMarkers?.stem
   const stemHoverSource = sourceStem?.states?.hover
   const stemFocusSource = sourceStem?.states?.focus
   themeForm.stemHoverEnabled = Boolean(stemHoverSource)
   themeForm.stemFocusEnabled = Boolean(stemFocusSource)
-  assignStemState(themeForm.stemHover, stemHoverSource ?? stemDefault)
-  assignStemState(themeForm.stemFocus, stemFocusSource ?? stemDefault)
+  assignStemState(
+    themeForm.stemHover,
+    {
+      color: stemHoverSource?.color ?? stemDefault.color,
+      opacity: stemHoverSource?.opacity ?? stemDefault.opacity
+    }
+  )
+  assignStemState(
+    themeForm.stemFocus,
+    {
+      color: stemFocusSource?.color ?? stemDefault.color,
+      opacity: stemFocusSource?.opacity ?? stemDefault.opacity
+    }
+  )
 }
 
 function updateProjectLabel(value: string) {
