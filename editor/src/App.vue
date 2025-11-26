@@ -762,8 +762,6 @@ import {
   initTerrainViewer,
   loadWynArchiveFromArrayBuffer,
   resolveTerrainTheme,
-  type MarkerSpriteStateStyle,
-  type MarkerStemStateStyle,
   type MarkerStemGeometryShape,
   type LayerBrowserState,
   type LayerToggleState,
@@ -776,16 +774,38 @@ import {
   type LocationViewState,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  clearPersistedProject,
+  persistLocalSettings,
+  persistProjectSnapshot,
+  readLocalSettings,
+  readPersistedProject,
+  setAutoRestoreEnabled,
+  shouldAutoRestoreProject,
+  type PersistedProject
+} from './utils/storage'
+import {
+  SpriteStateKey,
+  StemStateKey,
+  assignStemState,
+  assignThemeState,
+  createThemeFormState,
+  handleSpriteStateInput as handleSpriteStateInputHelper,
+  handleStemStateInput as handleStemStateInputHelper,
+  resetSpriteState as resetSpriteStateHelper,
+  resetStemState as resetStemStateHelper,
+  stemShapeOptions
+} from './utils/theme'
+import { buildIconPath, normalizeAssetFileName } from './utils/assets'
+import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LocationPickerDialog from './components/LocationPickerDialog.vue'
 import type { UIAction } from './types/uiActions'
-
-const STORAGE_KEY = 'ctw-editor-project-v2'
-const AUTO_RESTORE_KEY = 'ctw-editor-restore-enabled'
-const LOCAL_SETTINGS_KEY = 'ctw-editor-local-settings'
 
 type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
 
@@ -819,148 +839,22 @@ const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
 
 const localSettings = reactive<LocalSettings>({ ...DEFAULT_LOCAL_SETTINGS })
 
-type ThemeStateForm = {
-  textColor: string
-  backgroundColor: string
-  borderColor: string
-  borderThickness: number
-  opacity: number
-}
-
-type StemStateForm = {
-  color: string
-  opacity: number
-}
-
-type SpriteStateKey = 'hover' | 'focus'
-type StemStateKey = 'hover' | 'focus'
-const stemShapeOptions: MarkerStemGeometryShape[] = ['cylinder', 'triangle', 'square', 'pentagon', 'hexagon']
-
-function createThemeStateForm(overrides?: Partial<ThemeStateForm>): ThemeStateForm {
-  return {
-    textColor: '#f2ede0',
-    backgroundColor: '#0d1320',
-    borderColor: '#f6e7c3',
-    borderThickness: 1,
-    opacity: 1,
-    ...overrides
-  }
-}
-
-function assignThemeState(target: ThemeStateForm, source: ThemeStateForm | MarkerSpriteStateStyle) {
-  target.textColor = source.textColor
-  target.backgroundColor = source.backgroundColor
-  target.borderColor = source.borderColor
-  target.borderThickness = source.borderThickness
-  target.opacity = source.opacity
-}
-
-function createStemStateForm(overrides?: Partial<StemStateForm>): StemStateForm {
-  return {
-    color: '#f6e7c3',
-    opacity: 0.85,
-    ...overrides
-  }
-}
-
-function assignStemState(target: StemStateForm, source: StemStateForm | MarkerStemStateStyle) {
-  target.color = source.color
-  target.opacity = source.opacity
-}
-
-const themeForm = reactive({
-  textColor: '#f2ede0',
-  backgroundColor: '#0d1320',
-  borderColor: '#f6e7c3',
-  borderThickness: 1,
-  opacity: 1,
-  stemColor: '#f6e7c3',
-  stemOpacity: 0.85,
-  stemShape: 'cylinder' as MarkerStemGeometryShape,
-  fontFamily: 'Inter, sans-serif',
-  fontWeight: '600',
-  maxFontSize: 16,
-  minFontSize: 10,
-  paddingX: 12,
-  paddingY: 6,
-  borderRadius: 12,
-  hoverEnabled: false,
-  focusEnabled: false,
-  hover: createThemeStateForm(),
-  focus: createThemeStateForm(),
-  stemHoverEnabled: false,
-  stemFocusEnabled: false,
-  stemHover: createStemStateForm(),
-  stemFocus: createStemStateForm()
-})
-
-function getSpriteStateRef(key: SpriteStateKey) {
-  return key === 'hover' ? themeForm.hover : themeForm.focus
-}
-
-function getSpriteFlagKey(key: SpriteStateKey) {
-  return key === 'hover' ? 'hoverEnabled' : 'focusEnabled'
-}
-
-function getCurrentDefaultState(): ThemeStateForm {
-  return createThemeStateForm({
-    textColor: themeForm.textColor,
-    backgroundColor: themeForm.backgroundColor,
-    borderColor: themeForm.borderColor,
-    borderThickness: themeForm.borderThickness,
-    opacity: themeForm.opacity
-  })
-}
+const themeForm = createThemeFormState()
 
 function handleSpriteStateInput(state: SpriteStateKey) {
-  const flag = getSpriteFlagKey(state)
-  if (!themeForm[flag]) {
-    themeForm[flag] = true
-    assignThemeState(getSpriteStateRef(state), getCurrentDefaultState())
-  }
-  scheduleThemeUpdate()
+  handleSpriteStateInputHelper(themeForm, state, scheduleThemeUpdate)
 }
 
 function resetSpriteState(state: SpriteStateKey) {
-  const flag = getSpriteFlagKey(state)
-  if (themeForm[flag]) {
-    themeForm[flag] = false
-  }
-  assignThemeState(getSpriteStateRef(state), getCurrentDefaultState())
-  scheduleThemeUpdate()
-}
-
-function getStemStateRef(key: StemStateKey) {
-  return key === 'hover' ? themeForm.stemHover : themeForm.stemFocus
-}
-
-function getStemFlagKey(key: StemStateKey) {
-  return key === 'hover' ? 'stemHoverEnabled' : 'stemFocusEnabled'
-}
-
-function getCurrentStemState(): StemStateForm {
-  return createStemStateForm({
-    color: themeForm.stemColor,
-    opacity: themeForm.stemOpacity
-  })
+  resetSpriteStateHelper(themeForm, state, scheduleThemeUpdate)
 }
 
 function handleStemStateInput(state: StemStateKey) {
-  const flag = getStemFlagKey(state)
-  if (!themeForm[flag]) {
-    themeForm[flag] = true
-    assignStemState(getStemStateRef(state), getCurrentStemState())
-  }
-  scheduleThemeUpdate()
+  handleStemStateInputHelper(themeForm, state, scheduleThemeUpdate)
 }
 
 function resetStemState(state: StemStateKey) {
-  const flag = getStemFlagKey(state)
-  if (themeForm[flag]) {
-    themeForm[flag] = false
-  }
-  assignStemState(getStemStateRef(state), getCurrentStemState())
-  scheduleThemeUpdate()
+  resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
 }
 
 const projectStore = createProjectStore()
@@ -1185,7 +1079,7 @@ watch(
     cameraTracking: localSettings.cameraTracking,
     openLocationsOnSelect: localSettings.openLocationsOnSelect
   }),
-  () => persistLocalSettings()
+  () => persistLocalSettings(localSettings)
 )
 
 watch(
@@ -1196,11 +1090,6 @@ watch(
     }
   }
 )
-
-type PersistedProject = {
-  label: string
-  archiveBase64: string
-}
 
 function handleResize() {
   isCompactViewport.value = window.innerWidth < 800
@@ -1451,25 +1340,6 @@ function applySeaLevel() {
   void persistCurrentProject()
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  let binary = ''
-  const bytes = new Uint8Array(buffer)
-  const chunkSize = 0x8000
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
-}
-
-function base64ToArrayBuffer(base64: string) {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes.buffer
-}
-
 function cloneValue<T>(value: T): T {
   return value ? (JSON.parse(JSON.stringify(value)) as T) : value
 }
@@ -1477,57 +1347,10 @@ function cloneValue<T>(value: T): T {
 async function persistCurrentProject(options: { base64?: string; label?: string } = {}) {
   const snapshot = projectStore.getSnapshot()
   if (!snapshot.legend) return
-  let base64 = options.base64
-  if (!base64) {
-    const blob = await buildWynArchive(snapshot)
-    const buffer = await blob.arrayBuffer()
-    base64 = arrayBufferToBase64(buffer)
-  }
-  const next: PersistedProject = {
-    label: options.label ?? snapshot.metadata.label ?? 'Untitled terrain',
-    archiveBase64: base64
-  }
-  persistedProject.value = next
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    localStorage.setItem(AUTO_RESTORE_KEY, '1')
-  } catch (err) {
-    console.warn('Failed to persist project', err)
-  }
-  projectStore.markPersisted()
-}
-
-function readPersistedProject(): PersistedProject | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as PersistedProject
-  } catch (err) {
-    console.warn('Failed to read persisted project', err)
-    return null
-  }
-}
-
-function shouldAutoRestoreProject() {
-  return localStorage.getItem(AUTO_RESTORE_KEY) !== '0'
-}
-
-function persistLocalSettings() {
-  try {
-    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(localSettings))
-  } catch (err) {
-    console.warn('Failed to persist local settings', err)
-  }
-}
-
-function readLocalSettings() {
-  try {
-    const raw = localStorage.getItem(LOCAL_SETTINGS_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as Partial<LocalSettings>
-  } catch (err) {
-    console.warn('Failed to read local settings', err)
-    return null
+  const next = await persistProjectSnapshot(snapshot, options)
+  if (next) {
+    persistedProject.value = next
+    projectStore.markPersisted()
   }
 }
 
@@ -1695,11 +1518,8 @@ function closeActiveArchive() {
   cancelThemeUpdate()
   refreshIconPreviewCache()
   updateStatus('Viewer cleared. Load a map to continue.')
-  try {
-    localStorage.setItem(AUTO_RESTORE_KEY, '0')
-  } catch (err) {
-    console.warn('Failed to clear persistence flags', err)
-  }
+  persistedProject.value = null
+  setAutoRestoreEnabled(false)
 }
 
 function promptCloseArchive() {
@@ -1732,13 +1552,9 @@ function startNewMap() {
   setActivePanel('workspace')
   isDockCollapsed.value = false
   updateStatus('New project ready. Import layers to begin editing.')
-  try {
-    persistedProject.value = null
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.setItem(AUTO_RESTORE_KEY, '0')
-  } catch (err) {
-    console.warn('Failed to reset persisted project', err)
-  }
+  persistedProject.value = null
+  clearPersistedProject()
+  setAutoRestoreEnabled(false)
 }
 
 function addLocation() {
@@ -1842,7 +1658,7 @@ async function restorePersistedProject(autoTrigger: boolean) {
     base64: saved.archiveBase64
   })
   if (!autoTrigger) {
-    localStorage.setItem(AUTO_RESTORE_KEY, '1')
+    setAutoRestoreEnabled(true)
   }
   updateStatus(`${saved.label} restored from local storage.`, 4500)
 }
@@ -1939,13 +1755,6 @@ function clearActiveLocationView() {
   if (!activeLocation.value || !activeLocation.value.view) return
   activeLocation.value.view = undefined
   commitLocations()
-}
-
-function ensureLocationId(location: TerrainLocation): TerrainLocation {
-  if (!location.id) {
-    location.id = `loc-${Math.random().toString(36).slice(2, 10)}`
-  }
-  return location
 }
 
 function openIconPicker(location: TerrainLocation) {
@@ -2078,44 +1887,6 @@ function clampLocationPixel(location: TerrainLocation) {
 function clearLocationIcon(location: TerrainLocation) {
   location.icon = undefined
   commitLocations()
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
-}
-
-function getPlacementStep(dimension: number) {
-  if (!Number.isFinite(dimension) || dimension <= 0) return 0.001
-  const normalized = dimension / 1000
-  if (normalized >= 1) {
-    return Math.max(1, Math.round(normalized))
-  }
-  return Math.max(0.001, Number(normalized.toFixed(3)))
-}
-
-function snapLocationValue(value: number, dimension: number) {
-  const step = getPlacementStep(dimension)
-  if (!Number.isFinite(step) || step <= 0) return value
-  const snapped = Math.round(value / step) * step
-  const decimals = step >= 1 ? 0 : Math.min(6, Math.ceil(-Math.log10(step)))
-  const precisionFactor = Math.pow(10, decimals)
-  return Math.round(snapped * precisionFactor) / precisionFactor
-}
-
-function normalizeAssetFileName(name: string) {
-  const trimmed = name.trim().toLowerCase()
-  const segments = trimmed.split('.')
-  const ext = segments.length > 1 ? segments.pop() ?? '' : ''
-  const base = segments
-    .join('.')
-    .replace(/[^a-z0-9._-]+/g, '_')
-    .replace(/^[_-]+|[_-]+$/g, '')
-  const safeExt = ext.replace(/[^a-z0-9]+/g, '')
-  return safeExt ? `${base || 'asset'}.${safeExt}` : base || 'asset'
-}
-
-function buildIconPath(name: string) {
-  return `icons/${normalizeAssetFileName(name)}`
 }
 
 function setAssetOverride(path: string, file: File) {
@@ -2337,7 +2108,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('dragover', handleWindowDragEvent, true)
   window.addEventListener('drop', handleWindowDragEvent, true)
-  const savedSettings = readLocalSettings()
+  const savedSettings = readLocalSettings<Partial<LocalSettings>>()
   if (savedSettings) {
     localSettings.cameraTracking =
       savedSettings.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
