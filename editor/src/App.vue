@@ -523,6 +523,32 @@
           </div>
         </section>
 
+        <section v-else-if="activeDockPanel === 'settings'" class="panel-card">
+          <header class="panel-card__header panel-card__header--split">
+            <div class="panel-card__header-main">
+              <Icon icon="gear">Settings</Icon>
+            </div>
+            <span class="panel-card__hint">Local to this browser</span>
+          </header>
+          <div class="panel-card__list">
+            <label class="locations-panel__toggle">
+              <input type="checkbox" v-model="localSettings.cameraTracking" />
+              <span>Camera tracking between locations</span>
+            </label>
+            <p class="panel-card__hint">
+              When enabled, the viewer uses a location’s saved camera view (distance/polar/azimuth) while
+              moving between markers instead of reusing the current angle.
+            </p>
+            <label class="locations-panel__toggle">
+              <input type="checkbox" v-model="localSettings.openLocationsOnSelect" />
+              <span>Open Locations panel when selecting from viewer</span>
+            </label>
+            <p class="panel-card__hint">
+              Turn off to keep the current panel open when clicking markers in the viewer.
+            </p>
+          </div>
+        </section>
+
         <section v-else class="panel-card panel-card--locations">
           <header class="panel-card__header panel-card__header--split">
             <div class="panel-card__header-main">
@@ -629,6 +655,56 @@
                   />
                 </label>
               </div>
+              <div class="locations-panel__coords locations-panel__coords--view">
+                <label>
+                  <span>Camera distance</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    :value="activeLocation.view?.distance ?? ''"
+                    @change="updateActiveLocationViewField('distance', ($event.target as HTMLInputElement).value)"
+                    placeholder="auto"
+                  />
+                </label>
+                <label>
+                  <span>Polar (rad)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    :value="activeLocation.view?.polar ?? ''"
+                    @change="updateActiveLocationViewField('polar', ($event.target as HTMLInputElement).value)"
+                    placeholder="auto"
+                  />
+                </label>
+                <label>
+                  <span>Azimuth (rad)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    :value="activeLocation.view?.azimuth ?? ''"
+                    @change="updateActiveLocationViewField('azimuth', ($event.target as HTMLInputElement).value)"
+                    placeholder="auto"
+                  />
+                </label>
+              </div>
+              <div class="locations-panel__preview-actions locations-panel__preview-actions--compact">
+                <button
+                  type="button"
+                  class="pill-button"
+                  @click="captureCameraViewForActiveLocation"
+                  :disabled="!handle"
+                >
+                  <Icon icon="camera">Use current camera</Icon>
+                </button>
+                <button
+                  type="button"
+                  class="pill-button pill-button--ghost"
+                  @click="clearActiveLocationView"
+                  :disabled="!activeLocation.view"
+                >
+                  <Icon icon="eraser">Clear camera view</Icon>
+                </button>
+              </div>
               <label class="locations-panel__toggle">
                 <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
                 <span>Show label border</span>
@@ -697,6 +773,7 @@ import {
   type TerrainLegend,
   type TerrainProjectFileEntry,
   type TerrainThemeOverrides,
+  type LocationViewState,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import EditorViewer from './components/EditorViewer.vue'
@@ -708,8 +785,9 @@ import type { UIAction } from './types/uiActions'
 
 const STORAGE_KEY = 'ctw-editor-project-v2'
 const AUTO_RESTORE_KEY = 'ctw-editor-restore-enabled'
+const LOCAL_SETTINGS_KEY = 'ctw-editor-local-settings'
 
-type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations'
+type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
@@ -728,6 +806,18 @@ const workspaceForm = reactive({
   height: 1536,
   seaLevel: 0
 })
+
+type LocalSettings = {
+  cameraTracking: boolean
+  openLocationsOnSelect: boolean
+}
+
+const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
+  cameraTracking: true,
+  openLocationsOnSelect: true
+}
+
+const localSettings = reactive<LocalSettings>({ ...DEFAULT_LOCAL_SETTINGS })
 
 type ThemeStateForm = {
   textColor: string
@@ -996,6 +1086,16 @@ const uiActions = computed<UIAction[]>(() => {
         }
       },
       {
+        id: 'settings',
+        icon: 'gear',
+        label: 'Settings',
+        description: 'Adjust editor preferences + viewer behavior.',
+        callback: () => {
+          setActivePanel('settings')
+          isDockCollapsed.value = false
+        }
+      },
+      {
         id: 'export',
         icon: 'file-export',
         label: 'Export WYN',
@@ -1076,6 +1176,23 @@ watch(
   (count) => {
     if (count === 0) {
       locationPickerOpen.value = false
+    }
+  }
+)
+
+watch(
+  () => ({
+    cameraTracking: localSettings.cameraTracking,
+    openLocationsOnSelect: localSettings.openLocationsOnSelect
+  }),
+  () => persistLocalSettings()
+)
+
+watch(
+  () => localSettings.cameraTracking,
+  (enabled) => {
+    if (enabled && selectedLocationId.value) {
+      focusLocationInViewer(selectedLocationId.value)
     }
   }
 )
@@ -1363,6 +1480,25 @@ function readPersistedProject(): PersistedProject | null {
 
 function shouldAutoRestoreProject() {
   return localStorage.getItem(AUTO_RESTORE_KEY) !== '0'
+}
+
+function persistLocalSettings() {
+  try {
+    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(localSettings))
+  } catch (err) {
+    console.warn('Failed to persist local settings', err)
+  }
+}
+
+function readLocalSettings() {
+  try {
+    const raw = localStorage.getItem(LOCAL_SETTINGS_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as Partial<LocalSettings>
+  } catch (err) {
+    console.warn('Failed to read local settings', err)
+    return null
+  }
 }
 
 function archiveUrl() {
@@ -1691,7 +1827,7 @@ function setActivePanel(panel: DockPanel) {
 
 function setActiveLocation(id: string | null, options: { fromViewer?: boolean } = {}) {
   selectedLocationId.value = id
-  if (id && options.fromViewer) {
+  if (id && options.fromViewer && localSettings.openLocationsOnSelect) {
     setActivePanel('locations')
     isDockCollapsed.value = false
   }
@@ -1729,7 +1865,50 @@ function focusLocationInViewer(id: string) {
       x: Math.round(workspaceForm.width / 2),
       y: Math.round(workspaceForm.height / 2)
     }
-  handle.value.navigateTo({ pixel, locationId: id })
+  const view = localSettings.cameraTracking ? target.view : undefined
+  handle.value.navigateTo({ pixel, locationId: id, view })
+}
+
+function getFallbackViewState(): LocationViewState {
+  return handle.value?.getViewState() ?? { distance: 1, polar: Math.PI / 3, azimuth: 0 }
+}
+
+function ensureLocationView(location: TerrainLocation): LocationViewState {
+  if (!location.view) {
+    location.view = { ...getFallbackViewState() }
+  }
+  return location.view
+}
+
+function updateActiveLocationViewField(key: keyof LocationViewState, rawValue: string | number) {
+  const location = activeLocation.value
+  if (!location) return
+  if (rawValue === '' || rawValue === null) {
+    location.view = undefined
+    commitLocations()
+    return
+  }
+  const parsed = Number(rawValue)
+  if (!Number.isFinite(parsed)) return
+  const view = ensureLocationView(location)
+  view[key] = parsed
+  commitLocations()
+}
+
+function captureCameraViewForActiveLocation() {
+  if (!handle.value || !activeLocation.value) return
+  activeLocation.value.view = { ...handle.value.getViewState() }
+  commitLocations()
+  updateStatus(
+    `Saved camera view for ${activeLocation.value.name ?? activeLocation.value.id}.`,
+    1500
+  )
+}
+
+function clearActiveLocationView() {
+  if (!activeLocation.value || !activeLocation.value.view) return
+  activeLocation.value.view = undefined
+  commitLocations()
 }
 
 function ensureLocationId(location: TerrainLocation): TerrainLocation {
@@ -2128,6 +2307,13 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('dragover', handleWindowDragEvent, true)
   window.addEventListener('drop', handleWindowDragEvent, true)
+  const savedSettings = readLocalSettings()
+  if (savedSettings) {
+    localSettings.cameraTracking =
+      savedSettings.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
+    localSettings.openLocationsOnSelect =
+      savedSettings.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
+  }
   const saved = readPersistedProject()
   if (saved) {
     persistedProject.value = saved
