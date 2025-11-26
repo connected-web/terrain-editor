@@ -113,6 +113,7 @@ export type TerrainHandle = {
   getViewState: () => LocationViewState
   setTheme: (overrides?: TerrainThemeOverrides) => void
   setSeaLevel: (level: number) => void
+  invalidateIconTextures: (paths?: string[]) => void
 }
 
 export type Cleanup = () => void
@@ -763,7 +764,8 @@ export async function initTerrainViewer(
       setCameraOffset: noop,
       getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 }),
       setTheme: () => {},
-      setSeaLevel: () => {}
+      setSeaLevel: () => {},
+      invalidateIconTextures: () => {}
     }
   }
 
@@ -1011,6 +1013,22 @@ const markerMap = new Map<
   const loader = new THREE.TextureLoader()
   const iconTextureCache = new Map<string, THREE.Texture>()
   const iconTexturePromises = new Map<string, Promise<THREE.Texture | null>>()
+  function invalidateIconCache(paths?: string[]) {
+    if (!paths || paths.length === 0) {
+      iconTextureCache.forEach((texture) => texture.dispose())
+      iconTextureCache.clear()
+      iconTexturePromises.clear()
+      return
+    }
+    paths.forEach((path) => {
+      const cached = iconTextureCache.get(path)
+      if (cached) {
+        cached.dispose()
+        iconTextureCache.delete(path)
+      }
+      iconTexturePromises.delete(path)
+    })
+  }
 
   function clearMarkerResources() {
     markerResources.splice(0).forEach(({ spriteMaterials, spriteTextures, stemMaterial, stemGeometry }) => {
@@ -1626,6 +1644,10 @@ const markerMap = new Map<
       azimuth: controls.getAzimuthalAngle()
     }),
     setTheme: applyThemeUpdate,
-    setSeaLevel: applySeaLevelUpdate
+    setSeaLevel: applySeaLevelUpdate,
+    invalidateIconTextures: (paths?: string[]) => {
+      invalidateIconCache(paths)
+      setLocationMarkers(currentLocations, currentFocusId)
+    }
   }
 }

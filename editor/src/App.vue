@@ -5,6 +5,7 @@
         ref="viewerShell"
         class="viewer-surface"
         :status="status"
+        :status-fade="statusFaded"
         :ui-actions="uiActions"
         :show-toolbar-labels="isDockCollapsed"
         @load-file="loadArchiveFromFile"
@@ -686,6 +687,9 @@ type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const status = ref('Load a Wyn archive to begin.')
+const statusFaded = ref(false)
+let statusFadeHandle: number | null = null
+let statusFadeToken = 0
 const interactive = ref(false)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
@@ -1059,8 +1063,23 @@ function handleResize() {
   isCompactViewport.value = window.innerWidth < 800
 }
 
-function updateStatus(message: string) {
+function updateStatus(message: string, fadeOutDelay = 0) {
   status.value = message
+  statusFaded.value = false
+  statusFadeToken += 1
+  const token = statusFadeToken
+  if (statusFadeHandle !== null) {
+    window.clearTimeout(statusFadeHandle)
+    statusFadeHandle = null
+  }
+  if (fadeOutDelay > 0) {
+    statusFadeHandle = window.setTimeout(() => {
+      if (statusFadeToken === token) {
+        statusFaded.value = true
+      }
+      statusFadeHandle = null
+    }, fadeOutDelay)
+  }
 }
 
 function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
@@ -1606,7 +1625,7 @@ async function restorePersistedProject(autoTrigger: boolean) {
   if (!autoTrigger) {
     localStorage.setItem(AUTO_RESTORE_KEY, '1')
   }
-  updateStatus(`${saved.label} restored from local storage.`)
+  updateStatus(`${saved.label} restored from local storage.`, 4500)
 }
 
 function toggleDock() {
@@ -1847,6 +1866,7 @@ function setAssetOverride(path: string, file: File) {
   iconPreviewCache[path] = url
   iconPreviewOwnership.set(path, url)
   missingIconWarnings.delete(path)
+  handle.value?.invalidateIconTextures?.([path])
 }
 
 function clearAssetOverrides() {
@@ -2076,6 +2096,10 @@ onBeforeUnmount(() => {
   if (viewerRemountHandle !== null) {
     window.clearTimeout(viewerRemountHandle)
     viewerRemountHandle = null
+  }
+  if (statusFadeHandle !== null) {
+    window.clearTimeout(statusFadeHandle)
+    statusFadeHandle = null
   }
 })
 </script>

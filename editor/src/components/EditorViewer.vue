@@ -30,6 +30,7 @@ import type { UIAction } from '../types/uiActions'
 
 const props = defineProps<{
   status: string
+  statusFade?: boolean
   uiActions: UIAction[]
   showToolbarLabels?: boolean
 }>()
@@ -88,6 +89,7 @@ function setupOverlay() {
   overlayHandle.value?.destroy()
   overlayHandle.value = createViewerOverlay(viewerRef.value, buildOptions())
   overlayHandle.value.setStatus(props.status)
+  overlayHandle.value.setStatusFade(props.statusFade ?? false)
   overlayHandle.value.setViewMode(document.fullscreenElement ? 'fullscreen' : 'embed')
 }
 
@@ -95,6 +97,13 @@ watch(
   () => props.status,
   (next) => {
     overlayHandle.value?.setStatus(next)
+  }
+)
+
+watch(
+  () => props.statusFade,
+  (next) => {
+    overlayHandle.value?.setStatusFade(Boolean(next))
   }
 )
 

@@ -157,6 +157,12 @@ const OVERLAY_CSS = `
   overflow: hidden;
   max-width: max(150px, 50%, 30vw);
   text-overflow: ellipsis;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.ctw-viewer-overlay__status--fade {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .ctw-viewer-overlay__buttons {
@@ -325,6 +331,7 @@ export type ViewerOverlayLoadingState = {
 
 export type ViewerOverlayHandle = {
   setStatus: (message: string) => void
+  setStatusFade: (fade: boolean) => void
   setViewMode: (mode: TerrainViewMode) => void
   setLoadingProgress: (state: ViewerOverlayLoadingState | null) => void
   openFileDialog: () => void
@@ -355,6 +362,7 @@ export function createViewerOverlay(
   if (typeof window === 'undefined') {
     return {
       setStatus: () => {},
+      setStatusFade: () => {},
       setViewMode: () => {},
       setLoadingProgress: () => {},
       openFileDialog: () => {},
@@ -444,6 +452,9 @@ export function createViewerOverlay(
   statusLabel.className = 'ctw-viewer-overlay__status'
   statusLabel.textContent = options.status.initialText
   appendToSlot('top-left', statusLabel)
+  function setStatusFade(fade: boolean) {
+    statusLabel.classList.toggle('ctw-viewer-overlay__status--fade', fade)
+  }
 
   const buttonGroup = doc.createElement('div')
   buttonGroup.className = 'ctw-viewer-overlay__buttons'
@@ -680,7 +691,9 @@ export function createViewerOverlay(
   return {
     setStatus(message: string) {
       statusLabel.textContent = message
+      setStatusFade(false)
     },
+    setStatusFade,
     setViewMode(mode: TerrainViewMode) {
       applyMode(mode)
     },
