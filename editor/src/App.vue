@@ -539,9 +539,10 @@
             <article class="locations-panel__item">
               <div class="locations-panel__preview">
                 <div
-                  class="locations-panel__icon"
+                  class="locations-panel__icon button"
                   :class="{ 'locations-panel__icon--ghost': activeLocation.showBorder === false }"
                   :style="{ backgroundImage: getIconPreview(activeLocation.icon) ? `url('${getIconPreview(activeLocation.icon)}')` : undefined }"
+                  @click="openIconPicker(activeLocation)"
                 >
                   <span v-if="!getIconPreview(activeLocation.icon)">{{ activeLocation.name?.[0] ?? '?' }}</span>
                 </div>
@@ -950,22 +951,22 @@ const uiActions = computed<UIAction[]>(() => {
         }
       },
       {
-        id: 'theme',
-        icon: 'palette',
-        label: 'Theme',
-        description: 'Edit label + marker styling.',
-        callback: () => {
-          setActivePanel('theme')
-          isDockCollapsed.value = false
-        }
-      },
-      {
         id: 'locations',
         icon: 'location-dot',
         label: 'Locations',
         description: 'Edit location names + icons.',
         callback: () => {
           setActivePanel('locations')
+          isDockCollapsed.value = false
+        }
+      },
+      {
+        id: 'theme',
+        icon: 'palette',
+        label: 'Theme',
+        description: 'Edit label + marker styling.',
+        callback: () => {
+          setActivePanel('theme')
           isDockCollapsed.value = false
         }
       },
@@ -1544,7 +1545,7 @@ function addLocation() {
 }
 
 function confirmRemoveLocation(location: TerrainLocation) {
-  requestConfirm(`Remove ${location.name ?? 'this location'}?`, () => {
+  requestConfirm(`Remove location "${location.name ?? 'this location'}"?`, () => {
     locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
     commitLocations()
     if (selectedLocationId.value === location.id) {
@@ -1574,7 +1575,8 @@ async function exportArchive() {
     updateStatus('Building archive…')
     const blob = await buildWynArchive(snapshot)
     const label = snapshot.metadata.label ?? 'terrain'
-    downloadBlob(`${label}.wyn`, blob)
+    const filename = label.endsWith('.wyn') ? label : `${label}.wyn`
+    downloadBlob(filename, blob)
     updateStatus('Archive exported.')
   } catch (err) {
     console.error(err)

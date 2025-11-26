@@ -20,8 +20,9 @@
       <div class="asset-dialog__grid">
         <article v-for="asset in filteredAssets" :key="asset.path" class="asset-dialog__item">
           <div
-            class="asset-dialog__thumb"
+            class="asset-dialog__thumb button"
             :style="{ backgroundImage: getPreview(asset.path) ? `url('${getPreview(asset.path)}')` : undefined }"
+             @click="$emit('select', asset.path)"
           />
           <div class="asset-dialog__meta">
             <strong>{{ asset.sourceFileName ?? asset.path }}</strong>
@@ -183,6 +184,16 @@ const filteredAssets = computed(() => {
   background-size: cover;
   background-position: center;
   border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.asset-dialog__thumb.button {
+  cursor: pointer;
+  border-color: rgba(255, 255, 255, 0.2);
+  transition: border-color 0.2s ease;
+}
+
+.asset-dialog__thumb.button:hover {
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .asset-dialog__meta {
