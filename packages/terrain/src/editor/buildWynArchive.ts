@@ -30,6 +30,9 @@ export async function buildWynArchive(
   if (project.theme) {
     zip.file('theme.json', stringify(project.theme, options))
   }
+  if (project.metadata) {
+    zip.file('metadata.json', stringify(project.metadata, options))
+  }
   for (const file of project.files) {
     zip.file(file.path, file.data, {
       binary: true,

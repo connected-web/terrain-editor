@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 
-import type { TerrainProjectFileEntry } from './editor/projectStore'
+import type { TerrainProjectFileEntry, TerrainProjectMetadata } from './editor/projectStore'
 import type { TerrainDataset, TerrainLegend, TerrainLocation } from './terrainViewer'
 import type { TerrainThemeOverrides } from './theme'
 
@@ -62,6 +62,7 @@ export type LoadedWynFile = {
   legend: TerrainLegend
   locations?: TerrainLocation[]
   files?: TerrainProjectFileEntry[]
+  metadata?: TerrainProjectMetadata
 }
 
 function parseContentLength(header: string | null): number | undefined {
@@ -159,7 +160,7 @@ function guessMimeType(path: string): string | undefined {
   return undefined
 }
 
-const SKIP_FILE_TABLE = new Set(['legend.json', 'locations.json', 'theme.json'])
+const SKIP_FILE_TABLE = new Set(['legend.json', 'locations.json', 'theme.json', 'metadata.json'])
 
 async function extractProjectFiles(zip: JSZip): Promise<TerrainProjectFileEntry[]> {
   const entries: TerrainProjectFileEntry[] = []
@@ -201,6 +202,13 @@ async function parseWynZip(zip: JSZip, options: LoadWynArchiveOptions = {}): Pro
     themeOverrides = JSON.parse(contents) as TerrainThemeOverrides
   }
 
+  const metadataEntry = zip.file('metadata.json')
+  let metadata: TerrainProjectMetadata | undefined
+  if (metadataEntry) {
+    const contents = await metadataEntry.async('string')
+    metadata = JSON.parse(contents) as TerrainProjectMetadata
+  }
+
   const { getUrl, cleanup } = createObjectUrlResolver(zip)
   const heightMapPath = legend.heightmap
   const topologyPath = legend.topology ?? legend.heightmap
@@ -214,7 +222,7 @@ async function parseWynZip(zip: JSZip, options: LoadWynArchiveOptions = {}): Pro
     theme: themeOverrides
   }
   const files = options.includeFiles ? await extractProjectFiles(zip) : undefined
-  return { dataset, legend, locations, files }
+  return { dataset, legend, locations, files, metadata }
 }
 
 export async function loadWynArchive(

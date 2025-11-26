@@ -670,6 +670,7 @@ import {
   type TerrainDataset,
   type TerrainHandle,
   type TerrainLocation,
+  type TerrainLegend,
   type TerrainProjectFileEntry,
   type TerrainThemeOverrides,
   type ViewerOverlayLoadingState
@@ -858,7 +859,7 @@ const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
-const hasActiveArchive = computed(() => Boolean(datasetRef.value))
+const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(projectSnapshot.value.legend))
 
 const projectAssets = computed(() => projectSnapshot.value.files ?? [])
 const layerEntries = computed(() => layerBrowserState.value.entries)
@@ -1427,6 +1428,7 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
   pendingLocationId.value = null
   try {
     const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
+    const archiveLabel = archive.metadata?.label ?? label
     datasetRef.value = wrapDatasetWithOverrides(archive.dataset)
     baseThemeRef.value = cloneValue(archive.dataset.theme)
     layerBrowserStore.setLegend(archive.legend)
@@ -1435,14 +1437,17 @@ async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options:
       locations: archive.locations,
       theme: archive.dataset.theme,
       files: archive.files,
-      metadata: { label }
+      metadata: {
+        ...archive.metadata,
+        label: archiveLabel
+      }
     })
 
     await mountViewer()
-    updateStatus(`${label} loaded.`)
+    updateStatus(`${archiveLabel} loaded.`)
     if (options.persist ?? true) {
       const base64 = options.base64 ?? arrayBufferToBase64(buffer)
-      await persistCurrentProject({ label, base64 })
+      await persistCurrentProject({ label: archiveLabel, base64 })
     }
   } catch (err) {
     console.error(err)
@@ -1512,8 +1517,30 @@ function promptCloseArchive() {
   requestConfirm('Unload the current map? Unsaved changes may be lost.', () => closeActiveArchive())
 }
 
+function createScratchLegend(): TerrainLegend {
+  const width = Math.max(1, Math.floor(workspaceForm.width) || 1024)
+  const height = Math.max(1, Math.floor(workspaceForm.height) || 1536)
+  const seaLevel = clampNumber(Number.isFinite(workspaceForm.seaLevel) ? Number(workspaceForm.seaLevel) : 0, -1, 1)
+  return {
+    size: [width, height] as [number, number],
+    heightmap: 'heightmap.png',
+    topology: 'heightmap.png',
+    sea_level: seaLevel,
+    biomes: {},
+    overlays: {}
+  }
+}
+
 function startNewMap() {
   closeActiveArchive()
+  const scratchLegend = createScratchLegend()
+  projectStore.setLegend(scratchLegend)
+  layerBrowserStore.setLegend(scratchLegend)
+  workspaceForm.width = scratchLegend.size[0]
+  workspaceForm.height = scratchLegend.size[1]
+  workspaceForm.seaLevel = scratchLegend.sea_level ?? 0
+  setActivePanel('workspace')
+  isDockCollapsed.value = false
   updateStatus('New project ready. Import layers to begin editing.')
   try {
     persistedProject.value = null
