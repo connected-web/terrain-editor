@@ -130,7 +130,7 @@ function updateProjectAuthor(value: string) {
 
 function applyMapSize() {
   const deps = ensureDependencies()
-  const legend = deps.projectSnapshot.value.legend
+  const legend = projectSnapshotRef.value.legend
   if (!legend) return
   const width = Math.max(1, Math.floor(workspaceForm.width))
   const height = Math.max(1, Math.floor(workspaceForm.height))
@@ -146,7 +146,7 @@ function applyMapSize() {
 
 function applySeaLevel() {
   const deps = ensureDependencies()
-  const legend = deps.projectSnapshot.value.legend
+  const legend = projectSnapshotRef.value.legend
   if (!legend) return
   const seaLevel = clampNumber(Number(workspaceForm.seaLevel), -1, 1)
   workspaceForm.seaLevel = seaLevel
