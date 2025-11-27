@@ -1,29 +1,33 @@
 import { ref } from 'vue'
 import {
   initTerrainViewer,
-  resolveTerrainTheme,
   type LayerToggleState,
   type TerrainDataset,
   type TerrainHandle,
-  type TerrainThemeOverrides,
-  type ViewerOverlayLoadingState
+  type TerrainLocation,
+  type TerrainThemeOverrides
 } from '@connected-web/terrain-editor'
-import { arrayBufferToBase64 } from '../utils/storage'
+
+type MountContext = {
+  dataset: TerrainDataset
+  layerState: LayerToggleState
+  locations: TerrainLocation[]
+  interactive: boolean
+  theme?: TerrainThemeOverrides
+  onLocationPick: (payload: any) => void
+  onLocationClick: (id: string) => void
+}
 
 export function useViewer(options: {
   getViewerElement: () => HTMLElement | null
-  getDataset: () => TerrainDataset | null
-  getLayerState: () => LayerToggleState | null
-  getLocations: () => any[]
-  getTheme: () => TerrainThemeOverrides | undefined
-  onLocationPick: (payload: any) => void
-  onLocationClick: (id: string) => void
+  getMountContext: () => MountContext | null
 }) {
   const handle = ref<TerrainHandle | null>(null)
   const status = ref('Load a Wyn archive to begin.')
   const statusFaded = ref(false)
   let statusFadeHandle: number | null = null
   let statusFadeToken = 0
+  let remountHandle: number | null = null
 
   function updateStatus(message: string, fadeOutDelay = 0) {
     status.value = message
@@ -44,19 +48,19 @@ export function useViewer(options: {
     }
   }
 
-  async function mountViewer(interactive: boolean) {
+  async function mountViewer(context?: MountContext | null) {
+    const nextContext = context ?? options.getMountContext()
+    if (!nextContext) return
     const viewerElement = options.getViewerElement()
-    const dataset = options.getDataset()
-    const layerState = options.getLayerState()
-    if (!viewerElement || !dataset || !layerState) return
+    if (!viewerElement) return
     disposeViewer()
-    handle.value = await initTerrainViewer(viewerElement, dataset, {
-      layers: layerState,
-      locations: options.getLocations(),
-      interactive,
-      theme: options.getTheme(),
-      onLocationPick: options.onLocationPick,
-      onLocationClick: options.onLocationClick
+    handle.value = await initTerrainViewer(viewerElement, nextContext.dataset, {
+      layers: nextContext.layerState,
+      locations: nextContext.locations,
+      interactive: nextContext.interactive,
+      theme: nextContext.theme,
+      onLocationPick: nextContext.onLocationPick,
+      onLocationClick: nextContext.onLocationClick
     })
   }
 
@@ -65,8 +69,14 @@ export function useViewer(options: {
     handle.value = null
   }
 
-  function setOverlayLoading(viewerShell: { setOverlayLoading: (state: ViewerOverlayLoadingState | null) => void } | null, state: ViewerOverlayLoadingState | null) {
-    viewerShell?.setOverlayLoading(state)
+  function requestViewerRemount() {
+    if (remountHandle !== null) {
+      window.clearTimeout(remountHandle)
+    }
+    remountHandle = window.setTimeout(() => {
+      remountHandle = null
+      void mountViewer()
+    }, 80)
   }
 
   function cleanup() {
@@ -74,6 +84,10 @@ export function useViewer(options: {
     if (statusFadeHandle !== null) {
       window.clearTimeout(statusFadeHandle)
       statusFadeHandle = null
+    }
+    if (remountHandle !== null) {
+      window.clearTimeout(remountHandle)
+      remountHandle = null
     }
   }
 
@@ -83,8 +97,8 @@ export function useViewer(options: {
     statusFaded,
     updateStatus,
     mountViewer,
+    requestViewerRemount,
     disposeViewer,
-    setOverlayLoading,
     cleanup
   }
 }

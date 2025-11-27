@@ -123,23 +123,17 @@ import {
   buildWynArchive,
   createLayerBrowserStore,
   createProjectStore,
-  initTerrainViewer,
-  loadWynArchiveFromArrayBuffer,
-  resolveTerrainTheme,
   type MarkerStemGeometryShape,
   type LayerBrowserState,
   type LayerToggleState,
   type TerrainDataset,
-  type TerrainHandle,
   type TerrainLocation,
-  type TerrainLegend,
   type TerrainProjectFileEntry,
   type TerrainThemeOverrides,
   type LocationViewState,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import {
-  arrayBufferToBase64,
   base64ToArrayBuffer,
   clearPersistedProject,
   persistProjectSnapshot,
@@ -175,43 +169,41 @@ import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
 import { useUiActions } from './composables/useUiActions'
+import { useViewer } from './composables/useViewer'
+import { useArchiveLoader } from './composables/useArchiveLoader'
 import type { UIAction } from './types/uiActions'
 
 type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
 
 const editorRoot = ref<HTMLElement | null>(null)
+const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const interactive = ref(false)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
 const activeDockPanel = ref<DockPanel>('workspace')
-const status = ref('Load a Wyn archive to begin.')
-const statusFaded = ref(false)
-let statusFadeHandle: number | null = null
-let statusFadeToken = 0
 const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
-
-
-function handleSpriteStateInput(state: SpriteStateKey) {
-  handleSpriteStateInputHelper(themeForm, state, scheduleThemeUpdate)
-}
-
-function resetSpriteState(state: SpriteStateKey) {
-  resetSpriteStateHelper(themeForm, state, scheduleThemeUpdate)
-}
-
-function handleStemStateInput(state: StemStateKey) {
-  handleStemStateInputHelper(themeForm, state, scheduleThemeUpdate)
-}
-
-function resetStemState(state: StemStateKey) {
-  resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
-}
 
 const projectStore = createProjectStore()
 const projectSnapshot = ref(projectStore.getSnapshot())
 const layerBrowserStore = createLayerBrowserStore()
 const layerBrowserState = ref<LayerBrowserState>(layerBrowserStore.getState())
 const layerState = ref<LayerToggleState | null>(layerBrowserStore.getLayerToggles())
+const datasetRef = ref<TerrainDataset | null>(null)
+const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
+
+const {
+  handle,
+  status,
+  statusFaded,
+  updateStatus,
+  mountViewer,
+  requestViewerRemount,
+  disposeViewer,
+  cleanup: cleanupViewer
+} = useViewer({
+  getViewerElement: () => viewerShell.value?.getViewerElement() ?? null,
+  getMountContext: getViewerMountContext
+})
 
 const {
   workspaceForm,
@@ -239,9 +231,6 @@ const {
 
 const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
 
-const datasetRef = ref<TerrainDataset | null>(null)
-const handle = ref<TerrainHandle | null>(null)
-const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 const {
   themeForm,
   syncThemeFormFromSnapshot,
@@ -256,6 +245,22 @@ const {
   persistCurrentProject,
   baseThemeRef
 })
+
+function handleSpriteStateInput(state: SpriteStateKey) {
+  handleSpriteStateInputHelper(themeForm, state, scheduleThemeUpdate)
+}
+
+function resetSpriteState(state: SpriteStateKey) {
+  resetSpriteStateHelper(themeForm, state, scheduleThemeUpdate)
+}
+
+function handleStemStateInput(state: StemStateKey) {
+  handleStemStateInputHelper(themeForm, state, scheduleThemeUpdate)
+}
+
+function resetStemState(state: StemStateKey) {
+  resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
+}
 const {
   locationsList,
   selectedLocationId,
@@ -280,7 +285,6 @@ const {
 })
 const commitLocations = commitLocationsBase
 const clampLocationPixel = clampLocationPixelBase
-const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const persistedProject = ref<PersistedProject | null>(null)
 const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(projectSnapshot.value.legend))
 
@@ -310,6 +314,32 @@ const {
   commitLocations
 })
 
+const {
+  loadArchiveFromBytes,
+  loadArchiveFromFile: loadArchiveFromFileInternal,
+  loadSampleArchive
+} = useArchiveLoader({
+  projectStore,
+  layerBrowserStore,
+  datasetRef,
+  baseThemeRef,
+  wrapDatasetWithOverrides,
+  clearAssetOverrides,
+  missingIconWarnings,
+  refreshIconPreviewCache,
+  updateStatus,
+  setOverlayLoading,
+  persistCurrentProject,
+  mountViewer,
+  disposeViewer,
+  cleanupDataset,
+  onBeforeLoad: resetLocationPlacementState,
+  getSampleArchiveUrl: archiveUrl
+})
+
+const loadSample = loadSampleArchive
+const loadArchiveFromFile = loadArchiveFromFileInternal
+
 const layerEntries = computed(() => layerBrowserState.value.entries)
 const iconPickerTarget = ref<string | null>(null)
 const assetDialogFilter = ref('')
@@ -320,8 +350,6 @@ const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
-let viewerRemountHandle: number | null = null
-let themeUpdateHandle: number | null = null
 const { uiActions } = useUiActions({
   hasActiveArchive,
   setActivePanel,
@@ -436,32 +464,6 @@ function handleResize() {
   isCompactViewport.value = window.innerWidth < 800
 }
 
-function updateStatus(message: string, fadeOutDelay = 0) {
-  status.value = message
-  statusFaded.value = false
-  statusFadeToken += 1
-  const token = statusFadeToken
-  if (statusFadeHandle !== null) {
-    window.clearTimeout(statusFadeHandle)
-    statusFadeHandle = null
-  }
-  if (fadeOutDelay > 0) {
-    statusFadeHandle = window.setTimeout(() => {
-      if (statusFadeToken === token) {
-        statusFaded.value = true
-      }
-      statusFadeHandle = null
-    }, fadeOutDelay)
-  }
-}
-
-function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
-  viewerShell.value?.setOverlayLoading(state)
-}
-
-function cloneValue<T>(value: T): T {
-  return value ? (JSON.parse(JSON.stringify(value)) as T) : value
-}
 
 async function persistCurrentProject(options: { base64?: string; label?: string } = {}) {
   const snapshot = projectStore.getSnapshot()
@@ -477,140 +479,13 @@ function archiveUrl() {
   return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
 }
 
-function disposeViewer() {
-  handle.value?.destroy()
-  handle.value = null
-}
-
 function cleanupDataset() {
   datasetRef.value?.cleanup?.()
   datasetRef.value = null
 }
 
-function requestViewerRemount() {
-  if (!datasetRef.value) return
-  if (viewerRemountHandle !== null) {
-    window.clearTimeout(viewerRemountHandle)
-  }
-  viewerRemountHandle = window.setTimeout(() => {
-    viewerRemountHandle = null
-    void mountViewer()
-  }, 80)
-}
-
-async function mountViewer() {
-  const viewerElement = viewerShell.value?.getViewerElement()
-  if (!viewerElement || !datasetRef.value || !layerState.value) return
-  disposeViewer()
-  handle.value = await initTerrainViewer(viewerElement, datasetRef.value, {
-    layers: layerState.value,
-    locations: getViewerLocations(),
-    interactive: interactive.value,
-    theme: projectSnapshot.value.theme,
-    onLocationPick: (payload) => {
-        const snapped = {
-          x: snapLocationValue(clampNumber(payload.pixel.x, 0, workspaceForm.width), workspaceForm.width),
-          y: snapLocationValue(clampNumber(payload.pixel.y, 0, workspaceForm.height), workspaceForm.height)
-        }
-        if (pendingLocationId.value === NEW_LOCATION_PLACEHOLDER && pendingLocationDraft.value) {
-          const draft = ensureLocationId({ ...pendingLocationDraft.value, pixel: snapped })
-          pendingLocationDraft.value = null
-          pendingLocationId.value = null
-          interactive.value = false
-          handle.value?.setInteractiveMode(false)
-          locationsList.value = [...locationsList.value, draft]
-          commitLocations()
-          setActiveLocation(draft.id!)
-          updateStatus(`Added ${draft.name ?? draft.id} at (${draft.pixel.x}, ${draft.pixel.y}).`)
-          return
-        }
-        if (pendingLocationId.value) {
-          const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
-          if (target) {
-            target.pixel = snapped
-            pendingLocationId.value = null
-            interactive.value = false
-            handle.value?.setInteractiveMode(false)
-            commitLocations()
-            setActiveLocation(target.id!)
-            updateStatus(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
-            return
-          }
-        }
-        updateStatus(`Picked pixel (${snapped.x}, ${snapped.y})`)
-    },
-    onLocationClick: (locationId) => setActiveLocation(locationId, { fromViewer: true })
-  })
-}
-
-type LoadArchiveOptions = {
-  persist?: boolean
-  base64?: string
-}
-
-async function loadArchiveFromBytes(buffer: ArrayBuffer, label: string, options: LoadArchiveOptions = {}) {
-  const loadingLabel = `Loading ${label}…`
-  updateStatus(loadingLabel)
-  setOverlayLoading({ label: loadingLabel, loadedBytes: 0 })
-  disposeViewer()
-  cleanupDataset()
-  clearAssetOverrides()
-  missingIconWarnings.clear()
-  pendingLocationDraft.value = null
-  pendingLocationId.value = null
-  try {
-    const archive = await loadWynArchiveFromArrayBuffer(buffer, { includeFiles: true })
-    const archiveLabel = archive.metadata?.label ?? label
-    datasetRef.value = wrapDatasetWithOverrides(archive.dataset)
-    baseThemeRef.value = cloneValue(archive.dataset.theme)
-    layerBrowserStore.setLegend(archive.legend)
-    projectStore.loadFromArchive({
-      legend: archive.legend,
-      locations: archive.locations,
-      theme: archive.dataset.theme,
-      files: archive.files,
-      metadata: {
-        ...archive.metadata,
-        label: archiveLabel
-      }
-    })
-
-    await mountViewer()
-    updateStatus(`${archiveLabel} loaded.`)
-    if (options.persist ?? true) {
-      const base64 = options.base64 ?? arrayBufferToBase64(buffer)
-      await persistCurrentProject({ label: archiveLabel, base64 })
-    }
-  } catch (err) {
-    console.error(err)
-    updateStatus(`Failed to load ${label}.`)
-  } finally {
-    setOverlayLoading(null)
-    refreshIconPreviewCache()
-  }
-}
-
-async function loadSample() {
-  try {
-    updateStatus('Downloading sample archive…')
-    const response = await fetch(archiveUrl())
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const buffer = await response.arrayBuffer()
-    await loadArchiveFromBytes(buffer, 'sample archive')
-  } catch (err) {
-    console.error(err)
-    updateStatus('Failed to download sample archive.')
-  }
-}
-
-async function loadArchiveFromFile(file: File) {
-  try {
-    const buffer = await file.arrayBuffer()
-    await loadArchiveFromBytes(buffer, file.name)
-  } catch (err) {
-    console.error(err)
-    updateStatus(`Failed to load ${file.name}.`)
-  }
+function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
+  viewerShell.value?.setOverlayLoading(state)
 }
 
 function closeActiveArchive() {
@@ -793,6 +668,13 @@ function startPlacement(location: TerrainLocation) {
   interactive.value = true
   handle.value.setInteractiveMode(true)
   updateStatus(`Click anywhere on the map to place ${location.name ?? 'this location'}.`)
+}
+
+function resetLocationPlacementState() {
+  pendingLocationDraft.value = null
+  pendingLocationId.value = null
+  interactive.value = false
+  handle.value?.setInteractiveMode(false)
 }
 
 function focusLocationInViewer(id: string) {
@@ -1032,6 +914,52 @@ function getViewerLocations(list = locationsList.value) {
   }))
 }
 
+function handleViewerLocationPick(payload: { pixel: { x: number; y: number } }) {
+  const snapped = {
+    x: snapLocationValue(clampNumber(payload.pixel.x, 0, workspaceForm.width), workspaceForm.width),
+    y: snapLocationValue(clampNumber(payload.pixel.y, 0, workspaceForm.height), workspaceForm.height)
+  }
+  if (pendingLocationId.value === NEW_LOCATION_PLACEHOLDER && pendingLocationDraft.value) {
+    const draft = ensureLocationId({ ...pendingLocationDraft.value, pixel: snapped })
+    pendingLocationDraft.value = null
+    pendingLocationId.value = null
+    interactive.value = false
+    handle.value?.setInteractiveMode(false)
+    locationsList.value = [...locationsList.value, draft]
+    commitLocations()
+    setActiveLocation(draft.id!)
+    updateStatus(`Added ${draft.name ?? draft.id} at (${draft.pixel.x}, ${draft.pixel.y}).`)
+    return
+  }
+  if (pendingLocationId.value) {
+    const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
+    if (target) {
+      target.pixel = snapped
+      pendingLocationId.value = null
+      interactive.value = false
+      handle.value?.setInteractiveMode(false)
+      commitLocations()
+      setActiveLocation(target.id!)
+      updateStatus(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
+      return
+    }
+  }
+  updateStatus(`Picked pixel (${snapped.x}, ${snapped.y})`)
+}
+
+function getViewerMountContext() {
+  if (!datasetRef.value || !layerState.value) return null
+  return {
+    dataset: datasetRef.value,
+    layerState: layerState.value,
+    locations: getViewerLocations(),
+    interactive: interactive.value,
+    theme: projectSnapshot.value.theme,
+    onLocationPick: handleViewerLocationPick,
+    onLocationClick: (locationId: string) => setActiveLocation(locationId, { fromViewer: true })
+  }
+}
+
 function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
   const baseResolve = dataset.resolveAssetUrl.bind(dataset)
   return {
@@ -1060,20 +988,12 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  disposeViewer()
+  cleanupViewer()
   cleanupDataset()
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('dragover', handleWindowDragEvent, true)
   window.removeEventListener('drop', handleWindowDragEvent, true)
   disposeAssetPreviewUrls()
   cancelThemeUpdate()
-  if (viewerRemountHandle !== null) {
-    window.clearTimeout(viewerRemountHandle)
-    viewerRemountHandle = null
-  }
-  if (statusFadeHandle !== null) {
-    window.clearTimeout(statusFadeHandle)
-    statusFadeHandle = null
-  }
 })
 </script>
