@@ -151,22 +151,19 @@ import {
 import {
   SpriteStateKey,
   StemStateKey,
-  assignStemState,
-  assignThemeState,
-  createThemeFormState,
   handleSpriteStateInput as handleSpriteStateInputHelper,
   handleStemStateInput as handleStemStateInputHelper,
   resetSpriteState as resetSpriteStateHelper,
   resetStemState as resetStemStateHelper,
   stemShapeOptions
 } from './utils/theme'
+import { useTheme } from './composables/useTheme'
 import { buildIconPath } from './utils/assets'
 import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
 import { useWorkspace } from './composables/useWorkspace'
 import { useLocations } from './composables/useLocations'
-import { useViewer } from './composables/useViewer'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
@@ -242,9 +239,23 @@ const {
 
 const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
 
-const themeForm = createThemeFormState()
 const datasetRef = ref<TerrainDataset | null>(null)
 const handle = ref<TerrainHandle | null>(null)
+const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
+const {
+  themeForm,
+  syncThemeFormFromSnapshot,
+  commitThemeOverrides,
+  scheduleThemeUpdate,
+  cancelThemeUpdate,
+  resetThemeForm
+} = useTheme({
+  projectSnapshot,
+  projectStore,
+  handle,
+  persistCurrentProject,
+  baseThemeRef
+})
 const {
   locationsList,
   selectedLocationId,
@@ -306,7 +317,6 @@ function setAssetDialogFilter(value: string) {
   assetDialogFilter.value = value
 }
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
-const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
@@ -447,180 +457,6 @@ function updateStatus(message: string, fadeOutDelay = 0) {
 
 function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
   viewerShell.value?.setOverlayLoading(state)
-}
-
-function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
-  const resolved = resolveTerrainTheme(snapshot.theme)
-  const sprite = resolved.locationMarkers.sprite
-  const spriteDefault = sprite.states.default
-  themeForm.textColor = spriteDefault.textColor
-  themeForm.backgroundColor = spriteDefault.backgroundColor
-  themeForm.borderColor = spriteDefault.borderColor
-  themeForm.borderThickness = spriteDefault.borderThickness
-  themeForm.opacity = spriteDefault.opacity
-  const stemDefault = resolved.locationMarkers.stem.states.default
-  themeForm.stemColor = stemDefault.color
-  themeForm.stemOpacity = stemDefault.opacity
-  themeForm.stemShape = resolved.locationMarkers.stem.shape
-  themeForm.fontFamily = sprite.fontFamily
-  themeForm.fontWeight = sprite.fontWeight
-  themeForm.maxFontSize = sprite.maxFontSize
-  themeForm.minFontSize = sprite.minFontSize
-  themeForm.paddingX = sprite.paddingX
-  themeForm.paddingY = sprite.paddingY
-  themeForm.borderRadius = sprite.borderRadius
-  const sourceSprite = snapshot.theme?.locationMarkers?.sprite
-  const hoverSource = sourceSprite?.states?.hover
-  const focusSource = sourceSprite?.states?.focus
-  themeForm.hoverEnabled = Boolean(hoverSource)
-  themeForm.focusEnabled = Boolean(focusSource)
-  assignThemeState(
-    themeForm.hover,
-    {
-      textColor: hoverSource?.textColor ?? spriteDefault.textColor,
-      backgroundColor: hoverSource?.backgroundColor ?? spriteDefault.backgroundColor,
-      borderColor: hoverSource?.borderColor ?? spriteDefault.borderColor,
-      borderThickness: hoverSource?.borderThickness ?? spriteDefault.borderThickness,
-      opacity: hoverSource?.opacity ?? spriteDefault.opacity
-    }
-  )
-  assignThemeState(
-    themeForm.focus,
-    {
-      textColor: focusSource?.textColor ?? spriteDefault.textColor,
-      backgroundColor: focusSource?.backgroundColor ?? spriteDefault.backgroundColor,
-      borderColor: focusSource?.borderColor ?? spriteDefault.borderColor,
-      borderThickness: focusSource?.borderThickness ?? spriteDefault.borderThickness,
-      opacity: focusSource?.opacity ?? spriteDefault.opacity
-    }
-  )
-  const sourceStem = snapshot.theme?.locationMarkers?.stem
-  const stemHoverSource = sourceStem?.states?.hover
-  const stemFocusSource = sourceStem?.states?.focus
-  themeForm.stemHoverEnabled = Boolean(stemHoverSource)
-  themeForm.stemFocusEnabled = Boolean(stemFocusSource)
-  assignStemState(
-    themeForm.stemHover,
-    {
-      color: stemHoverSource?.color ?? stemDefault.color,
-      opacity: stemHoverSource?.opacity ?? stemDefault.opacity
-    }
-  )
-  assignStemState(
-    themeForm.stemFocus,
-    {
-      color: stemFocusSource?.color ?? stemDefault.color,
-      opacity: stemFocusSource?.opacity ?? stemDefault.opacity
-    }
-  )
-}
-
-function resetThemeForm() {
-  if (!hasActiveArchive.value) return
-  if (baseThemeRef.value) {
-    projectStore.setTheme(cloneValue(baseThemeRef.value))
-    handle.value?.setTheme(cloneValue(baseThemeRef.value))
-  } else {
-    projectStore.setTheme(undefined)
-    handle.value?.setTheme(undefined)
-  }
-  syncThemeFormFromSnapshot()
-  cancelThemeUpdate()
-  void persistCurrentProject()
-}
-
-function scheduleThemeUpdate() {
-  if (!hasActiveArchive.value) return
-  if (themeUpdateHandle) {
-    window.clearTimeout(themeUpdateHandle)
-  }
-  themeUpdateHandle = window.setTimeout(() => {
-    themeUpdateHandle = null
-    commitThemeOverrides()
-  }, 250)
-}
-
-function cancelThemeUpdate() {
-  if (themeUpdateHandle) {
-    window.clearTimeout(themeUpdateHandle)
-    themeUpdateHandle = null
-  }
-}
-
-function commitThemeOverrides() {
-  if (!hasActiveArchive.value) return
-  const overrides: TerrainThemeOverrides = {
-    locationMarkers: {
-      sprite: {
-        fontFamily: themeForm.fontFamily,
-        fontWeight: themeForm.fontWeight,
-        maxFontSize: themeForm.maxFontSize,
-        minFontSize: themeForm.minFontSize,
-        paddingX: themeForm.paddingX,
-        paddingY: themeForm.paddingY,
-        borderRadius: themeForm.borderRadius,
-        states: {
-          default: {
-            textColor: themeForm.textColor,
-            backgroundColor: themeForm.backgroundColor,
-            borderColor: themeForm.borderColor,
-            borderThickness: themeForm.borderThickness,
-            opacity: themeForm.opacity
-          },
-          ...(themeForm.hoverEnabled
-            ? {
-                hover: {
-                  textColor: themeForm.hover.textColor,
-                  backgroundColor: themeForm.hover.backgroundColor,
-                  borderColor: themeForm.hover.borderColor,
-                  borderThickness: themeForm.hover.borderThickness,
-                  opacity: themeForm.hover.opacity
-                }
-              }
-            : {}),
-          ...(themeForm.focusEnabled
-            ? {
-                focus: {
-                  textColor: themeForm.focus.textColor,
-                  backgroundColor: themeForm.focus.backgroundColor,
-                  borderColor: themeForm.focus.borderColor,
-                  borderThickness: themeForm.focus.borderThickness,
-                  opacity: themeForm.focus.opacity
-                }
-              }
-            : {})
-        }
-      },
-      stem: {
-        shape: themeForm.stemShape,
-        states: {
-          default: {
-            color: themeForm.stemColor,
-            opacity: themeForm.stemOpacity
-          },
-          ...(themeForm.stemHoverEnabled
-            ? {
-                hover: {
-                  color: themeForm.stemHover.color,
-                  opacity: themeForm.stemHover.opacity
-                }
-              }
-            : {}),
-          ...(themeForm.stemFocusEnabled
-            ? {
-                focus: {
-                  color: themeForm.stemFocus.color,
-                  opacity: themeForm.stemFocus.opacity
-                }
-              }
-            : {})
-        }
-      }
-    }
-  }
-  projectStore.setTheme(overrides)
-  handle.value?.setTheme(overrides)
-  void persistCurrentProject()
 }
 
 function cloneValue<T>(value: T): T {
