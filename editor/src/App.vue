@@ -398,11 +398,6 @@ watch(
 watch(
   () => projectSnapshot.value,
   (snapshot) => {
-    workspaceForm.label = snapshot.metadata.label ?? ''
-    workspaceForm.author = snapshot.metadata.author ?? ''
-    workspaceForm.width = snapshot.legend?.size?.[0] ?? 1024
-    workspaceForm.height = snapshot.legend?.size?.[1] ?? 1536
-    workspaceForm.seaLevel = snapshot.legend?.sea_level ?? 0
     syncThemeFormFromSnapshot(snapshot)
   },
   { immediate: true }
