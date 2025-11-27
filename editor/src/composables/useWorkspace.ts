@@ -14,6 +14,8 @@ import {
 } from '../models/workspace'
 import type { WorkspaceSnapshot } from '../models/workspace'
 
+import type { Ref } from 'vue'
+
 export function useWorkspace(options: {
   projectStore: {
     getSnapshot: () => WorkspaceSnapshot
@@ -30,8 +32,8 @@ export function useWorkspace(options: {
     toggleVisibility: (id: string) => void
     setAll: (kind: 'biome' | 'overlay', visible: boolean) => void
   }
-  datasetRef: { value: TerrainDataset | null }
-  handle: { value: TerrainHandle | null }
+  datasetRef: Ref<TerrainDataset | null>
+  handle: Ref<TerrainHandle | null>
   persistCurrentProject: () => Promise<void>
   requestViewerRemount: () => void
   localSettings?: { cameraTracking: boolean; openLocationsOnSelect: boolean }

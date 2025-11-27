@@ -223,11 +223,13 @@ const {
   cancelThemeUpdate,
   resetThemeForm
 } = useTheme({
-  projectSnapshot,
+  projectSnapshot: computed(() => ({
+    ...projectSnapshot.value,
+    theme: projectSnapshot.value.theme as DeepPartial<TerrainTheme> | undefined
+  })),
   projectStore,
   handle,
-  persistCurrentProject,
-  baseThemeRef
+  persistCurrentProject
 })
 
 function handleSpriteStateInput(state: SpriteStateKey) {
@@ -275,15 +277,11 @@ const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(pro
 
 const {
   assetOverrides,
-  iconPreviewCache,
-  iconPreviewOwnership,
   missingIconWarnings,
   projectAssets,
-  setAssetOverride,
   clearAssetOverrides,
   resolveAssetReference,
   getIconPreview,
-  preloadIconPreview,
   refreshIconPreviewCache,
   importIconAsset: importIconAssetHelper,
   replaceAssetWithFile: replaceAssetWithFileHelper,
@@ -292,7 +290,10 @@ const {
   normalizeAssetFileName
 } = useAssetLibrary({
   projectStore,
-  projectSnapshot,
+  projectSnapshot: computed(() => ({
+    ...projectSnapshot.value,
+    files: (projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]
+  })),
   datasetRef,
   locationsList,
   handle,
@@ -373,7 +374,10 @@ watch(
 watch(
   () => projectSnapshot.value,
   (snapshot) => {
-    syncThemeFormFromSnapshot(snapshot)
+    return syncThemeFormFromSnapshot({
+      ...snapshot,
+      theme: snapshot.theme as DeepPartial<TerrainTheme> | undefined
+    })
   },
   { immediate: true }
 )
@@ -715,14 +719,26 @@ function getViewerLocations(list = locationsList.value) {
 
 registerViewerLocationResolver(getViewerLocations)
 
-function getViewerMountContext() {
+import type { DeepPartial, TerrainTheme } from '@connected-web/terrain-editor'
+
+type ViewerMountContext = {
+  dataset: TerrainDataset
+  layerState: LayerToggleState
+  locations: ReturnType<typeof getViewerLocations>
+  interactive: boolean
+  theme?: DeepPartial<TerrainTheme>
+  onLocationPick: (payload: { pixel: { x: number; y: number } }) => void
+  onLocationClick: (locationId: string) => void
+}
+
+function getViewerMountContext(): ViewerMountContext | null {
   if (!datasetRef.value || !layerState.value) return null
   return {
     dataset: datasetRef.value,
     layerState: layerState.value,
     locations: getViewerLocations(),
     interactive: interactive.value,
-    theme: projectSnapshot.value.theme,
+    theme: projectSnapshot.value.theme as DeepPartial<TerrainTheme> | undefined,
     onLocationPick: handleLocationPick,
     onLocationClick: (locationId: string) => setActiveLocationBase(locationId)
   }
