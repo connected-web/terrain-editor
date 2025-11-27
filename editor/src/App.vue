@@ -17,705 +17,69 @@
         :mobile="isCompactViewport"
         @toggle="toggleDock"
       >
+        <WorkspacePanel
+          v-if="activeDockPanel === 'workspace'"
+          :workspace-form="workspaceForm"
+          :has-active-archive="hasActiveArchive"
+          @load-sample="loadSample"
+          @load-map="() => viewerShell?.triggerFileSelect()"
+          @reset="resetWorkspaceForm"
+          @update-label="updateProjectLabel"
+          @update-author="updateProjectAuthor"
+          @apply-map-size="applyMapSize"
+          @apply-sea-level="applySeaLevel"
+          @export-archive="exportArchive"
+        />
 
-        <section v-if="activeDockPanel === 'workspace'" class="panel-card">
-          <header class="panel-card__header panel-card__header--split">
-            <div class="panel-card__header-main">
-              <Icon icon="compass-drafting">Workspace</Icon>
-            </div>
-            <button class="pill-button pill-button--ghost" @click="resetWorkspaceForm" :disabled="!hasActiveArchive">
-              Reset
-            </button>
-          </header>
-          <div v-if="!hasActiveArchive" class="workspace-form__starter">
-            <button
-              type="button"
-              class="pill-button"
-              aria-label="Workspace panel: load sample map"
-              @click="loadSample"
-            >
-              <Icon icon="mountain-sun">Load sample map</Icon>
-            </button>
-            <button
-              type="button"
-              class="pill-button pill-button--ghost"
-              aria-label="Workspace panel: load map"
-              @click="viewerShell?.triggerFileSelect()"
-            >
-              <Icon icon="folder-open">Load map</Icon>
-            </button>
-          </div>
-          <div class="workspace-form">
-            <label class="workspace-form__field">
-              <span>Project title</span>
-              <input type="text" v-model="workspaceForm.label" @change="updateProjectLabel(workspaceForm.label)" />
-            </label>
-            <label class="workspace-form__field">
-              <span>Author</span>
-              <input type="text" v-model="workspaceForm.author" @change="updateProjectAuthor(workspaceForm.author)" />
-            </label>
-            <div class="workspace-form__split">
-              <label class="workspace-form__field">
-                <span>Map width (px)</span>
-                <input
-                  type="number"
-                  min="1"
-                  v-model.number="workspaceForm.width"
-                  @change="applyMapSize"
-                />
-              </label>
-              <label class="workspace-form__field">
-                <span>Map height (px)</span>
-                <input
-                  type="number"
-                  min="1"
-                  v-model.number="workspaceForm.height"
-                  @change="applyMapSize"
-                />
-              </label>
-            </div>
-            <label class="workspace-form__field">
-              <span>Sea level</span>
-              <div class="workspace-form__range">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  v-model.number="workspaceForm.seaLevel"
-                  @input="applySeaLevel"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  v-model.number="workspaceForm.seaLevel"
-                  @change="applySeaLevel"
-                />
-              </div>
-            </label>
-            <p class="workspace-form__hint">
-              Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
-            </p>
-            <div class="workspace-form__actions" v-if="hasActiveArchive">
-              <button class="pill-button pill-button--ghost" type="button" @click="exportArchive">
-                <Icon icon="file-export">Export WYN</Icon>
-              </button>
-            </div>
-          </div>
-        </section>
+        <LayersPanel
+          v-else-if="activeDockPanel === 'layers'"
+          :layer-entries="layerEntries"
+          :color-to-css="rgb"
+          @toggle-layer="toggleLayer"
+          @set-all="setAllLayers"
+        />
 
-        <section v-else-if="activeDockPanel === 'layers'" class="panel-card">
-          <header class="panel-card__header">
-            <Icon icon="layer-group">Layers</Icon>
-            <span class="panel-card__hint">Toggle biome + overlay visibility</span>
-          </header>
-          <div v-if="layerEntries.length" class="panel-card__list">
-            <button
-              v-for="entry in layerEntries"
-              :key="entry.id"
-              type="button"
-              class="pill-button panel-card__pill"
-              :class="{ 'panel-card__pill--inactive': !entry.visible }"
-              @click="toggleLayer(entry.id)"
-            >
-              <span class="panel-card__pill-swatch" :style="{ backgroundColor: rgb(entry.color) }" />
-              <span class="panel-card__pill-label">{{ entry.label }}</span>
-            </button>
-            <div class="panel-card__pill-actions">
-              <button class="pill-button panel-card__pill-small" @click="setAllLayers('biome', true)">
-                Show all biomes
-              </button>
-              <button class="pill-button panel-card__pill-small" @click="setAllLayers('biome', false)">
-                Hide all biomes
-              </button>
-              <button class="pill-button panel-card__pill-small" @click="setAllLayers('overlay', true)">
-                Show overlays
-              </button>
-              <button class="pill-button panel-card__pill-small" @click="setAllLayers('overlay', false)">
-                Hide overlays
-              </button>
-            </div>
-          </div>
-          <p v-else class="panel-card__placeholder">Legend data not loaded yet.</p>
-        </section>
+        <ThemePanel
+          v-else-if="activeDockPanel === 'theme'"
+          :theme-form="themeForm"
+          :stem-shape-options="stemShapeOptions"
+          :has-active-archive="hasActiveArchive"
+          @reset-theme="resetThemeForm"
+          @schedule-update="scheduleThemeUpdate"
+          @sprite-input="handleSpriteStateInput"
+          @reset-sprite="resetSpriteState"
+          @stem-input="handleStemStateInput"
+          @reset-stem="resetStemState"
+        />
 
-        <section v-else-if="activeDockPanel === 'theme'" class="panel-card panel-card--theme">
-          <header class="panel-card__header panel-card__header--split">
-            <div class="panel-card__header-main">
-              <Icon icon="palette">Theme</Icon>
-            </div>
-            <button class="pill-button pill-button--ghost" @click="resetThemeForm" :disabled="!hasActiveArchive">
-              Reset
-            </button>
-          </header>
-          <div class="theme-form">
-            <section class="theme-form__section">
-              <header>
-                <h4>Label styling</h4>
-                <p>Adjust sprite colors + border thickness.</p>
-              </header>
-              <label class="theme-form__field">
-                <span>Text color</span>
-                <input type="color" v-model="themeForm.textColor" @input="scheduleThemeUpdate" />
-              </label>
-              <label class="theme-form__field">
-                <span>Background</span>
-                <input type="color" v-model="themeForm.backgroundColor" @input="scheduleThemeUpdate" />
-              </label>
-              <label class="theme-form__field">
-                <span>Border</span>
-                <input type="color" v-model="themeForm.borderColor" @input="scheduleThemeUpdate" />
-              </label>
-              <div class="theme-form__split">
-                <label class="theme-form__field">
-                  <span>Border thickness</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="4"
-                    step="0.25"
-                    v-model.number="themeForm.borderThickness"
-                    @input="scheduleThemeUpdate"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max="4"
-                    step="0.25"
-                    v-model.number="themeForm.borderThickness"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Opacity</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    v-model.number="themeForm.opacity"
-                    @input="scheduleThemeUpdate"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    v-model.number="themeForm.opacity"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-              </div>
-            </section>
-            <section class="theme-form__section">
-              <header>
-                <h4>Typography & spacing</h4>
-                <p>Control font + padding used across label states.</p>
-              </header>
-              <label class="theme-form__field">
-                <span>Font family</span>
-                <input type="text" v-model="themeForm.fontFamily" @change="scheduleThemeUpdate" />
-              </label>
-              <div class="theme-form__split">
-                <label class="theme-form__field">
-                  <span>Font weight</span>
-                  <input type="text" v-model="themeForm.fontWeight" @change="scheduleThemeUpdate" />
-                </label>
-                <label class="theme-form__field">
-                  <span>Min font size</span>
-                  <input
-                    type="number"
-                    min="4"
-                    max="64"
-                    step="1"
-                    v-model.number="themeForm.minFontSize"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Max font size</span>
-                  <input
-                    type="number"
-                    min="4"
-                    max="96"
-                    step="1"
-                    v-model.number="themeForm.maxFontSize"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-              </div>
-              <div class="theme-form__split">
-                <label class="theme-form__field">
-                  <span>Padding X</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="64"
-                    step="1"
-                    v-model.number="themeForm.paddingX"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Padding Y</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="64"
-                    step="1"
-                    v-model.number="themeForm.paddingY"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Border radius</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="64"
-                    step="1"
-                    v-model.number="themeForm.borderRadius"
-                    @change="scheduleThemeUpdate"
-                  />
-                </label>
-              </div>
-            </section>
-            <section class="theme-form__section">
-              <header class="theme-form__section-header">
-                <div class="theme-form__section-text">
-                  <h4>Hover state</h4>
-                  <p class="theme-form__state-hint" v-if="!themeForm.hoverEnabled">
-                    Inherits the default label styling until you edit a field.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="pill-button pill-button--ghost"
-                  @click="resetSpriteState('hover')"
-                  :disabled="!themeForm.hoverEnabled"
-                >
-                  Use default
-                </button>
-              </header>
-              <div class="theme-form__state-grid">
-                <label class="theme-form__field">
-                  <span>Text</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.hover.textColor"
-                    @input="handleSpriteStateInput('hover')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Background</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.hover.backgroundColor"
-                    @input="handleSpriteStateInput('hover')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Border</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.hover.borderColor"
-                    @input="handleSpriteStateInput('hover')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Thickness</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="4"
-                    step="0.25"
-                    v-model.number="themeForm.hover.borderThickness"
-                    @input="handleSpriteStateInput('hover')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Opacity</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    v-model.number="themeForm.hover.opacity"
-                    @input="handleSpriteStateInput('hover')"
-                  />
-                </label>
-              </div>
-            </section>
-            <section class="theme-form__section">
-              <header class="theme-form__section-header">
-                <div class="theme-form__section-text">
-                  <h4>Focus state</h4>
-                  <p class="theme-form__state-hint" v-if="!themeForm.focusEnabled">
-                    Inherits the default label styling until you edit a field.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="pill-button pill-button--ghost"
-                  @click="resetSpriteState('focus')"
-                  :disabled="!themeForm.focusEnabled"
-                >
-                  Use default
-                </button>
-              </header>
-              <div class="theme-form__state-grid">
-                <label class="theme-form__field">
-                  <span>Text</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.focus.textColor"
-                    @input="handleSpriteStateInput('focus')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Background</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.focus.backgroundColor"
-                    @input="handleSpriteStateInput('focus')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Border</span>
-                  <input
-                    type="color"
-                    v-model="themeForm.focus.borderColor"
-                    @input="handleSpriteStateInput('focus')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Thickness</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="4"
-                    step="0.25"
-                    v-model.number="themeForm.focus.borderThickness"
-                    @input="handleSpriteStateInput('focus')"
-                  />
-                </label>
-                <label class="theme-form__field">
-                  <span>Opacity</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    v-model.number="themeForm.focus.opacity"
-                    @input="handleSpriteStateInput('focus')"
-                  />
-                </label>
-              </div>
-            </section>
-            <section class="theme-form__section">
-              <header>
-                <h4>Marker stem</h4>
-                <p>Set supporting rod tint + opacity.</p>
-              </header>
-              <label class="theme-form__field">
-                <span>Stem shape</span>
-                <select v-model="themeForm.stemShape" @change="scheduleThemeUpdate">
-                  <option v-for="shape in stemShapeOptions" :key="shape" :value="shape">
-                    {{ shape }}
-                  </option>
-                </select>
-              </label>
-              <label class="theme-form__field">
-                <span>Stem color</span>
-                <input type="color" v-model="themeForm.stemColor" @input="scheduleThemeUpdate" />
-              </label>
-              <label class="theme-form__field">
-                <span>Stem opacity</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  v-model.number="themeForm.stemOpacity"
-                  @input="scheduleThemeUpdate"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  v-model.number="themeForm.stemOpacity"
-                  @change="scheduleThemeUpdate"
-                />
-              </label>
-              <div class="theme-form__state-block">
-                <div class="theme-form__state-header">
-                  <h5>Hover stem</h5>
-                  <button
-                    type="button"
-                    class="pill-button pill-button--ghost"
-                    @click="resetStemState('hover')"
-                    :disabled="!themeForm.stemHoverEnabled"
-                  >
-                    Use default
-                  </button>
-                </div>
-                <div class="theme-form__state-grid">
-                  <label class="theme-form__field">
-                    <span>Color</span>
-                    <input
-                      type="color"
-                      v-model="themeForm.stemHover.color"
-                      @input="handleStemStateInput('hover')"
-                    />
-                  </label>
-                  <label class="theme-form__field">
-                    <span>Opacity</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      v-model.number="themeForm.stemHover.opacity"
-                      @input="handleStemStateInput('hover')"
-                    />
-                  </label>
-                </div>
-              </div>
-              <div class="theme-form__state-block">
-                <div class="theme-form__state-header">
-                  <h5>Focus stem</h5>
-                  <button
-                    type="button"
-                    class="pill-button pill-button--ghost"
-                    @click="resetStemState('focus')"
-                    :disabled="!themeForm.stemFocusEnabled"
-                  >
-                    Use default
-                  </button>
-                </div>
-                <div class="theme-form__state-grid">
-                  <label class="theme-form__field">
-                    <span>Color</span>
-                    <input
-                      type="color"
-                      v-model="themeForm.stemFocus.color"
-                      @input="handleStemStateInput('focus')"
-                    />
-                  </label>
-                  <label class="theme-form__field">
-                    <span>Opacity</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      v-model.number="themeForm.stemFocus.opacity"
-                      @input="handleStemStateInput('focus')"
-                    />
-                  </label>
-                </div>
-              </div>
-            </section>
-            <p class="theme-form__hint">
-              Theme changes debounce automatically so rapid color tweaks don’t stall the viewer.
-            </p>
-          </div>
-        </section>
+        <SettingsPanel v-else-if="activeDockPanel === 'settings'" :local-settings="localSettings" />
 
-        <section v-else-if="activeDockPanel === 'settings'" class="panel-card">
-          <header class="panel-card__header panel-card__header--split">
-            <div class="panel-card__header-main">
-              <Icon icon="gear">Settings</Icon>
-            </div>
-            <span class="panel-card__hint">Local to this browser</span>
-          </header>
-          <div class="panel-card__list">
-            <label class="locations-panel__toggle">
-              <input type="checkbox" v-model="localSettings.cameraTracking" />
-              <span>Camera tracking between locations</span>
-            </label>
-            <p class="panel-card__hint">
-              When enabled, the viewer uses a location’s saved camera view (distance/polar/azimuth) while
-              moving between markers instead of reusing the current angle.
-            </p>
-            <label class="locations-panel__toggle">
-              <input type="checkbox" v-model="localSettings.openLocationsOnSelect" />
-              <span>Open Locations panel when selecting from viewer</span>
-            </label>
-            <p class="panel-card__hint">
-              Turn off to keep the current panel open when clicking markers in the viewer.
-            </p>
-          </div>
-        </section>
-
-        <section v-else class="panel-card panel-card--locations">
-          <header class="panel-card__header panel-card__header--split">
-            <div class="panel-card__header-main">
-              <Icon icon="location-dot">Locations</Icon>
-            </div>
-            <button class="pill-button pill-button--ghost" @click="addLocation" :disabled="!projectSnapshot.legend">
-              <Icon icon="plus">Add location</Icon>
-            </button>
-          </header>
-          <div class="locations-panel__selector">
-            <button
-              class="pill-button locations-panel__selector-button"
-              type="button"
-              :disabled="!locationsList.length"
-              @click="openLocationPicker"
-            >
-              <Icon icon="location-crosshairs" />
-              <div class="locations-panel__selector-text">
-                <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
-                <small v-if="activeLocation">
-                  {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
-                </small>
-              </div>
-            </button>
-            <p v-if="!locationsList.length" class="panel-card__placeholder locations-panel__placeholder">
-              No locations yet. Import a map with locations or add them manually.
-            </p>
-          </div>
-          <div
-            v-if="activeLocation"
-            class="locations-panel"
-            :class="{ 'drag-active': locationsDragActive }"
-            @dragenter="onLocationsDragEnter"
-            @dragover="onLocationsDragEnter"
-            @dragleave="onLocationsDragLeave"
-            @drop="onLocationsDrop"
-          >
-            <article class="locations-panel__item">
-              <div class="locations-panel__preview">
-                <div
-                  class="locations-panel__icon button"
-                  :class="{ 'locations-panel__icon--ghost': activeLocation.showBorder === false }"
-                  :style="{ backgroundImage: getIconPreview(activeLocation.icon) ? `url('${getIconPreview(activeLocation.icon)}')` : undefined }"
-                  @click="openIconPicker(activeLocation)"
-                >
-                  <span v-if="!getIconPreview(activeLocation.icon)">{{ activeLocation.name?.[0] ?? '?' }}</span>
-                </div>
-                <div class="locations-panel__preview-actions">
-                  <button type="button" class="pill-button" @click="openIconPicker(activeLocation)">
-                    <Icon icon="images">Choose icon</Icon>
-                  </button>
-                  <button
-                    type="button"
-                    class="pill-button pill-button--ghost"
-                    @click="clearLocationIcon(activeLocation)"
-                    :disabled="!activeLocation.icon"
-                  >
-                    <Icon icon="ban">Clear icon</Icon>
-                  </button>
-                  <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
-                    <Icon icon="crosshairs">Pick on map</Icon>
-                  </button>
-                </div>
-              </div>
-              <label class="locations-panel__field">
-                <span>Name</span>
-                <input
-                  type="text"
-                  v-model="activeLocation.name"
-                  @blur="commitLocations"
-                  placeholder="Location name"
-                />
-              </label>
-              <label class="locations-panel__field">
-                <span>Icon reference</span>
-                <input
-                  type="text"
-                  v-model="activeLocation.icon"
-                  @blur="commitLocations"
-                  placeholder="e.g. icons/castle.png"
-                />
-              </label>
-              <div class="locations-panel__coords">
-                <label>
-                  <span>X</span>
-                  <input
-                    type="number"
-                    min="0"
-                    :max="workspaceForm.width"
-                    :step="locationStepX"
-                    v-model.number="activeLocation.pixel.x"
-                    @change="clampLocationPixel(activeLocation)"
-                  />
-                </label>
-                <label>
-                  <span>Y</span>
-                  <input
-                    type="number"
-                    min="0"
-                    :max="workspaceForm.height"
-                    :step="locationStepY"
-                    v-model.number="activeLocation.pixel.y"
-                    @change="clampLocationPixel(activeLocation)"
-                  />
-                </label>
-              </div>
-              <div class="locations-panel__coords locations-panel__coords--view">
-                <label>
-                  <span>Camera distance</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    :value="activeLocation.view?.distance ?? ''"
-                    @change="updateActiveLocationViewField('distance', ($event.target as HTMLInputElement).value)"
-                    placeholder="auto"
-                  />
-                </label>
-                <label>
-                  <span>Polar (rad)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    :value="activeLocation.view?.polar ?? ''"
-                    @change="updateActiveLocationViewField('polar', ($event.target as HTMLInputElement).value)"
-                    placeholder="auto"
-                  />
-                </label>
-                <label>
-                  <span>Azimuth (rad)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    :value="activeLocation.view?.azimuth ?? ''"
-                    @change="updateActiveLocationViewField('azimuth', ($event.target as HTMLInputElement).value)"
-                    placeholder="auto"
-                  />
-                </label>
-              </div>
-              <div class="locations-panel__preview-actions locations-panel__preview-actions--compact">
-                <button
-                  type="button"
-                  class="pill-button"
-                  @click="captureCameraViewForActiveLocation"
-                  :disabled="!handle"
-                >
-                  <Icon icon="camera">Use current camera</Icon>
-                </button>
-                <button
-                  type="button"
-                  class="pill-button pill-button--ghost"
-                  @click="clearActiveLocationView"
-                  :disabled="!activeLocation.view"
-                >
-                  <Icon icon="eraser">Clear camera view</Icon>
-                </button>
-              </div>
-              <label class="locations-panel__toggle">
-                <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
-                <span>Show label border</span>
-              </label>
-              <button type="button" class="pill-button pill-button--danger" @click="confirmRemoveLocation(activeLocation)">
-                <Icon icon="trash">Remove location</Icon>
-              </button>
-            </article>
-          </div>
-          <p v-else-if="locationsList.length" class="panel-card__placeholder">Select a location to edit.</p>
-        </section>
+        <LocationsPanel
+          v-else
+          :active-location="activeLocation"
+          :locations-list="locationsList"
+          :workspace-form="{ width: workspaceForm.width, height: workspaceForm.height }"
+          :location-step-x="locationStepX"
+          :location-step-y="locationStepY"
+          :locations-drag-active="locationsDragActive"
+          :get-icon-preview="getIconPreview"
+          :has-legend="Boolean(projectSnapshot.legend)"
+          :disable-camera-actions="!handle"
+          @add-location="addLocation"
+          @open-picker="openLocationPicker"
+          @open-icon-picker="openIconPicker"
+          @clear-icon="clearLocationIcon"
+          @start-placement="startPlacement"
+          @clamp-pixel="clampLocationPixel"
+          @commit="commitLocations"
+          @remove="confirmRemoveLocation"
+          @drag-enter="onLocationsDragEnter"
+          @drag-leave="onLocationsDragLeave"
+          @drop="onLocationsDrop"
+          @capture-camera="captureCameraViewForActiveLocation"
+          @clear-camera="clearActiveLocationView"
+          @update-camera="updateActiveLocationViewField"
+        />
       </PanelDock>
       <input
         type="file"
@@ -796,7 +160,7 @@ import {
   resetStemState as resetStemStateHelper,
   stemShapeOptions
 } from './utils/theme'
-import { buildIconPath, normalizeAssetFileName } from './utils/assets'
+import { buildIconPath } from './utils/assets'
 import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
@@ -805,6 +169,11 @@ import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LocationPickerDialog from './components/LocationPickerDialog.vue'
+import WorkspacePanel from './components/panels/WorkspacePanel.vue'
+import LayersPanel from './components/panels/LayersPanel.vue'
+import ThemePanel from './components/panels/ThemePanel.vue'
+import SettingsPanel from './components/panels/SettingsPanel.vue'
+import LocationsPanel from './components/panels/LocationsPanel.vue'
 import type { UIAction } from './types/uiActions'
 
 type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
