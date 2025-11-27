@@ -22,7 +22,7 @@
           :workspace-form="workspaceForm"
           :has-active-archive="hasActiveArchive"
           @load-sample="loadSample"
-          @load-map="() => viewerShell?.triggerFileSelect()"
+          @load-map="triggerFileSelect"
           @reset="resetWorkspaceForm"
           @update-label="updateProjectLabel"
           @update-author="updateProjectAuthor"
@@ -164,6 +164,9 @@ import { buildIconPath } from './utils/assets'
 import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
+import { useWorkspace } from './composables/useWorkspace'
+import { useLocations } from './composables/useLocations'
+import { useViewer } from './composables/useViewer'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
@@ -174,31 +177,22 @@ import LayersPanel from './components/panels/LayersPanel.vue'
 import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
+import { useUiActions } from './composables/useUiActions'
 import type { UIAction } from './types/uiActions'
 
 type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
 
 const editorRoot = ref<HTMLElement | null>(null)
-const status = ref('Load a Wyn archive to begin.')
-const statusFaded = ref(false)
-let statusFadeHandle: number | null = null
-let statusFadeToken = 0
 const interactive = ref(false)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
 const activeDockPanel = ref<DockPanel>('workspace')
+const status = ref('Load a Wyn archive to begin.')
+const statusFaded = ref(false)
+let statusFadeHandle: number | null = null
+let statusFadeToken = 0
+const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
 
-const workspaceForm = reactive({
-  label: '',
-  author: '',
-  width: 1024,
-  height: 1536,
-  seaLevel: 0
-})
-
-const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
-
-const themeForm = createThemeFormState()
 
 function handleSpriteStateInput(state: SpriteStateKey) {
   handleSpriteStateInputHelper(themeForm, state, scheduleThemeUpdate)
@@ -221,11 +215,62 @@ const projectSnapshot = ref(projectStore.getSnapshot())
 const layerBrowserStore = createLayerBrowserStore()
 const layerBrowserState = ref<LayerBrowserState>(layerBrowserStore.getState())
 const layerState = ref<LayerToggleState | null>(layerBrowserStore.getLayerToggles())
+
+const {
+  workspaceForm,
+  resetWorkspaceForm,
+  updateProjectLabel,
+  updateProjectAuthor,
+  applyMapSize,
+  applySeaLevel,
+  createScratchLegend
+} = useWorkspace({
+  projectSnapshot,
+  projectStore,
+  layerBrowserStore,
+  persistCurrentProject,
+  setWorkspaceDimensions: (width, height, legend) => {
+    workspaceForm.width = width
+    workspaceForm.height = height
+    workspaceForm.seaLevel = legend.sea_level ?? 0
+    if (datasetRef.value) {
+      datasetRef.value.legend = legend
+      requestViewerRemount()
+    }
+  }
+})
+
+const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
+
+const themeForm = createThemeFormState()
 const datasetRef = ref<TerrainDataset | null>(null)
-const locationsList = ref<TerrainLocation[]>([])
 const handle = ref<TerrainHandle | null>(null)
-const persistedProject = ref<PersistedProject | null>(null)
+const {
+  locationsList,
+  selectedLocationId,
+  locationPickerOpen,
+  pendingLocationId,
+  pendingLocationDraft,
+  locationsDragActive,
+  activeLocation,
+  locationStepX,
+  locationStepY,
+  setActiveLocation: setActiveLocationBase,
+  ensureActiveLocationSelection: ensureActiveLocationSelection,
+  commitLocations: commitLocationsBase,
+  clampLocationPixel: clampLocationPixelBase,
+  setLocations
+} = useLocations({
+  workspaceForm,
+  projectStore,
+  handle,
+  getViewerLocations,
+  persistCurrentProject
+})
+const commitLocations = commitLocationsBase
+const clampLocationPixel = clampLocationPixelBase
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
+const persistedProject = ref<PersistedProject | null>(null)
 const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(projectSnapshot.value.legend))
 
 const {
@@ -255,7 +300,6 @@ const {
 })
 
 const layerEntries = computed(() => layerBrowserState.value.entries)
-const locationsDragActive = ref(false)
 const iconPickerTarget = ref<string | null>(null)
 const assetDialogFilter = ref('')
 function setAssetDialogFilter(value: string) {
@@ -263,19 +307,23 @@ function setAssetDialogFilter(value: string) {
 }
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
 const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
-const selectedLocationId = ref<string | null>(null)
 const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
-const pendingLocationId = ref<string | null>(null)
-const pendingLocationDraft = ref<TerrainLocation | null>(null)
-const locationPickerOpen = ref(false)
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
-const activeLocation = computed(() =>
-  locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
 let viewerRemountHandle: number | null = null
 let themeUpdateHandle: number | null = null
-const locationStepX = computed(() => getPlacementStep(workspaceForm.width))
-const locationStepY = computed(() => getPlacementStep(workspaceForm.height))
+const { uiActions } = useUiActions({
+  hasActiveArchive,
+  setActivePanel,
+  setDockExpanded: () => {
+    isDockCollapsed.value = false
+  },
+  loadSample,
+  triggerFileSelect: () => viewerShell.value?.triggerFileSelect(),
+  startNewMap,
+  exportArchive,
+  promptCloseArchive
+})
 
 function requestConfirm(message: string, onConfirm: () => void) {
   confirmState.value = { message, onConfirm }
@@ -290,103 +338,6 @@ function handleConfirmDialog() {
 function dismissConfirmDialog() {
   confirmState.value = null
 }
-
-const uiActions = computed<UIAction[]>(() => {
-  const actions: UIAction[] = []
-  if (!hasActiveArchive.value) {
-    actions.push(
-      {
-        id: 'load-sample',
-        icon: 'mountain-sun',
-        label: 'Load sample map',
-        description: 'Preview the bundled Wynnal terrain archive.',
-        callback: () => void loadSample()
-      },
-      {
-        id: 'load-file',
-        icon: 'folder-open',
-        label: 'Load map',
-        description: 'Select a local .wyn archive from disk.',
-        callback: () => viewerShell.value?.triggerFileSelect()
-      },
-      {
-        id: 'new-project',
-        icon: 'file-circle-plus',
-        label: 'New project',
-        description: 'Start from an empty workspace.',
-        callback: () => startNewMap()
-      }
-    )
-  } else {
-    actions.push(
-      {
-        id: 'workspace',
-        icon: 'compass-drafting',
-        label: 'Workspace',
-        description: 'Jump to the workspace controls.',
-        callback: () => {
-          setActivePanel('workspace')
-          isDockCollapsed.value = false
-        }
-      },
-      {
-        id: 'layers',
-        icon: 'layer-group',
-        label: 'Layers',
-        description: 'Jump to the layer controls.',
-        callback: () => {
-          setActivePanel('layers')
-          isDockCollapsed.value = false
-        }
-      },
-      {
-        id: 'locations',
-        icon: 'location-dot',
-        label: 'Locations',
-        description: 'Edit location names + icons.',
-        callback: () => {
-          setActivePanel('locations')
-          isDockCollapsed.value = false
-        }
-      },
-      {
-        id: 'theme',
-        icon: 'palette',
-        label: 'Theme',
-        description: 'Edit label + marker styling.',
-        callback: () => {
-          setActivePanel('theme')
-          isDockCollapsed.value = false
-        }
-      },
-      {
-        id: 'settings',
-        icon: 'gear',
-        label: 'Settings',
-        description: 'Adjust editor preferences + viewer behavior.',
-        callback: () => {
-          setActivePanel('settings')
-          isDockCollapsed.value = false
-        }
-      },
-      {
-        id: 'export',
-        icon: 'file-export',
-        label: 'Export WYN',
-        description: 'Download the current project as a Wyn archive.',
-        callback: () => void exportArchive()
-      },
-      {
-        id: 'close',
-        icon: 'circle-xmark',
-        label: 'Close map',
-        description: 'Unload the active archive without auto-restoring on refresh.',
-        callback: () => promptCloseArchive()
-      }
-    )
-  }
-  return actions
-})
 
 projectStore.subscribe((snapshot) => {
   projectSnapshot.value = snapshot
@@ -498,14 +449,6 @@ function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
   viewerShell.value?.setOverlayLoading(state)
 }
 
-function resetWorkspaceForm() {
-  workspaceForm.label = projectSnapshot.value.metadata.label ?? ''
-  workspaceForm.author = projectSnapshot.value.metadata.author ?? ''
-  workspaceForm.width = projectSnapshot.value.legend?.size?.[0] ?? 1024
-  workspaceForm.height = projectSnapshot.value.legend?.size?.[1] ?? 1536
-  workspaceForm.seaLevel = projectSnapshot.value.legend?.sea_level ?? 0
-}
-
 function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
   const resolved = resolveTerrainTheme(snapshot.theme)
   const sprite = resolved.locationMarkers.sprite
@@ -570,16 +513,6 @@ function syncThemeFormFromSnapshot(snapshot = projectSnapshot.value) {
       opacity: stemFocusSource?.opacity ?? stemDefault.opacity
     }
   )
-}
-
-function updateProjectLabel(value: string) {
-  projectStore.updateMetadata({ label: value })
-  void persistCurrentProject()
-}
-
-function updateProjectAuthor(value: string) {
-  projectStore.updateMetadata({ author: value })
-  void persistCurrentProject()
 }
 
 function resetThemeForm() {
@@ -687,36 +620,6 @@ function commitThemeOverrides() {
   }
   projectStore.setTheme(overrides)
   handle.value?.setTheme(overrides)
-  void persistCurrentProject()
-}
-
-function applyMapSize() {
-  const legend = projectSnapshot.value.legend
-  if (!legend) return
-  const width = Math.max(1, Math.floor(workspaceForm.width))
-  const height = Math.max(1, Math.floor(workspaceForm.height))
-  const nextLegend = { ...legend, size: [width, height] as [number, number] }
-  projectStore.setLegend(nextLegend)
-  layerBrowserStore.setLegend(nextLegend)
-  if (datasetRef.value) {
-    datasetRef.value.legend = nextLegend
-    requestViewerRemount()
-  }
-  void persistCurrentProject()
-}
-
-function applySeaLevel() {
-  const legend = projectSnapshot.value.legend
-  if (!legend) return
-  const seaLevel = clampNumber(Number(workspaceForm.seaLevel), -1, 1)
-  workspaceForm.seaLevel = seaLevel
-  const nextLegend = { ...legend, sea_level: seaLevel }
-  projectStore.setLegend(nextLegend)
-  layerBrowserStore.setLegend(nextLegend)
-  if (datasetRef.value) {
-    datasetRef.value.legend = nextLegend
-    handle.value?.setSeaLevel(seaLevel)
-  }
   void persistCurrentProject()
 }
 
@@ -907,20 +810,6 @@ function promptCloseArchive() {
   requestConfirm('Unload the current map? Unsaved changes may be lost.', () => closeActiveArchive())
 }
 
-function createScratchLegend(): TerrainLegend {
-  const width = Math.max(1, Math.floor(workspaceForm.width) || 512)
-  const height = Math.max(1, Math.floor(workspaceForm.height) || 512)
-  const seaLevel = clampNumber(Number.isFinite(workspaceForm.seaLevel) ? Number(workspaceForm.seaLevel) : 0, -1, 1)
-  return {
-    size: [width, height] as [number, number],
-    heightmap: 'heightmap.png',
-    topology: 'heightmap.png',
-    sea_level: seaLevel,
-    biomes: {},
-    overlays: {}
-  }
-}
-
 function startNewMap() {
   closeActiveArchive()
   const scratchLegend = createScratchLegend()
@@ -1052,21 +941,10 @@ function setActivePanel(panel: DockPanel) {
 }
 
 function setActiveLocation(id: string | null, options: { fromViewer?: boolean } = {}) {
-  selectedLocationId.value = id
+  setActiveLocationBase(id)
   if (id && options.fromViewer && localSettings.openLocationsOnSelect) {
     setActivePanel('locations')
     isDockCollapsed.value = false
-  }
-}
-
-function ensureActiveLocationSelection() {
-  if (!locationsList.value.length) {
-    selectedLocationId.value = null
-    return
-  }
-  const ensured = locationsList.value.map((location) => ensureLocationId(location))
-  if (!selectedLocationId.value || !ensured.some((location) => location.id === selectedLocationId.value)) {
-    selectedLocationId.value = ensured[0].id ?? null
   }
 }
 
@@ -1241,27 +1119,6 @@ async function handleLibraryUpload(event: Event) {
 
 async function importLocationIcon(location: TerrainLocation, file: File) {
   await importIconAssetHelper(file, ensureLocationId(location).id!)
-}
-
-function commitLocations() {
-  const cloned = locationsList.value.map((location) => {
-    const copy = ensureLocationId({ ...location })
-    if (copy.showBorder === undefined) copy.showBorder = true
-    return copy
-  })
-  locationsList.value = cloned
-  projectStore.setLocations(cloned)
-  handle.value?.updateLocations(getViewerLocations(cloned), selectedLocationId.value ?? undefined)
-  ensureActiveLocationSelection()
-  void persistCurrentProject()
-}
-
-function clampLocationPixel(location: TerrainLocation) {
-  const width = workspaceForm.width
-  const height = workspaceForm.height
-  location.pixel.x = snapLocationValue(clampNumber(location.pixel.x ?? 0, 0, width), width)
-  location.pixel.y = snapLocationValue(clampNumber(location.pixel.y ?? 0, 0, height), height)
-  commitLocations()
 }
 
 function clearLocationIcon(location: TerrainLocation) {
