@@ -171,11 +171,11 @@
 <script setup lang="ts">
 import type { TerrainLocation } from '@connected-web/terrain-editor'
 import Icon from '../Icon.vue'
+import { useWorkspaceModel } from '../../models/workspace'
 
 defineProps<{
   activeLocation: TerrainLocation | null
   locationsList: TerrainLocation[]
-  workspaceForm: { width: number; height: number }
   locationStepX: number
   locationStepY: number
   locationsDragActive: boolean
@@ -200,4 +200,6 @@ defineEmits<{
   'clear-camera': []
   'update-camera': ['distance' | 'polar' | 'azimuth', string]
 }>()
+
+const { workspaceForm } = useWorkspaceModel()
 </script>

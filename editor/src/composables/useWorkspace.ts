@@ -1,24 +1,6 @@
-import { reactive } from 'vue'
 import type { TerrainLegend } from '@connected-web/terrain-editor'
 import { clampNumber } from '../utils/locations'
-
-export type WorkspaceForm = {
-  label: string
-  author: string
-  width: number
-  height: number
-  seaLevel: number
-}
-
-export function createWorkspaceForm(): WorkspaceForm {
-  return reactive({
-    label: '',
-    author: '',
-    width: 1024,
-    height: 1536,
-    seaLevel: 0
-  })
-}
+import { useWorkspaceModel, registerWorkspaceActions, type WorkspaceForm } from '../models/workspace'
 
 export function useWorkspace(options: {
   projectSnapshot: { value: { metadata: { label?: string; author?: string }; legend?: TerrainLegend } }
@@ -27,7 +9,7 @@ export function useWorkspace(options: {
   persistCurrentProject: () => Promise<void>
   setWorkspaceDimensions: (width: number, height: number, legend: TerrainLegend) => void
 }) {
-  const workspaceForm = createWorkspaceForm()
+  const { workspaceForm } = useWorkspaceModel()
 
   function resetWorkspaceForm() {
     workspaceForm.label = options.projectSnapshot.value.metadata.label ?? ''
@@ -88,6 +70,14 @@ export function useWorkspace(options: {
       overlays: {}
     }
   }
+
+  registerWorkspaceActions({
+    resetWorkspaceForm,
+    updateProjectLabel,
+    updateProjectAuthor,
+    applyMapSize,
+    applySeaLevel
+  })
 
   return {
     workspaceForm,

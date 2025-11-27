@@ -19,15 +19,9 @@
       >
         <WorkspacePanel
           v-if="activeDockPanel === 'workspace'"
-          :workspace-form="workspaceForm"
           :has-active-archive="hasActiveArchive"
           @load-sample="loadSample"
           @load-map="triggerFileSelect"
-          @reset="resetWorkspaceForm"
-          @update-label="updateProjectLabel"
-          @update-author="updateProjectAuthor"
-          @apply-map-size="applyMapSize"
-          @apply-sea-level="applySeaLevel"
           @export-archive="exportArchive"
         />
 
@@ -58,7 +52,6 @@
           v-else
           :active-location="activeLocation"
           :locations-list="locationsList"
-          :workspace-form="{ width: workspaceForm.width, height: workspaceForm.height }"
           :location-step-x="locationStepX"
           :location-step-y="locationStepY"
           :locations-drag-active="locationsDragActive"
@@ -205,15 +198,7 @@ const {
   getMountContext: getViewerMountContext
 })
 
-const {
-  workspaceForm,
-  resetWorkspaceForm,
-  updateProjectLabel,
-  updateProjectAuthor,
-  applyMapSize,
-  applySeaLevel,
-  createScratchLegend
-} = useWorkspace({
+const { workspaceForm, createScratchLegend } = useWorkspace({
   projectSnapshot,
   projectStore,
   layerBrowserStore,
@@ -609,11 +594,6 @@ function rgb(color: [number, number, number]) {
   return `rgb(${color[0]}, ${color[1]}, ${color[2]})`
 }
 
-function toggleInteraction() {
-  interactive.value = !interactive.value
-  handle.value?.setInteractiveMode(interactive.value)
-}
-
 async function toggleEditorFullscreen() {
   const root = editorRoot.value
   if (!root) return
@@ -888,14 +868,6 @@ function handleWindowDragEvent(event: DragEvent) {
     return
   }
   swallowDragEvent(event)
-}
-
-async function importIconAsset(file: File, targetLocationId?: string, overridePath?: string) {
-  await importIconAsset(file, targetLocationId, overridePath)
-}
-
-async function replaceAssetWithFile(path: string, file: File) {
-  await replaceAssetWithFile(path, file)
 }
 
 function removeAsset(path: string) {

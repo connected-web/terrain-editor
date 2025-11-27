@@ -4,7 +4,11 @@
       <div class="panel-card__header-main">
         <Icon icon="compass-drafting">Workspace</Icon>
       </div>
-      <button class="pill-button pill-button--ghost" @click="$emit('reset')" :disabled="!hasActiveArchive">
+      <button
+        class="pill-button pill-button--ghost"
+        @click="workspaceActions.resetWorkspaceForm()"
+        :disabled="!hasActiveArchive"
+      >
         Reset
       </button>
     </header>
@@ -29,20 +33,38 @@
     <div class="workspace-form">
       <label class="workspace-form__field">
         <span>Project title</span>
-        <input type="text" v-model="workspaceForm.label" @change="$emit('update-label', workspaceForm.label)" />
+        <input
+          type="text"
+          v-model="workspaceForm.label"
+          @change="workspaceActions.updateProjectLabel(workspaceForm.label)"
+        />
       </label>
       <label class="workspace-form__field">
         <span>Author</span>
-        <input type="text" v-model="workspaceForm.author" @change="$emit('update-author', workspaceForm.author)" />
+        <input
+          type="text"
+          v-model="workspaceForm.author"
+          @change="workspaceActions.updateProjectAuthor(workspaceForm.author)"
+        />
       </label>
       <div class="workspace-form__split">
         <label class="workspace-form__field">
           <span>Map width (px)</span>
-          <input type="number" min="1" v-model.number="workspaceForm.width" @change="$emit('apply-map-size')" />
+          <input
+            type="number"
+            min="1"
+            v-model.number="workspaceForm.width"
+            @change="workspaceActions.applyMapSize()"
+          />
         </label>
         <label class="workspace-form__field">
           <span>Map height (px)</span>
-          <input type="number" min="1" v-model.number="workspaceForm.height" @change="$emit('apply-map-size')" />
+          <input
+            type="number"
+            min="1"
+            v-model.number="workspaceForm.height"
+            @change="workspaceActions.applyMapSize()"
+          />
         </label>
       </div>
       <label class="workspace-form__field">
@@ -54,13 +76,13 @@
             max="1"
             step="0.01"
             v-model.number="workspaceForm.seaLevel"
-            @input="$emit('apply-sea-level')"
+            @input="workspaceActions.applySeaLevel()"
           />
           <input
             type="number"
             step="0.01"
             v-model.number="workspaceForm.seaLevel"
-            @change="$emit('apply-sea-level')"
+            @change="workspaceActions.applySeaLevel()"
           />
         </div>
       </label>
@@ -78,26 +100,17 @@
 
 <script setup lang="ts">
 import Icon from '../Icon.vue'
+import { useWorkspaceModel } from '../../models/workspace'
 
 defineProps<{
-  workspaceForm: {
-    label: string
-    author: string
-    width: number
-    height: number
-    seaLevel: number
-  }
   hasActiveArchive: boolean
 }>()
+
+const { workspaceForm, actions: workspaceActions } = useWorkspaceModel()
 
 defineEmits<{
   'load-sample': []
   'load-map': []
-  reset: []
-  'update-label': [value: string]
-  'update-author': [value: string]
-  'apply-map-size': []
-  'apply-sea-level': []
   'export-archive': []
 }>()
 </script>
