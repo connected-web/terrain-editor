@@ -162,6 +162,7 @@ import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
 import { useUiActions } from './composables/useUiActions'
+import { useLayerSync } from './composables/useLayerSync'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import type { UIAction } from './types/uiActions'
@@ -192,7 +193,7 @@ const {
   getMountContext: getViewerMountContext
 })
 
-const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
+const { localSettings, loadLocalSettings } = useLocalSettings()
 
 const {
   workspaceForm,
@@ -215,9 +216,10 @@ const {
   updateStatus
 })
 
+useLayerSync({ layerState, handle })
+
 const {
   themeForm,
-  syncThemeFormFromSnapshot,
   commitThemeOverrides,
   scheduleThemeUpdate,
   cancelThemeUpdate,
@@ -361,34 +363,6 @@ function handleConfirmDialog() {
 function dismissConfirmDialog() {
   confirmState.value = null
 }
-
-watch(
-  () => layerState.value,
-  async (next) => {
-    if (next && handle.value) {
-      await handle.value.updateLayers(next)
-    }
-  }
-)
-
-watch(
-  () => projectSnapshot.value,
-  (snapshot) => {
-    return syncThemeFormFromSnapshot({
-      ...snapshot,
-      theme: snapshot.theme as DeepPartial<TerrainTheme> | undefined
-    })
-  },
-  { immediate: true }
-)
-
-watch(
-  () => ({
-    cameraTracking: localSettings.cameraTracking,
-    openLocationsOnSelect: localSettings.openLocationsOnSelect
-  }),
-  () => persistSettings()
-)
 
 function handleResize() {
   isCompactViewport.value = window.innerWidth < 800

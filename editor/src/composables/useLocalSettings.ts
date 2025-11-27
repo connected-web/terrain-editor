@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import { persistLocalSettings, readLocalSettings } from '../utils/storage'
 
 export type LocalSettings = {
@@ -26,6 +26,11 @@ export function useLocalSettings() {
   function persistSettings() {
     persistLocalSettings(localSettings)
   }
+
+  watch(
+    () => [localSettings.cameraTracking, localSettings.openLocationsOnSelect],
+    () => persistSettings()
+  )
 
   return {
     localSettings,

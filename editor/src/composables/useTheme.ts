@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { resolveTerrainTheme, type TerrainHandle, type TerrainThemeOverrides } from '@connected-web/terrain-editor'
 import {
   assignStemState,
@@ -83,6 +83,12 @@ export function useTheme(options: {
       }
     )
   }
+
+  watch(
+    () => options.projectSnapshot.value,
+    (snapshot) => syncThemeFormFromSnapshot(snapshot),
+    { immediate: true }
+  )
 
   function commitThemeOverrides() {
     const overrides: TerrainThemeOverrides = {
