@@ -1,22 +1,47 @@
-import type { TerrainLegend } from '@connected-web/terrain-editor'
+import type {
+  LayerBrowserState,
+  LayerToggleState,
+  TerrainDataset,
+  TerrainHandle,
+  TerrainLegend,
+  TerrainLocation
+} from '@connected-web/terrain-editor'
 import {
   initWorkspaceModel,
   useWorkspaceModel,
   createScratchLegend as createScratchLegendInternal
 } from '../models/workspace'
+import type { WorkspaceSnapshot } from '../models/workspace'
 
 export function useWorkspace(options: {
-  projectSnapshot: { value: { metadata: { label?: string; author?: string }; legend?: TerrainLegend } }
-  projectStore: { updateMetadata: (meta: Partial<{ label?: string; author?: string }>) => void; setLegend: (legend: TerrainLegend) => void }
-  layerBrowserStore: { setLegend: (legend?: TerrainLegend) => void }
+  projectStore: {
+    getSnapshot: () => WorkspaceSnapshot
+    subscribe: (listener: (snapshot: WorkspaceSnapshot) => void) => () => void
+    updateMetadata: (meta: Partial<{ label?: string; author?: string }>) => void
+    setLegend: (legend: TerrainLegend) => void
+    setLocations: (locations?: TerrainLocation[]) => void
+  }
+  layerBrowserStore: {
+    setLegend: (legend?: TerrainLegend) => void
+    getState: () => LayerBrowserState
+    subscribe: (listener: (state: LayerBrowserState) => void) => () => void
+    getLayerToggles: () => LayerToggleState
+    toggleVisibility: (id: string) => void
+    setAll: (kind: 'biome' | 'overlay', visible: boolean) => void
+  }
+  datasetRef: { value: TerrainDataset | null }
+  handle: { value: TerrainHandle | null }
   persistCurrentProject: () => Promise<void>
-  setWorkspaceDimensions: (width: number, height: number, legend: TerrainLegend) => void
+  requestViewerRemount: () => void
 }) {
   initWorkspaceModel(options)
-  const { workspaceForm } = useWorkspaceModel()
+  const { workspaceForm, projectSnapshot, layerBrowserState, layerState } = useWorkspaceModel()
 
   return {
     workspaceForm,
+    projectSnapshot,
+    layerBrowserState,
+    layerState,
     createScratchLegend: createScratchLegendInternal
   }
 }

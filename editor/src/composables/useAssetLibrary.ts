@@ -1,4 +1,4 @@
-import { computed, reactive } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import type {
   TerrainDataset,
   TerrainHandle,
@@ -176,6 +176,20 @@ export function useAssetLibrary(options: {
     iconPreviewOwnership.forEach((url) => URL.revokeObjectURL(url))
     iconPreviewOwnership.clear()
   }
+
+  watch(
+    () => options.projectSnapshot.value,
+    () => refreshIconPreviewCache(),
+    { deep: true }
+  )
+
+  watch(
+    () => options.locationsList.value.map((location) => location.icon),
+    () => refreshIconPreviewCache(),
+    { deep: true }
+  )
+
+  refreshIconPreviewCache()
 
   return {
     assetOverrides,

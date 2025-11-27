@@ -1,14 +1,11 @@
-import { computed, ref } from 'vue'
-import type { TerrainHandle, TerrainLocation } from '@connected-web/terrain-editor'
+import { computed, ref, watch } from 'vue'
+import type { TerrainLocation } from '@connected-web/terrain-editor'
 import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from '../utils/locations'
+import { useWorkspaceContext, useWorkspaceModel } from '../models/workspace'
 
-export function useLocations(options: {
-  workspaceForm: { width: number; height: number }
-  projectStore: { setLocations: (locations?: TerrainLocation[]) => void }
-  handle: { value: TerrainHandle | null }
-  getViewerLocations: (list?: TerrainLocation[]) => TerrainLocation[]
-  persistCurrentProject: () => Promise<void>
-}) {
+export function useLocations() {
+  const { workspaceForm } = useWorkspaceModel()
+  const workspace = useWorkspaceContext()
   const locationsList = ref<TerrainLocation[]>([])
   const selectedLocationId = ref<string | null>(null)
   const locationPickerOpen = ref(false)
@@ -18,8 +15,8 @@ export function useLocations(options: {
 
   const activeLocation = computed(() =>
     locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
-  const locationStepX = computed(() => getPlacementStep(options.workspaceForm.width))
-  const locationStepY = computed(() => getPlacementStep(options.workspaceForm.height))
+  const locationStepX = computed(() => getPlacementStep(workspaceForm.width))
+  const locationStepY = computed(() => getPlacementStep(workspaceForm.height))
 
   function setActiveLocation(id: string | null) {
     selectedLocationId.value = id
@@ -43,15 +40,18 @@ export function useLocations(options: {
       return copy
     })
     locationsList.value = cloned
-    options.projectStore.setLocations(cloned)
-    options.handle.value?.updateLocations(options.getViewerLocations(cloned), selectedLocationId.value ?? undefined)
+    workspace.projectStore.setLocations(cloned)
+    workspace.handle.value?.updateLocations(
+      workspace.getViewerLocations(cloned),
+      selectedLocationId.value ?? undefined
+    )
     ensureActiveLocationSelection()
-    void options.persistCurrentProject()
+    void workspace.persistCurrentProject()
   }
 
   function clampLocationPixel(location: TerrainLocation) {
-    const width = options.workspaceForm.width
-    const height = options.workspaceForm.height
+    const width = workspaceForm.width
+    const height = workspaceForm.height
     location.pixel.x = snapLocationValue(clampNumber(location.pixel.x ?? 0, 0, width), width)
     location.pixel.y = snapLocationValue(clampNumber(location.pixel.y ?? 0, 0, height), height)
     commitLocations()
@@ -61,6 +61,21 @@ export function useLocations(options: {
     locationsList.value = list
     ensureActiveLocationSelection()
   }
+
+  watch(
+    () => workspace.projectSnapshot.value,
+    (snapshot) => {
+      locationsList.value = snapshot.locations
+        ? snapshot.locations.map((location) => {
+            const copy = ensureLocationId({ ...location })
+            if (copy.showBorder === undefined) copy.showBorder = true
+            return copy
+          })
+        : []
+      ensureActiveLocationSelection()
+    },
+    { immediate: true }
+  )
 
   return {
     locationsList,

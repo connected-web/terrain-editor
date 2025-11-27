@@ -1,5 +1,12 @@
-import { reactive, watch, type Ref, type WatchStopHandle } from 'vue'
-import type { TerrainLegend } from '@connected-web/terrain-editor'
+import { reactive, ref, type Ref } from 'vue'
+import type {
+  LayerBrowserState,
+  LayerToggleState,
+  TerrainDataset,
+  TerrainHandle,
+  TerrainLegend,
+  TerrainLocation
+} from '@connected-web/terrain-editor'
 import { clampNumber } from '../utils/locations'
 
 export type WorkspaceForm = {
@@ -21,17 +28,38 @@ export type WorkspaceActions = {
 type ProjectSnapshot = {
   metadata: { label?: string; author?: string }
   legend?: TerrainLegend
+  locations?: TerrainLocation[]
+  theme?: unknown
+  files: unknown[]
+  dirty: boolean
 }
 
+export type WorkspaceSnapshot = ProjectSnapshot
+
 type WorkspaceDependencies = {
-  projectSnapshot: Ref<ProjectSnapshot>
   projectStore: {
+    getSnapshot: () => ProjectSnapshot
+    subscribe: (listener: (snapshot: ProjectSnapshot) => void) => () => void
     updateMetadata: (meta: Partial<{ label?: string; author?: string }>) => void
     setLegend: (legend: TerrainLegend) => void
+    setLocations: (locations?: TerrainLocation[]) => void
   }
-  layerBrowserStore: { setLegend: (legend?: TerrainLegend) => void }
+  layerBrowserStore: {
+    setLegend: (legend?: TerrainLegend) => void
+    getState: () => LayerBrowserState
+    subscribe: (listener: (state: LayerBrowserState) => void) => () => void
+    getLayerToggles: () => LayerToggleState
+    toggleVisibility: (id: string) => void
+    setAll: (kind: 'biome' | 'overlay', visible: boolean) => void
+  }
+  datasetRef: Ref<TerrainDataset | null>
+  handle: Ref<TerrainHandle | null>
   persistCurrentProject: () => Promise<void>
-  setWorkspaceDimensions: (width: number, height: number, legend: TerrainLegend) => void
+  requestViewerRemount: () => void
+}
+
+type WorkspaceContext = WorkspaceDependencies & {
+  viewerLocationResolver: ((list?: TerrainLocation[]) => TerrainLocation[]) | null
 }
 
 const workspaceForm = reactive<WorkspaceForm>({
@@ -42,8 +70,21 @@ const workspaceForm = reactive<WorkspaceForm>({
   seaLevel: 0
 })
 
+const defaultSnapshot: ProjectSnapshot = {
+  metadata: {},
+  files: [],
+  dirty: false
+}
+
+const projectSnapshotRef = ref<ProjectSnapshot>(defaultSnapshot)
+const layerBrowserStateRef = ref<LayerBrowserState>({ entries: [] })
+const layerStateRef = ref<LayerToggleState | null>(null)
+
 let dependencies: WorkspaceDependencies | null = null
-let stopSnapshotWatch: WatchStopHandle | null = null
+let workspaceContext: WorkspaceContext | null = null
+let viewerLocationResolver: ((list?: TerrainLocation[]) => TerrainLocation[]) | null = null
+let unsubscribeProject: (() => void) | null = null
+let unsubscribeLayerBrowser: (() => void) | null = null
 
 function ensureDependencies() {
   if (!dependencies) throw new Error('Workspace model not initialized.')
@@ -52,7 +93,7 @@ function ensureDependencies() {
 
 function syncWorkspaceFormFromSnapshot() {
   if (!dependencies) return
-  const snapshot = dependencies.projectSnapshot.value
+  const snapshot = projectSnapshotRef.value
   workspaceForm.label = snapshot.metadata.label ?? ''
   workspaceForm.author = snapshot.metadata.author ?? ''
   workspaceForm.width = snapshot.legend?.size?.[0] ?? 1024
@@ -85,7 +126,10 @@ function applyMapSize() {
   const nextLegend = { ...legend, size: [width, height] as [number, number] }
   deps.projectStore.setLegend(nextLegend)
   deps.layerBrowserStore.setLegend(nextLegend)
-  deps.setWorkspaceDimensions(width, height, nextLegend)
+  if (deps.datasetRef.value) {
+    deps.datasetRef.value.legend = nextLegend
+    deps.requestViewerRemount()
+  }
   persistProject()
 }
 
@@ -98,7 +142,10 @@ function applySeaLevel() {
   const nextLegend = { ...legend, sea_level: seaLevel }
   deps.projectStore.setLegend(nextLegend)
   deps.layerBrowserStore.setLegend(nextLegend)
-  deps.setWorkspaceDimensions(legend.size[0], legend.size[1], nextLegend)
+  if (deps.datasetRef.value) {
+    deps.datasetRef.value.legend = nextLegend
+    deps.requestViewerRemount()
+  }
   persistProject()
 }
 
@@ -134,12 +181,24 @@ const workspaceActions: WorkspaceActions = {
 
 export function initWorkspaceModel(options: WorkspaceDependencies) {
   dependencies = options
-  stopSnapshotWatch?.()
-  stopSnapshotWatch = watch(
-    () => options.projectSnapshot.value,
-    () => syncWorkspaceFormFromSnapshot(),
-    { immediate: true, deep: true }
-  )
+  workspaceContext = {
+    ...options,
+    viewerLocationResolver
+  }
+  unsubscribeProject?.()
+  unsubscribeLayerBrowser?.()
+  projectSnapshotRef.value = options.projectStore.getSnapshot()
+  layerBrowserStateRef.value = options.layerBrowserStore.getState()
+  layerStateRef.value = options.layerBrowserStore.getLayerToggles()
+  syncWorkspaceFormFromSnapshot()
+  unsubscribeProject = options.projectStore.subscribe((snapshot) => {
+    projectSnapshotRef.value = snapshot
+    syncWorkspaceFormFromSnapshot()
+  })
+  unsubscribeLayerBrowser = options.layerBrowserStore.subscribe((state) => {
+    layerBrowserStateRef.value = state
+    layerStateRef.value = options.layerBrowserStore.getLayerToggles()
+  })
 }
 
 export function createScratchLegend() {
@@ -149,6 +208,39 @@ export function createScratchLegend() {
 export function useWorkspaceModel() {
   return {
     workspaceForm,
-    actions: workspaceActions
+    actions: workspaceActions,
+    projectSnapshot: projectSnapshotRef,
+    layerBrowserState: layerBrowserStateRef,
+    layerState: layerStateRef
+  }
+}
+
+export function useWorkspaceContext() {
+  if (!workspaceContext) {
+    throw new Error('Workspace context not initialized.')
+  }
+  return {
+    projectSnapshot: projectSnapshotRef,
+    projectStore: workspaceContext.projectStore,
+    layerBrowserStore: workspaceContext.layerBrowserStore,
+    layerBrowserState: layerBrowserStateRef,
+    layerState: layerStateRef,
+    datasetRef: workspaceContext.datasetRef,
+    handle: workspaceContext.handle,
+    persistCurrentProject: workspaceContext.persistCurrentProject,
+    requestViewerRemount: workspaceContext.requestViewerRemount,
+    getViewerLocations: (list?: TerrainLocation[]) => {
+      if (!viewerLocationResolver) {
+        throw new Error('Viewer location resolver not registered.')
+      }
+      return viewerLocationResolver(list)
+    }
+  }
+}
+
+export function registerViewerLocationResolver(resolver: (list?: TerrainLocation[]) => TerrainLocation[]) {
+  viewerLocationResolver = resolver
+  if (workspaceContext) {
+    workspaceContext.viewerLocationResolver = resolver
   }
 }

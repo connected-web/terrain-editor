@@ -150,6 +150,7 @@ import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } fr
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
 import { useWorkspace } from './composables/useWorkspace'
+import { registerViewerLocationResolver } from './models/workspace'
 import { useLocations } from './composables/useLocations'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
@@ -177,10 +178,7 @@ const activeDockPanel = ref<DockPanel>('workspace')
 const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
 
 const projectStore = createProjectStore()
-const projectSnapshot = ref(projectStore.getSnapshot())
 const layerBrowserStore = createLayerBrowserStore()
-const layerBrowserState = ref<LayerBrowserState>(layerBrowserStore.getState())
-const layerState = ref<LayerToggleState | null>(layerBrowserStore.getLayerToggles())
 const datasetRef = ref<TerrainDataset | null>(null)
 const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 
@@ -198,20 +196,19 @@ const {
   getMountContext: getViewerMountContext
 })
 
-const { workspaceForm, createScratchLegend } = useWorkspace({
+const {
+  workspaceForm,
   projectSnapshot,
+  layerBrowserState,
+  layerState,
+  createScratchLegend
+} = useWorkspace({
   projectStore,
   layerBrowserStore,
+  datasetRef,
+  handle,
   persistCurrentProject,
-  setWorkspaceDimensions: (width, height, legend) => {
-    workspaceForm.width = width
-    workspaceForm.height = height
-    workspaceForm.seaLevel = legend.sea_level ?? 0
-    if (datasetRef.value) {
-      datasetRef.value.legend = legend
-      requestViewerRemount()
-    }
-  }
+  requestViewerRemount
 })
 
 const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
@@ -261,13 +258,7 @@ const {
   commitLocations: commitLocationsBase,
   clampLocationPixel: clampLocationPixelBase,
   setLocations
-} = useLocations({
-  workspaceForm,
-  projectStore,
-  handle,
-  getViewerLocations,
-  persistCurrentProject
-})
+} = useLocations()
 const commitLocations = commitLocationsBase
 const clampLocationPixel = clampLocationPixelBase
 const persistedProject = ref<PersistedProject | null>(null)
@@ -362,24 +353,6 @@ function dismissConfirmDialog() {
   confirmState.value = null
 }
 
-projectStore.subscribe((snapshot) => {
-  projectSnapshot.value = snapshot
-  locationsList.value = snapshot.locations
-    ? snapshot.locations.map((location) => {
-        const copy = ensureLocationId({ ...location })
-        if (copy.showBorder === undefined) copy.showBorder = true
-        return copy
-      })
-    : []
-  refreshIconPreviewCache()
-  ensureActiveLocationSelection()
-})
-
-layerBrowserStore.subscribe((state) => {
-  layerBrowserState.value = state
-  layerState.value = layerBrowserStore.getLayerToggles()
-})
-
 watch(
   () => layerState.value,
   async (next) => {
@@ -387,12 +360,6 @@ watch(
       await handle.value.updateLayers(next)
     }
   }
-)
-
-watch(
-  () => locationsList.value.map((location) => location.icon),
-  () => refreshIconPreviewCache(),
-  { deep: true }
 )
 
 watch(
@@ -880,6 +847,8 @@ function getViewerLocations(list = locationsList.value) {
     icon: resolveAssetReference(location.icon)
   }))
 }
+
+registerViewerLocationResolver(getViewerLocations)
 
 function handleViewerLocationPick(payload: { pixel: { x: number; y: number } }) {
   const snapped = {
