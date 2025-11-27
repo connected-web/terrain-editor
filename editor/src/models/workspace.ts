@@ -36,6 +36,13 @@ type ProjectSnapshot = {
 
 export type WorkspaceSnapshot = ProjectSnapshot
 
+export type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
+
+type LocalSettings = {
+  cameraTracking: boolean
+  openLocationsOnSelect: boolean
+}
+
 type WorkspaceDependencies = {
   projectStore: {
     getSnapshot: () => ProjectSnapshot
@@ -56,6 +63,10 @@ type WorkspaceDependencies = {
   handle: Ref<TerrainHandle | null>
   persistCurrentProject: () => Promise<void>
   requestViewerRemount: () => void
+  localSettings?: LocalSettings
+  setActivePanel?: (panel: DockPanel) => void
+  ensureDockExpanded?: () => void
+  updateStatus?: (message: string, fadeOutDelay?: number) => void
 }
 
 type WorkspaceContext = WorkspaceDependencies & {
@@ -229,6 +240,10 @@ export function useWorkspaceContext() {
     handle: workspaceContext.handle,
     persistCurrentProject: workspaceContext.persistCurrentProject,
     requestViewerRemount: workspaceContext.requestViewerRemount,
+    localSettings: workspaceContext.localSettings,
+    setActivePanel: workspaceContext.setActivePanel,
+    ensureDockExpanded: workspaceContext.ensureDockExpanded,
+    updateStatus: workspaceContext.updateStatus,
     getViewerLocations: (list?: TerrainLocation[]) => {
       if (!viewerLocationResolver) {
         throw new Error('Viewer location resolver not registered.')

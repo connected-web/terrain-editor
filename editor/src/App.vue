@@ -123,7 +123,6 @@ import {
   type TerrainLocation,
   type TerrainProjectFileEntry,
   type TerrainThemeOverrides,
-  type LocationViewState,
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import {
@@ -146,11 +145,11 @@ import {
 } from './utils/theme'
 import { useTheme } from './composables/useTheme'
 import { buildIconPath } from './utils/assets'
-import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from './utils/locations'
+import { ensureLocationId } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
 import { useWorkspace } from './composables/useWorkspace'
-import { registerViewerLocationResolver } from './models/workspace'
+import { registerViewerLocationResolver, type DockPanel } from './models/workspace'
 import { useLocations } from './composables/useLocations'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
@@ -167,11 +166,8 @@ import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import type { UIAction } from './types/uiActions'
 
-type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
-
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
-const interactive = ref(false)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
 const activeDockPanel = ref<DockPanel>('workspace')
@@ -196,6 +192,8 @@ const {
   getMountContext: getViewerMountContext
 })
 
+const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
+
 const {
   workspaceForm,
   projectSnapshot,
@@ -208,10 +206,14 @@ const {
   datasetRef,
   handle,
   persistCurrentProject,
-  requestViewerRemount
+  requestViewerRemount,
+  localSettings,
+  setActivePanel,
+  ensureDockExpanded: () => {
+    isDockCollapsed.value = false
+  },
+  updateStatus
 })
-
-const { localSettings, loadLocalSettings, persistSettings } = useLocalSettings()
 
 const {
   themeForm,
@@ -247,8 +249,6 @@ const {
   locationsList,
   selectedLocationId,
   locationPickerOpen,
-  pendingLocationId,
-  pendingLocationDraft,
   locationsDragActive,
   activeLocation,
   locationStepX,
@@ -257,7 +257,16 @@ const {
   ensureActiveLocationSelection: ensureActiveLocationSelection,
   commitLocations: commitLocationsBase,
   clampLocationPixel: clampLocationPixelBase,
-  setLocations
+  setLocations,
+  addLocation,
+  startPlacement,
+  removeLocation,
+  handleLocationPick,
+  resetPlacementState,
+  interactive,
+  updateActiveLocationViewField,
+  captureCameraViewForActiveLocation,
+  clearActiveLocationView
 } = useLocations()
 const commitLocations = commitLocationsBase
 const clampLocationPixel = clampLocationPixelBase
@@ -309,7 +318,7 @@ const {
   mountViewer,
   disposeViewer,
   cleanupDataset,
-  onBeforeLoad: resetLocationPlacementState,
+  onBeforeLoad: resetPlacementState,
   getSampleArchiveUrl: archiveUrl
 })
 
@@ -323,7 +332,6 @@ function setAssetDialogFilter(value: string) {
   assetDialogFilter.value = value
 }
 const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
-const NEW_LOCATION_PLACEHOLDER = '__pending-location__'
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
 const { uiActions } = useUiActions({
@@ -371,40 +379,11 @@ watch(
 )
 
 watch(
-  () => selectedLocationId.value,
-  (id) => {
-    if (id) {
-      focusLocationInViewer(id)
-    } else if (handle.value) {
-      handle.value.updateLocations(getViewerLocations())
-    }
-  }
-)
-
-watch(
-  () => locationsList.value.length,
-  (count) => {
-    if (count === 0) {
-      locationPickerOpen.value = false
-    }
-  }
-)
-
-watch(
   () => ({
     cameraTracking: localSettings.cameraTracking,
     openLocationsOnSelect: localSettings.openLocationsOnSelect
   }),
   () => persistSettings()
-)
-
-watch(
-  () => localSettings.cameraTracking,
-  (enabled) => {
-    if (enabled && selectedLocationId.value) {
-      focusLocationInViewer(selectedLocationId.value)
-    }
-  }
 )
 
 function handleResize() {
@@ -443,17 +422,13 @@ function closeActiveArchive() {
   layerState.value = layerBrowserStore.getLayerToggles()
   locationsList.value = []
   selectedLocationId.value = null
-  pendingLocationId.value = null
   confirmState.value = null
   iconPickerTarget.value = null
   locationsDragActive.value = false
   handle.value = null
   baseThemeRef.value = undefined
   activeDockPanel.value = 'workspace'
-  interactive.value = false
   locationPickerOpen.value = false
-  pendingLocationDraft.value = null
-  pendingLocationId.value = null
   clearAssetOverrides()
   missingIconWarnings.clear()
   cancelThemeUpdate()
@@ -461,6 +436,7 @@ function closeActiveArchive() {
   updateStatus('Viewer cleared. Load a map to continue.')
   persistedProject.value = null
   setAutoRestoreEnabled(false)
+  resetPlacementState()
 }
 
 function promptCloseArchive() {
@@ -484,38 +460,9 @@ function startNewMap() {
   setAutoRestoreEnabled(false)
 }
 
-function addLocation() {
-  const legend = projectSnapshot.value.legend
-  if (!legend) return
-  const draft: TerrainLocation = ensureLocationId({
-    id: '',
-    name: `New location ${locationsList.value.length + 1}`,
-    pixel: { x: 0, y: 0 },
-    showBorder: true
-  })
-  pendingLocationDraft.value = draft
-  pendingLocationId.value = NEW_LOCATION_PLACEHOLDER
-  selectedLocationId.value = null
-  interactive.value = true
-  handle.value?.setInteractiveMode(true)
-  setActivePanel('locations')
-  isDockCollapsed.value = false
-  locationPickerOpen.value = false
-  updateStatus('Click anywhere on the map to place the new location.')
-}
-
 function confirmRemoveLocation(location: TerrainLocation) {
   requestConfirm(`Remove location "${location.name ?? 'this location'}"?`, () => {
-    locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
-    commitLocations()
-    if (selectedLocationId.value === location.id) {
-      setActiveLocation(locationsList.value[0]?.id ?? null)
-    }
-    if (pendingLocationId.value === location.id) {
-      pendingLocationId.value = null
-      interactive.value = false
-      handle.value?.setInteractiveMode(false)
-    }
+    removeLocation(location)
   })
 }
 
@@ -593,88 +540,6 @@ function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
 
-function setActiveLocation(id: string | null, options: { fromViewer?: boolean } = {}) {
-  setActiveLocationBase(id)
-  if (id && options.fromViewer && localSettings.openLocationsOnSelect) {
-    setActivePanel('locations')
-    isDockCollapsed.value = false
-  }
-}
-
-function startPlacement(location: TerrainLocation) {
-  if (!handle.value) return
-  pendingLocationDraft.value = null
-  const id = ensureLocationId(location).id!
-  selectedLocationId.value = id
-  pendingLocationId.value = id
-  interactive.value = true
-  handle.value.setInteractiveMode(true)
-  updateStatus(`Click anywhere on the map to place ${location.name ?? 'this location'}.`)
-}
-
-function resetLocationPlacementState() {
-  pendingLocationDraft.value = null
-  pendingLocationId.value = null
-  interactive.value = false
-  handle.value?.setInteractiveMode(false)
-}
-
-function focusLocationInViewer(id: string) {
-  if (!handle.value) return
-  const target = locationsList.value.find((location) => ensureLocationId(location).id === id)
-  if (!target) return
-  handle.value.updateLocations(getViewerLocations(), id)
-  const pixel =
-    target.pixel ?? {
-      x: Math.round(workspaceForm.width / 2),
-      y: Math.round(workspaceForm.height / 2)
-    }
-  const view = localSettings.cameraTracking ? target.view : undefined
-  handle.value.navigateTo({ pixel, locationId: id, view })
-}
-
-function getFallbackViewState(): LocationViewState {
-  return handle.value?.getViewState() ?? { distance: 1, polar: Math.PI / 3, azimuth: 0 }
-}
-
-function ensureLocationView(location: TerrainLocation): LocationViewState {
-  if (!location.view) {
-    location.view = { ...getFallbackViewState() }
-  }
-  return location.view
-}
-
-function updateActiveLocationViewField(key: keyof LocationViewState, rawValue: string | number) {
-  const location = activeLocation.value
-  if (!location) return
-  if (rawValue === '' || rawValue === null) {
-    location.view = undefined
-    commitLocations()
-    return
-  }
-  const parsed = Number(rawValue)
-  if (!Number.isFinite(parsed)) return
-  const view = ensureLocationView(location)
-  view[key] = parsed
-  commitLocations()
-}
-
-function captureCameraViewForActiveLocation() {
-  if (!handle.value || !activeLocation.value) return
-  activeLocation.value.view = { ...handle.value.getViewState() }
-  commitLocations()
-  updateStatus(
-    `Saved camera view for ${activeLocation.value.name ?? activeLocation.value.id}.`,
-    1500
-  )
-}
-
-function clearActiveLocationView() {
-  if (!activeLocation.value || !activeLocation.value.view) return
-  activeLocation.value.view = undefined
-  commitLocations()
-}
-
 function openIconPicker(location: TerrainLocation) {
   setAssetDialogFilter('icon')
   iconPickerTarget.value = ensureLocationId(location).id!
@@ -696,7 +561,7 @@ function closeLocationPicker() {
 }
 
 function handleLocationSelect(id: string) {
-  setActiveLocation(id)
+  setActiveLocationBase(id)
   closeLocationPicker()
 }
 
@@ -850,39 +715,6 @@ function getViewerLocations(list = locationsList.value) {
 
 registerViewerLocationResolver(getViewerLocations)
 
-function handleViewerLocationPick(payload: { pixel: { x: number; y: number } }) {
-  const snapped = {
-    x: snapLocationValue(clampNumber(payload.pixel.x, 0, workspaceForm.width), workspaceForm.width),
-    y: snapLocationValue(clampNumber(payload.pixel.y, 0, workspaceForm.height), workspaceForm.height)
-  }
-  if (pendingLocationId.value === NEW_LOCATION_PLACEHOLDER && pendingLocationDraft.value) {
-    const draft = ensureLocationId({ ...pendingLocationDraft.value, pixel: snapped })
-    pendingLocationDraft.value = null
-    pendingLocationId.value = null
-    interactive.value = false
-    handle.value?.setInteractiveMode(false)
-    locationsList.value = [...locationsList.value, draft]
-    commitLocations()
-    setActiveLocation(draft.id!)
-    updateStatus(`Added ${draft.name ?? draft.id} at (${draft.pixel.x}, ${draft.pixel.y}).`)
-    return
-  }
-  if (pendingLocationId.value) {
-    const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
-    if (target) {
-      target.pixel = snapped
-      pendingLocationId.value = null
-      interactive.value = false
-      handle.value?.setInteractiveMode(false)
-      commitLocations()
-      setActiveLocation(target.id!)
-      updateStatus(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
-      return
-    }
-  }
-  updateStatus(`Picked pixel (${snapped.x}, ${snapped.y})`)
-}
-
 function getViewerMountContext() {
   if (!datasetRef.value || !layerState.value) return null
   return {
@@ -891,8 +723,8 @@ function getViewerMountContext() {
     locations: getViewerLocations(),
     interactive: interactive.value,
     theme: projectSnapshot.value.theme,
-    onLocationPick: handleViewerLocationPick,
-    onLocationClick: (locationId: string) => setActiveLocation(locationId, { fromViewer: true })
+    onLocationPick: handleLocationPick,
+    onLocationClick: (locationId: string) => setActiveLocationBase(locationId)
   }
 }
 

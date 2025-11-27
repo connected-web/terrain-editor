@@ -1,10 +1,15 @@
 import { computed, ref, watch } from 'vue'
-import type { TerrainLocation } from '@connected-web/terrain-editor'
-import { clampNumber, ensureLocationId, getPlacementStep, snapLocationValue } from '../utils/locations'
+import type { LocationViewState, TerrainLocation } from '@connected-web/terrain-editor'
+import {
+  clampNumber,
+  ensureLocationId,
+  getPlacementStep,
+  snapLocationValue
+} from '../utils/locations'
 import { useWorkspaceContext, useWorkspaceModel } from '../models/workspace'
 
 export function useLocations() {
-  const { workspaceForm } = useWorkspaceModel()
+  const { workspaceForm, projectSnapshot } = useWorkspaceModel()
   const workspace = useWorkspaceContext()
   const locationsList = ref<TerrainLocation[]>([])
   const selectedLocationId = ref<string | null>(null)
@@ -12,9 +17,11 @@ export function useLocations() {
   const pendingLocationId = ref<string | null>(null)
   const pendingLocationDraft = ref<TerrainLocation | null>(null)
   const locationsDragActive = ref(false)
+  const interactive = ref(false)
 
-  const activeLocation = computed(() =>
-    locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null)
+  const activeLocation = computed(
+    () => locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null
+  )
   const locationStepX = computed(() => getPlacementStep(workspaceForm.width))
   const locationStepY = computed(() => getPlacementStep(workspaceForm.height))
 
@@ -62,20 +69,215 @@ export function useLocations() {
     ensureActiveLocationSelection()
   }
 
+  function focusLocationInViewer(id: string) {
+    const handle = workspace.handle.value
+    if (!handle) return
+    const target = locationsList.value.find((location) => ensureLocationId(location).id === id)
+    if (!target) return
+    handle.updateLocations(workspace.getViewerLocations(), id)
+    const pixel =
+      target.pixel ?? {
+        x: Math.round(workspaceForm.width / 2),
+        y: Math.round(workspaceForm.height / 2)
+      }
+    const view = workspace.localSettings?.cameraTracking ? target.view : undefined
+    handle.navigateTo({ pixel, locationId: id, view })
+  }
+
+  function setInteractiveMode(value: boolean) {
+    interactive.value = value
+    workspace.handle.value?.setInteractiveMode(value)
+  }
+
+  function getPendingLocationDraft() {
+    return pendingLocationDraft.value
+  }
+
+  function resetPlacementState() {
+    pendingLocationDraft.value = null
+    pendingLocationId.value = null
+    setInteractiveMode(false)
+  }
+
+  function addLocation() {
+    const legend = projectSnapshot.value.legend
+    if (!legend) return
+    const draft: TerrainLocation = ensureLocationId({
+      id: '',
+      name: `New location ${locationsList.value.length + 1}`,
+      pixel: { x: 0, y: 0 },
+      showBorder: true
+    })
+    pendingLocationDraft.value = draft
+    pendingLocationId.value = '__pending-location__'
+    setActiveLocation(null)
+    setInteractiveMode(true)
+    workspace.setActivePanel?.('locations')
+    workspace.ensureDockExpanded?.()
+    locationPickerOpen.value = false
+    workspace.updateStatus?.('Click anywhere on the map to place the new location.')
+  }
+
+  function startPlacement(location: TerrainLocation) {
+    if (!workspace.handle.value) return
+    pendingLocationDraft.value = null
+    const id = ensureLocationId(location).id!
+    selectedLocationId.value = id
+    pendingLocationId.value = id
+    setInteractiveMode(true)
+    workspace.updateStatus?.(`Click anywhere on the map to place ${location.name ?? 'this location'}.`)
+  }
+
+  function removeLocation(location: TerrainLocation) {
+    locationsList.value = locationsList.value.filter((entry) => entry.id !== location.id)
+    if (selectedLocationId.value === location.id) {
+      selectedLocationId.value = locationsList.value[0]?.id ?? null
+    }
+    if (pendingLocationId.value === location.id) {
+      resetPlacementState()
+    }
+    commitLocations()
+  }
+
+  function handleLocationPick(payload: { pixel: { x: number; y: number } }) {
+    const snapped = {
+      x: snapLocationValue(clampNumber(payload.pixel.x, 0, workspaceForm.width), workspaceForm.width),
+      y: snapLocationValue(clampNumber(payload.pixel.y, 0, workspaceForm.height), workspaceForm.height)
+    }
+    if (pendingLocationId.value === '__pending-location__' && pendingLocationDraft.value) {
+      const draft = ensureLocationId({ ...pendingLocationDraft.value, pixel: snapped })
+      pendingLocationDraft.value = null
+      pendingLocationId.value = null
+      setInteractiveMode(false)
+      locationsList.value = [...locationsList.value, draft]
+      commitLocations()
+      setActiveLocation(draft.id!)
+      workspace.updateStatus?.(`Added ${draft.name ?? draft.id} at (${draft.pixel.x}, ${draft.pixel.y}).`)
+      return
+    }
+    if (pendingLocationId.value) {
+      const target = locationsList.value.find((location) => location.id === pendingLocationId.value)
+      if (target) {
+        target.pixel = snapped
+        pendingLocationId.value = null
+        setInteractiveMode(false)
+        commitLocations()
+        setActiveLocation(target.id!)
+        workspace.updateStatus?.(`Placed ${target.name ?? target.id} at (${target.pixel.x}, ${target.pixel.y}).`)
+        return
+      }
+    }
+    workspace.updateStatus?.(`Picked pixel (${snapped.x}, ${snapped.y})`)
+  }
+
+
   watch(
-    () => workspace.projectSnapshot.value,
-    (snapshot) => {
-      locationsList.value = snapshot.locations
-        ? snapshot.locations.map((location) => {
+    () => projectSnapshot.value.locations,
+    (snapshotLocations) => {
+      locationsList.value = snapshotLocations
+        ? snapshotLocations.map((location) => {
             const copy = ensureLocationId({ ...location })
             if (copy.showBorder === undefined) copy.showBorder = true
             return copy
           })
         : []
       ensureActiveLocationSelection()
+      workspace.handle.value?.updateLocations(workspace.getViewerLocations(locationsList.value))
     },
-    { immediate: true }
+    { deep: true, immediate: true }
   )
+
+  watch(
+    () => selectedLocationId.value,
+    (id) => {
+      if (id) {
+        focusLocationInViewer(id)
+        if (workspace.localSettings?.openLocationsOnSelect) {
+          workspace.setActivePanel?.('locations')
+          workspace.ensureDockExpanded?.()
+        }
+      } else if (workspace.handle.value) {
+        workspace.handle.value.updateLocations(workspace.getViewerLocations())
+      }
+    }
+  )
+
+  watch(
+    () => workspace.localSettings?.cameraTracking,
+    (enabled) => {
+      if (enabled && selectedLocationId.value) {
+        focusLocationInViewer(selectedLocationId.value)
+      }
+    }
+  )
+
+  watch(
+    () => locationsList.value.length,
+    (count) => {
+      if (count === 0) {
+        locationPickerOpen.value = false
+      }
+    }
+  )
+
+  watch(
+    () => workspace.handle.value,
+    (handle) => {
+      if (!handle) return
+      handle.updateLocations(
+        workspace.getViewerLocations(locationsList.value),
+        selectedLocationId.value ?? undefined
+      )
+    }
+  )
+
+  function getFallbackViewState(): LocationViewState {
+    return (
+      workspace.handle.value?.getViewState() ?? {
+        distance: 1,
+        polar: Math.PI / 3,
+        azimuth: 0
+      }
+    )
+  }
+
+  function ensureLocationView(location: TerrainLocation) {
+    if (!location.view) {
+      location.view = { ...getFallbackViewState() }
+    }
+    return location.view
+  }
+
+  function updateActiveLocationViewField(key: keyof LocationViewState, rawValue: string | number) {
+    const location = activeLocation.value
+    if (!location) return
+    if (rawValue === '' || rawValue === null) {
+      location.view = undefined
+      commitLocations()
+      return
+    }
+    const parsed = Number(rawValue)
+    if (!Number.isFinite(parsed)) return
+    const view = ensureLocationView(location)
+    view[key] = parsed
+    commitLocations()
+  }
+
+  function captureCameraViewForActiveLocation() {
+    if (!workspace.handle.value || !activeLocation.value) return
+    activeLocation.value.view = { ...workspace.handle.value.getViewState() }
+    commitLocations()
+    workspace.updateStatus?.(
+      `Saved camera view for ${activeLocation.value.name ?? activeLocation.value.id}.`,
+      1500
+    )
+  }
+
+  function clearActiveLocationView() {
+    if (!activeLocation.value || !activeLocation.value.view) return
+    activeLocation.value.view = undefined
+    commitLocations()
+  }
 
   return {
     locationsList,
@@ -91,6 +293,15 @@ export function useLocations() {
     ensureActiveLocationSelection,
     commitLocations,
     clampLocationPixel,
-    setLocations
+    setLocations,
+    addLocation,
+    startPlacement,
+    removeLocation,
+    handleLocationPick,
+    resetPlacementState,
+    interactive,
+    updateActiveLocationViewField,
+    captureCameraViewForActiveLocation,
+    clearActiveLocationView
   }
 }

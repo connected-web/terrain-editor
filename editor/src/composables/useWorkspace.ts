@@ -9,7 +9,8 @@ import type {
 import {
   initWorkspaceModel,
   useWorkspaceModel,
-  createScratchLegend as createScratchLegendInternal
+  createScratchLegend as createScratchLegendInternal,
+  type DockPanel
 } from '../models/workspace'
 import type { WorkspaceSnapshot } from '../models/workspace'
 
@@ -33,6 +34,10 @@ export function useWorkspace(options: {
   handle: { value: TerrainHandle | null }
   persistCurrentProject: () => Promise<void>
   requestViewerRemount: () => void
+  localSettings?: { cameraTracking: boolean; openLocationsOnSelect: boolean }
+  setActivePanel?: (panel: DockPanel) => void
+  ensureDockExpanded?: () => void
+  updateStatus?: (message: string, fadeOutDelay?: number) => void
 }) {
   initWorkspaceModel(options)
   const { workspaceForm, projectSnapshot, layerBrowserState, layerState } = useWorkspaceModel()
