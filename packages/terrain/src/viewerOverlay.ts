@@ -724,6 +724,12 @@ export function createViewerOverlay(
     setLoadingProgress(state: ViewerOverlayLoadingState | null) {
       updateProgressPanel(state)
     },
+    hideDropOverlay() {
+      if (dropOverlay) {
+        dropOverlay.style.display = 'none'
+        target.classList.remove('ctw-viewer-host--dragging')
+      }
+    },
     openFileDialog() {
       openFileDialogImpl()
     },
