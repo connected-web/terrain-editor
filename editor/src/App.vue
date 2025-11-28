@@ -52,9 +52,13 @@
           v-else
           :locations-api="locationsApi"
           :get-icon-preview="getIconPreview"
-          :has-legend="Boolean(projectSnapshot?.value?.legend)"
+          :has-legend="Boolean(projectSnapshot?.legend)"
           :disable-camera-actions="!handle"
           @open-icon-picker="openIconPicker"
+          @clear-icon="clearLocationIcon"
+          @drag-enter="onLocationsDragEnter"
+          @drag-leave="onLocationsDragLeave"
+          @drop="onLocationsDrop"
         />
       </PanelDock>
       <input
@@ -618,6 +622,12 @@ function swallowDragEvent(event: DragEvent) {
 
 function handleWindowDragEvent(event: DragEvent) {
   const target = event.target as HTMLElement | null
+  if (
+    target &&
+    (target.closest('.ctw-viewer-host') || target.closest('.ctw-viewer-overlay'))
+  ) {
+    return
+  }
   if (
     target &&
     (target.closest('.panel-dock') ||

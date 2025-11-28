@@ -334,6 +334,7 @@ export type ViewerOverlayHandle = {
   setStatusFade: (fade: boolean) => void
   setViewMode: (mode: TerrainViewMode) => void
   setLoadingProgress: (state: ViewerOverlayLoadingState | null) => void
+  hideDropOverlay: () => void
   openFileDialog?: () => void
   destroy: () => void
 }
@@ -365,6 +366,7 @@ export function createViewerOverlay(
       setStatusFade: () => {},
       setViewMode: () => {},
       setLoadingProgress: () => {},
+      hideDropOverlay: () => {},
       openFileDialog: () => {},
       destroy: () => {}
     }
@@ -485,7 +487,7 @@ export function createViewerOverlay(
       fileInput.style.display = 'none'
       target.appendChild(fileInput)
 
-      const handleFiles = (files: FileList | null) => {
+      let handleFiles = (files: FileList | null) => {
         const file = files?.item(0)
         if (!file) return
         options.selectFile.callback?.(file)
@@ -495,7 +497,7 @@ export function createViewerOverlay(
       openFileDialogImpl = openDialog
       loadBtn.addEventListener('click', openDialog)
       fileInput.addEventListener('change', () => {
-        handleFiles(fileInput?.files ?? null)
+        void handleFiles(fileInput?.files ?? null)
         if (fileInput) {
           fileInput.value = ''
         }
@@ -504,6 +506,7 @@ export function createViewerOverlay(
       dropOverlay = doc.createElement('div')
       dropOverlay.className = 'ctw-drop-overlay'
       dropOverlay.textContent = 'Drop .wyn to load'
+      dropOverlay.style.display = 'none'
       target.appendChild(dropOverlay)
 
       const prevent = (event: Event) => {
@@ -511,11 +514,32 @@ export function createViewerOverlay(
         event.stopPropagation()
       }
 
+      const showOverlay = () => {
+        if (dropOverlay) dropOverlay.style.display = 'flex'
+      }
+      const hideOverlay = () => {
+        if (dropOverlay) dropOverlay.style.display = 'none'
+      }
       const highlight = () => {
         target.classList.add('ctw-viewer-host--dragging')
+        showOverlay()
       }
       const unhighlight = () => {
         target.classList.remove('ctw-viewer-host--dragging')
+        hideOverlay()
+      }
+
+      handleFiles = async (files: FileList | null) => {
+        const file = files?.item(0)
+        if (!file) {
+          unhighlight()
+          return
+        }
+        try {
+          await Promise.resolve(options.selectFile.callback?.(file))
+        } finally {
+          unhighlight()
+        }
       }
 
       dragEnter = (event: DragEvent) => {
@@ -536,7 +560,7 @@ export function createViewerOverlay(
       drop = (event: DragEvent) => {
         prevent(event)
         unhighlight()
-        handleFiles(event.dataTransfer?.files ?? null)
+        void handleFiles(event.dataTransfer?.files ?? null)
       }
 
       target.addEventListener('dragenter', dragEnter)
