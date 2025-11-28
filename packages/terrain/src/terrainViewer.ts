@@ -110,6 +110,7 @@ export type TerrainHandle = {
   }) => void
   setHoveredLocation: (id: string | null) => void
   setCameraOffset: (offset: number, focusId?: string) => void
+  onCameraMove: (callback: (newState: LocationViewState) => void) => void
   getViewState: () => LocationViewState
   setTheme: (overrides?: TerrainThemeOverrides) => void
   setSeaLevel: (level: number) => void
@@ -763,6 +764,7 @@ export async function initTerrainViewer(
       setHoveredLocation: noop,
       setCameraOffset: noop,
       getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 }),
+      onCameraMove: () => {},
       setTheme: () => {},
       setSeaLevel: () => {},
       invalidateIconTextures: () => {}
@@ -778,7 +780,6 @@ export async function initTerrainViewer(
   let resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
   let markerTheme = resolvedTheme.locationMarkers
   let seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
-  const initialSeaLevel = seaLevel
   const [rawLegendWidth, rawLegendHeight] = legend.size
   const safeLegendWidth = Math.max(1, rawLegendWidth || DEFAULT_MAP_WIDTH)
   const safeLegendHeight = Math.max(1, rawLegendHeight || DEFAULT_MAP_HEIGHT)
@@ -1636,6 +1637,19 @@ const markerMap = new Map<
             view: loc.view
           })
         }
+      }
+    },
+    onCameraMove: (callback: (newState: LocationViewState) => void) => {
+      const handler = () => {
+        callback({
+          distance: Math.max(camera.position.distanceTo(controls.target), 0.1),
+          polar: controls.getPolarAngle(),
+          azimuth: controls.getAzimuthalAngle()
+        })
+      }
+      controls.addEventListener('change', handler)
+      return () => {
+        controls.removeEventListener('change', handler)
       }
     },
     getViewState: () => ({

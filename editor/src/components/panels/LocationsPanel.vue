@@ -154,6 +154,14 @@
           >
             <Icon icon="eraser">Clear camera view</Icon>
           </button>
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="focusCameraOnActiveLocation"
+            :disabled="!activeLocation.view || isCameraFocusedOnActiveLocation"
+          >
+            <Icon :icon="isCameraFocusedOnActiveLocation ? 'camera' : 'camera-rotate'">Focus camera</Icon>
+          </button>
         </div>
         <label class="locations-panel__toggle">
           <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
@@ -169,6 +177,8 @@
 </template>
 
 <script setup lang="ts">
+
+import { computed } from 'vue'
 import type { TerrainLocation } from '@connected-web/terrain-editor'
 import Icon from '../Icon.vue'
 import { useWorkspaceModel } from '../../models/workspace'
@@ -193,11 +203,17 @@ const {
   commitLocations,
   removeLocation,
   updateActiveLocationViewField,
+  isCameraFocusedOnLocation,
   captureCameraViewForActiveLocation,
-  clearActiveLocationView
+  clearActiveLocationView,
+  focusCameraOnActiveLocation
 } = props.locationsApi
 
 const { workspaceForm } = useWorkspaceModel()
+
+const isCameraFocusedOnActiveLocation = computed(() => {
+  return activeLocation.value ? isCameraFocusedOnLocation(activeLocation.value) : false
+})
 
 defineEmits<{
   'open-picker': []

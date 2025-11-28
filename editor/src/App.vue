@@ -103,8 +103,6 @@ import {
   buildWynArchive,
   createLayerBrowserStore,
   createProjectStore,
-  type MarkerStemGeometryShape,
-  type LayerBrowserState,
   type LayerToggleState,
   type TerrainDataset,
   type TerrainLocation,

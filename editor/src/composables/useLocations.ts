@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import type { LocationViewState, TerrainLocation } from '@connected-web/terrain-editor'
 import {
   clampNumber,
@@ -18,6 +18,34 @@ export function useLocations() {
   const pendingLocationDraft = ref<TerrainLocation | null>(null)
   const locationsDragActive = ref(false)
   const interactive = ref(false)
+  // --- Camera view state is now reactive ---
+  const cameraViewState = ref<LocationViewState>(getFallbackViewState())
+
+  // Listen for camera movement and update cameraViewState reactively
+  let unsubscribeCameraMove: (() => void) | undefined
+  watch(
+    () => workspace.handle.value,
+    (handle, _, onCleanup) => {
+      if (unsubscribeCameraMove) {
+        unsubscribeCameraMove()
+        unsubscribeCameraMove = undefined
+      }
+      if (handle && typeof handle.onCameraMove === 'function') {
+        const maybeCleanup = handle.onCameraMove((newState: LocationViewState) => {
+          cameraViewState.value = newState
+        })
+        unsubscribeCameraMove = typeof maybeCleanup === 'function' ? maybeCleanup : () => {}
+        cameraViewState.value = handle.getViewState()
+        onCleanup(() => {
+          if (unsubscribeCameraMove) unsubscribeCameraMove()
+        })
+      }
+    },
+    { immediate: true }
+  )
+  onUnmounted(() => {
+    if (unsubscribeCameraMove) unsubscribeCameraMove()
+  })
 
   const activeLocation = computed(
     () => locationsList.value.find((location) => ensureLocationId(location).id === selectedLocationId.value) ?? null
@@ -98,8 +126,23 @@ export function useLocations() {
     workspace.handle.value?.setInteractiveMode(value)
   }
 
-  function getPendingLocationDraft() {
-    return pendingLocationDraft.value
+  function isCameraFocusedOnLocation(location: TerrainLocation): boolean {
+    if (!location) {
+      console.log('No active location to compare to')
+      return false
+    }
+    const viewState = cameraViewState.value
+    const locationView = location?.view
+    if (!locationView) {
+      console.log('Active location has no view to compare to')
+      return false
+    }
+    const epsilon = 0.05
+    return (
+      Math.abs(viewState.distance - locationView.distance) < epsilon &&
+      Math.abs(viewState.polar - locationView.polar) < epsilon &&
+      Math.abs(viewState.azimuth - locationView.azimuth) < epsilon
+    )
   }
 
   function resetPlacementState() {
@@ -282,6 +325,22 @@ export function useLocations() {
     )
   }
 
+  function focusCameraOnActiveLocation() {
+    if (!workspace.handle.value || !activeLocation.value) {
+      console.log('No active location to focus on')
+      return
+    }
+    const location = activeLocation.value
+    workspace.handle.value.navigateTo({
+      pixel: location.pixel ?? {
+        x: Math.round(workspaceForm.width / 2),
+        y: Math.round(workspaceForm.height / 2)
+      },
+      locationId: location.id!,
+      view: location.view ?? undefined
+    })
+  }
+
   function clearActiveLocationView() {
     if (!activeLocation.value || !activeLocation.value.view) return
     activeLocation.value.view = undefined
@@ -308,14 +367,17 @@ export function useLocations() {
     removeLocation,
     handleLocationPick,
     resetPlacementState,
+    isCameraFocusedOnLocation,
     interactive,
     updateActiveLocationViewField,
     captureCameraViewForActiveLocation,
     clearActiveLocationView,
+    focusCameraOnActiveLocation,
     openLocationPicker,
-    closeLocationPicker
+    closeLocationPicker,
+    cameraViewState
   }
 }
-export type LocationsApi = ReturnType<typeof useLocations>
 
 export type LocationsApi = ReturnType<typeof useLocations>
+

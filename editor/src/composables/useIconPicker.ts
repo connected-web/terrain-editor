@@ -1,5 +1,5 @@
 import { TerrainLocation } from "@connected-web/terrain-editor";
-import { ensureLocationId } from "src/utils/locations";
+import { ensureLocationId } from "../utils/locations";
 import { ref } from "vue";
 
 const iconPickerTarget = ref<string | null>(null)
