@@ -61,12 +61,12 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', path: string): void
-  (e: 'remove', path: string): void
-  (e: 'upload'): void
-  (e: 'close'): void
-  (e: 'replace', asset: TerrainProjectFileEntry): void
-  (e: 'update:filterText', value: string): void
+  (ev: 'select', path: string): void
+  (ev: 'remove', path: string): void
+  (ev: 'upload'): void
+  (ev: 'close'): void
+  (ev: 'replace', asset: TerrainProjectFileEntry): void
+  (ev: 'update:filterText', value: string): void
 }>()
 
 const filterModel = computed({

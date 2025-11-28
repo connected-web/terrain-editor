@@ -85,7 +85,7 @@
         :locations="locationsApi.locationsList.value"
         :active-id="locationsApi.selectedLocationId.value || undefined"
         @select="handleLocationSelect"
-        @close="closeLocationPicker"
+        @close="locationsApi.closeLocationPicker()"
       />
       <ConfirmDialog
         v-if="confirmState"
@@ -152,7 +152,7 @@ import { useUiActions } from './composables/useUiActions'
 import { useLayerSync } from './composables/useLayerSync'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
-import type { UIAction } from './types/uiActions'
+import { useIconPicker } from './composables/useIconPicker'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
@@ -207,7 +207,6 @@ useLayerSync({ layerState, handle })
 
 const {
   themeForm,
-  commitThemeOverrides,
   scheduleThemeUpdate,
   cancelThemeUpdate,
   resetThemeForm
@@ -244,6 +243,7 @@ const hasActiveArchive = computed(
 
 const {
   assetOverrides,
+  assetDialogFilter,
   missingIconWarnings,
   projectAssets,
   clearAssetOverrides,
@@ -254,7 +254,8 @@ const {
   replaceAssetWithFile: replaceAssetWithFileHelper,
   removeAsset: removeAssetFromStore,
   disposeAssetPreviewUrls,
-  normalizeAssetFileName
+  normalizeAssetFileName,
+  setAssetDialogFilter
 } = useAssetLibrary({
   projectStore,
   projectSnapshot: computed(() => ({
@@ -266,6 +267,14 @@ const {
   handle,
   commitLocations: locationsApi.commitLocations
 })
+
+const {
+  iconPickerTarget,
+  iconLibraryInputRef,
+  pendingAssetReplacement,
+  openIconPicker,
+  closeIconPicker,
+} = useIconPicker(setAssetDialogFilter)
 
 const {
   loadArchiveFromBytes,
@@ -294,14 +303,8 @@ const loadSample = loadSampleArchive
 const loadArchiveFromFile = loadArchiveFromFileInternal
 
 const layerEntries = computed(() => layerBrowserState.value.entries)
-const iconPickerTarget = ref<string | null>(null)
-const assetDialogFilter = ref('')
-function setAssetDialogFilter(value: string) {
-  assetDialogFilter.value = value
-}
-const iconLibraryInputRef = ref<HTMLInputElement | null>(null)
+
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
-const pendingAssetReplacement = ref<{ path: string; originalName?: string } | null>(null)
 const { uiActions } = useUiActions({
   hasActiveArchive,
   setActivePanel,
@@ -477,28 +480,10 @@ function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
 
-function openIconPicker(location: TerrainLocation) {
-  setAssetDialogFilter('icon')
-  iconPickerTarget.value = ensureLocationId(location).id!
-}
-
-function closeIconPicker() {
-  iconPickerTarget.value = null
-  setAssetDialogFilter('')
-  pendingAssetReplacement.value = null
-}
-
-function openLocationPicker() {
-  locationsApi.openLocationPicker()
-}
-
-function closeLocationPicker() {
-  locationsApi.closeLocationPicker()
-}
 
 function handleLocationSelect(id: string) {
   locationsApi.setActiveLocation(id)
-  closeLocationPicker()
+  locationsApi.closeLocationPicker()
 }
 
 function selectIconFromLibrary(path: string) {

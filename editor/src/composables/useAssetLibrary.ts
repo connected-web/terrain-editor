@@ -1,4 +1,4 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type {
   TerrainDataset,
   TerrainHandle,
@@ -11,6 +11,12 @@ import { ensureLocationId } from '../utils/locations'
 type ProjectStore = {
   upsertFile: (entry: TerrainProjectFileEntry) => void
   removeFile: (path: string) => void
+}
+
+const assetDialogFilter = ref('')
+
+function setAssetDialogFilter(value: string) {
+  assetDialogFilter.value = value
 }
 
 export function useAssetLibrary(options: {
@@ -193,6 +199,7 @@ export function useAssetLibrary(options: {
 
   return {
     assetOverrides,
+    assetDialogFilter,
     iconPreviewCache,
     iconPreviewOwnership,
     missingIconWarnings,
@@ -207,6 +214,7 @@ export function useAssetLibrary(options: {
     replaceAssetWithFile,
     removeAsset,
     disposeAssetPreviewUrls,
-    normalizeAssetFileName
+    normalizeAssetFileName,
+    setAssetDialogFilter
   }
 }
