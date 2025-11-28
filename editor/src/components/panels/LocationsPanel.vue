@@ -4,7 +4,7 @@
       <div class="panel-card__header-main">
         <Icon icon="location-dot">Locations</Icon>
       </div>
-      <button class="pill-button pill-button--ghost" @click="$emit('add-location')" :disabled="!hasLegend">
+      <button class="pill-button pill-button--ghost" @click="addLocation" :disabled="!hasLegend">
         <Icon icon="plus">Add location</Icon>
       </button>
     </header>
@@ -58,7 +58,7 @@
             >
               <Icon icon="ban">Clear icon</Icon>
             </button>
-            <button type="button" class="pill-button pill-button--ghost" @click="$emit('start-placement', activeLocation)">
+            <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
               <Icon icon="crosshairs">Pick on map</Icon>
             </button>
           </div>
@@ -68,7 +68,7 @@
           <input
             type="text"
             v-model="activeLocation.name"
-            @blur="$emit('commit')"
+            @blur="commitLocations"
             placeholder="Location name"
           />
         </label>
@@ -77,7 +77,7 @@
           <input
             type="text"
             v-model="activeLocation.icon"
-            @blur="$emit('commit')"
+            @blur="commitLocations"
             placeholder="e.g. icons/castle.png"
           />
         </label>
@@ -90,7 +90,7 @@
               :max="workspaceForm.width"
               :step="locationStepX"
               v-model.number="activeLocation.pixel.x"
-              @change="$emit('clamp-pixel', activeLocation)"
+              @change="clampLocationPixel(activeLocation)"
             />
           </label>
           <label>
@@ -101,7 +101,7 @@
               :max="workspaceForm.height"
               :step="locationStepY"
               v-model.number="activeLocation.pixel.y"
-              @change="$emit('clamp-pixel', activeLocation)"
+              @change="clampLocationPixel(activeLocation)"
             />
           </label>
         </div>
@@ -112,7 +112,7 @@
               type="number"
               step="0.01"
               :value="activeLocation.view?.distance ?? ''"
-              @change="$emit('update-camera', 'distance', ($event.target as HTMLInputElement).value)"
+              @change="updateActiveLocationViewField('distance', ($event.target as HTMLInputElement).value)"
               placeholder="auto"
             />
           </label>
@@ -122,7 +122,7 @@
               type="number"
               step="0.01"
               :value="activeLocation.view?.polar ?? ''"
-              @change="$emit('update-camera', 'polar', ($event.target as HTMLInputElement).value)"
+              @change="updateActiveLocationViewField('polar', ($event.target as HTMLInputElement).value)"
               placeholder="auto"
             />
           </label>
@@ -132,7 +132,7 @@
               type="number"
               step="0.01"
               :value="activeLocation.view?.azimuth ?? ''"
-              @change="$emit('update-camera', 'azimuth', ($event.target as HTMLInputElement).value)"
+              @change="updateActiveLocationViewField('azimuth', ($event.target as HTMLInputElement).value)"
               placeholder="auto"
             />
           </label>
@@ -141,7 +141,7 @@
           <button
             type="button"
             class="pill-button"
-            @click="$emit('capture-camera')"
+            @click="captureCameraViewForActiveLocation"
             :disabled="disableCameraActions"
           >
             <Icon icon="camera">Use current camera</Icon>
@@ -149,17 +149,17 @@
           <button
             type="button"
             class="pill-button pill-button--ghost"
-            @click="$emit('clear-camera')"
+            @click="clearActiveLocationView"
             :disabled="!activeLocation.view"
           >
             <Icon icon="eraser">Clear camera view</Icon>
           </button>
         </div>
         <label class="locations-panel__toggle">
-          <input type="checkbox" v-model="activeLocation.showBorder" @change="$emit('commit')" />
+          <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
           <span>Show label border</span>
         </label>
-        <button type="button" class="pill-button pill-button--danger" @click="$emit('remove', activeLocation)">
+        <button type="button" class="pill-button pill-button--danger" @click="removeLocation(activeLocation)">
           <Icon icon="trash">Remove location</Icon>
         </button>
       </article>
@@ -172,34 +172,39 @@
 import type { TerrainLocation } from '@connected-web/terrain-editor'
 import Icon from '../Icon.vue'
 import { useWorkspaceModel } from '../../models/workspace'
+import type { LocationsApi } from '../../composables/useLocations'
 
-defineProps<{
-  activeLocation: TerrainLocation | null
-  locationsList: TerrainLocation[]
-  locationStepX: number
-  locationStepY: number
-  locationsDragActive: boolean
+const props = defineProps<{
+  locationsApi: LocationsApi
   getIconPreview: (icon?: string) => string
   hasLegend: boolean
   disableCameraActions?: boolean
 }>()
 
+const {
+  locationsList,
+  activeLocation,
+  locationStepX,
+  locationStepY,
+  locationsDragActive,
+  addLocation,
+  startPlacement,
+  clampLocationPixel,
+  commitLocations,
+  removeLocation,
+  updateActiveLocationViewField,
+  captureCameraViewForActiveLocation,
+  clearActiveLocationView
+} = props.locationsApi
+
+const { workspaceForm } = useWorkspaceModel()
+
 defineEmits<{
-  'add-location': []
   'open-picker': []
   'open-icon-picker': [location: TerrainLocation]
   'clear-icon': [location: TerrainLocation]
-  'start-placement': [location: TerrainLocation]
-  'clamp-pixel': [location: TerrainLocation]
-  commit: []
-  remove: [location: TerrainLocation]
   'drag-enter': [event: DragEvent]
   'drag-leave': [event: DragEvent]
   drop: [event: DragEvent]
-  'capture-camera': []
-  'clear-camera': []
-  'update-camera': ['distance' | 'polar' | 'azimuth', string]
 }>()
-
-const { workspaceForm } = useWorkspaceModel()
 </script>

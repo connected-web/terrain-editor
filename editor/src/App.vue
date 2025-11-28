@@ -50,28 +50,11 @@
 
         <LocationsPanel
           v-else
-          :active-location="activeLocation"
-          :locations-list="locationsList"
-          :location-step-x="locationStepX"
-          :location-step-y="locationStepY"
-          :locations-drag-active="locationsDragActive"
+          :locations-api="locationsApi"
           :get-icon-preview="getIconPreview"
-          :has-legend="Boolean(projectSnapshot.legend)"
+          :has-legend="Boolean(projectSnapshot?.value?.legend)"
           :disable-camera-actions="!handle"
-          @add-location="addLocation"
-          @open-picker="openLocationPicker"
           @open-icon-picker="openIconPicker"
-          @clear-icon="clearLocationIcon"
-          @start-placement="startPlacement"
-          @clamp-pixel="clampLocationPixel"
-          @commit="commitLocations"
-          @remove="confirmRemoveLocation"
-          @drag-enter="onLocationsDragEnter"
-          @drag-leave="onLocationsDragLeave"
-          @drop="onLocationsDrop"
-          @capture-camera="captureCameraViewForActiveLocation"
-          @clear-camera="clearActiveLocationView"
-          @update-camera="updateActiveLocationViewField"
         />
       </PanelDock>
       <input
@@ -94,9 +77,9 @@
         @close="closeIconPicker"
       />
       <LocationPickerDialog
-        v-if="locationPickerOpen"
-        :locations="locationsList"
-        :active-id="selectedLocationId || undefined"
+        v-if="locationsApi.locationPickerOpen.value"
+        :locations="locationsApi.locationsList.value"
+        :active-id="locationsApi.selectedLocationId.value || undefined"
         @select="handleLocationSelect"
         @close="closeLocationPicker"
       />
@@ -249,33 +232,11 @@ function handleStemStateInput(state: StemStateKey) {
 function resetStemState(state: StemStateKey) {
   resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
 }
-const {
-  locationsList,
-  selectedLocationId,
-  locationPickerOpen,
-  locationsDragActive,
-  activeLocation,
-  locationStepX,
-  locationStepY,
-  setActiveLocation: setActiveLocationBase,
-  ensureActiveLocationSelection: ensureActiveLocationSelection,
-  commitLocations: commitLocationsBase,
-  clampLocationPixel: clampLocationPixelBase,
-  setLocations,
-  addLocation,
-  startPlacement,
-  removeLocation,
-  handleLocationPick,
-  resetPlacementState,
-  interactive,
-  updateActiveLocationViewField,
-  captureCameraViewForActiveLocation,
-  clearActiveLocationView
-} = useLocations()
-const commitLocations = commitLocationsBase
-const clampLocationPixel = clampLocationPixelBase
+const locationsApi = useLocations()
 const persistedProject = ref<PersistedProject | null>(null)
-const hasActiveArchive = computed(() => Boolean(datasetRef.value) || Boolean(projectSnapshot.value.legend))
+const hasActiveArchive = computed(
+  () => Boolean(datasetRef.value) || Boolean(projectSnapshot?.value?.legend)
+)
 
 const {
   assetOverrides,
@@ -297,9 +258,9 @@ const {
     files: (projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]
   })),
   datasetRef,
-  locationsList,
+  locationsList: locationsApi.locationsList,
   handle,
-  commitLocations
+  commitLocations: locationsApi.commitLocations
 })
 
 const {
@@ -321,7 +282,7 @@ const {
   mountViewer,
   disposeViewer,
   cleanupDataset,
-  onBeforeLoad: resetPlacementState,
+  onBeforeLoad: locationsApi.resetPlacementState,
   getSampleArchiveUrl: archiveUrl
 })
 
@@ -398,15 +359,15 @@ function closeActiveArchive() {
   layerBrowserStore.setLegend(undefined)
   projectStore.reset()
   layerState.value = layerBrowserStore.getLayerToggles()
-  locationsList.value = []
-  selectedLocationId.value = null
+  locationsApi.locationsList.value = []
+  locationsApi.setActiveLocation(null)
   confirmState.value = null
   iconPickerTarget.value = null
-  locationsDragActive.value = false
+  locationsApi.locationsDragActive.value = false
   handle.value = null
   baseThemeRef.value = undefined
   activeDockPanel.value = 'workspace'
-  locationPickerOpen.value = false
+  locationsApi.closeLocationPicker()
   clearAssetOverrides()
   missingIconWarnings.clear()
   cancelThemeUpdate()
@@ -414,7 +375,7 @@ function closeActiveArchive() {
   updateStatus('Viewer cleared. Load a map to continue.')
   persistedProject.value = null
   setAutoRestoreEnabled(false)
-  resetPlacementState()
+  locationsApi.resetPlacementState()
 }
 
 function promptCloseArchive() {
@@ -436,12 +397,6 @@ function startNewMap() {
   persistedProject.value = null
   clearPersistedProject()
   setAutoRestoreEnabled(false)
-}
-
-function confirmRemoveLocation(location: TerrainLocation) {
-  requestConfirm(`Remove location "${location.name ?? 'this location'}"?`, () => {
-    removeLocation(location)
-  })
 }
 
 function downloadBlob(filename: string, blob: Blob) {
@@ -530,27 +485,26 @@ function closeIconPicker() {
 }
 
 function openLocationPicker() {
-  if (!locationsList.value.length) return
-  locationPickerOpen.value = true
+  locationsApi.openLocationPicker()
 }
 
 function closeLocationPicker() {
-  locationPickerOpen.value = false
+  locationsApi.closeLocationPicker()
 }
 
 function handleLocationSelect(id: string) {
-  setActiveLocationBase(id)
+  locationsApi.setActiveLocation(id)
   closeLocationPicker()
 }
 
 function selectIconFromLibrary(path: string) {
   if (!iconPickerTarget.value) return
-  const target = locationsList.value.find(
+  const target = locationsApi.locationsList.value.find(
     (entry) => ensureLocationId(entry).id === iconPickerTarget.value
   )
   if (!target) return
   target.icon = path
-  commitLocations()
+  locationsApi.commitLocations()
   closeIconPicker()
 }
 
@@ -626,34 +580,34 @@ async function importLocationIcon(location: TerrainLocation, file: File) {
 
 function clearLocationIcon(location: TerrainLocation) {
   location.icon = undefined
-  commitLocations()
+  locationsApi.commitLocations()
 }
 
 function onLocationsDragEnter(event: DragEvent) {
   if (!event.dataTransfer?.types?.includes('Files')) return
   swallowDragEvent(event)
-  locationsDragActive.value = true
+  locationsApi.locationsDragActive.value = true
 }
 
 function onLocationsDragLeave(event: DragEvent) {
   swallowDragEvent(event)
   const target = event.relatedTarget as HTMLElement | null
   if (!target || !event.currentTarget) {
-    locationsDragActive.value = false
+    locationsApi.locationsDragActive.value = false
     return
   }
   const current = event.currentTarget as HTMLElement
   if (!current.contains(target)) {
-    locationsDragActive.value = false
+    locationsApi.locationsDragActive.value = false
   }
 }
 
 async function onLocationsDrop(event: DragEvent) {
   swallowDragEvent(event)
-  locationsDragActive.value = false
+  locationsApi.locationsDragActive.value = false
   const file = event.dataTransfer?.files?.[0]
-  if (!file || !activeLocation.value) return
-  await importLocationIcon(activeLocation.value, file)
+  if (!file || !locationsApi.activeLocation.value) return
+  await importLocationIcon(locationsApi.activeLocation.value, file)
 }
 
 function swallowDragEvent(event: DragEvent) {
@@ -684,7 +638,7 @@ function removeAsset(path: string) {
   })
 }
 
-function getViewerLocations(list = locationsList.value) {
+function getViewerLocations(list = locationsApi.locationsList.value) {
   return list.map((location) => ({
     ...location,
     icon: resolveAssetReference(location.icon)
@@ -711,10 +665,10 @@ function getViewerMountContext(): ViewerMountContext | null {
     dataset: datasetRef.value,
     layerState: layerState.value,
     locations: getViewerLocations(),
-    interactive: interactive.value,
+    interactive: locationsApi.interactive.value,
     theme: projectSnapshot.value.theme as DeepPartial<TerrainTheme> | undefined,
-    onLocationPick: handleLocationPick,
-    onLocationClick: (locationId: string) => setActiveLocationBase(locationId)
+    onLocationPick: locationsApi.handleLocationPick,
+    onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId)
   }
 }
 

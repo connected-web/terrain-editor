@@ -69,6 +69,15 @@ export function useLocations() {
     ensureActiveLocationSelection()
   }
 
+  function openLocationPicker() {
+    if (!locationsList.value.length) return
+    locationPickerOpen.value = true
+  }
+
+  function closeLocationPicker() {
+    locationPickerOpen.value = false
+  }
+
   function focusLocationInViewer(id: string) {
     const handle = workspace.handle.value
     if (!handle) return
@@ -302,6 +311,11 @@ export function useLocations() {
     interactive,
     updateActiveLocationViewField,
     captureCameraViewForActiveLocation,
-    clearActiveLocationView
+    clearActiveLocationView,
+    openLocationPicker,
+    closeLocationPicker
   }
 }
+export type LocationsApi = ReturnType<typeof useLocations>
+
+export type LocationsApi = ReturnType<typeof useLocations>
