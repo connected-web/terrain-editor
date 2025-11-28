@@ -42,6 +42,22 @@ body {
   min-height: 0;
 }
 
+.spacer {
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 @media (max-width: 800px) {
   .editor-shell {
     padding: 1rem;

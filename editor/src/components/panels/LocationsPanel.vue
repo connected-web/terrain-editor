@@ -58,8 +58,13 @@
             >
               <Icon icon="ban">Clear icon</Icon>
             </button>
-            <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
-              <Icon icon="crosshairs">Pick on map</Icon>
+            <button
+              type="button"
+              class="pill-button pill-button--ghost"
+              @click="focusCameraOnActiveLocation"
+              :disabled="!activeLocation.view || isCameraFocusedOnActiveLocation"
+            >
+              <Icon :icon="isCameraFocusedOnActiveLocation ? 'camera' : 'camera-rotate'">Focus camera</Icon>
             </button>
           </div>
         </div>
@@ -81,6 +86,13 @@
             placeholder="e.g. icons/castle.png"
           />
         </label>
+        <div class="row">
+          <h4>Position</h4>
+          <span class="spacer"></span>
+          <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
+            <Icon icon="crosshairs">Pick on map</Icon>
+          </button>
+        </div>
         <div class="locations-panel__coords">
           <label>
             <span>X</span>
@@ -104,6 +116,18 @@
               @change="clampLocationPixel(activeLocation)"
             />
           </label>
+        </div>
+        <div class="row">
+          <h4>Camera</h4>
+          <span class="spacer"></span>
+          <button
+            type="button"
+            class="pill-button"
+            @click="captureCameraViewForActiveLocation"
+            :disabled="disableCameraActions"
+          >
+            <Icon icon="camera">Use current view</Icon>
+          </button>
         </div>
         <div class="locations-panel__coords locations-panel__coords--view">
           <label>
@@ -136,37 +160,25 @@
               placeholder="auto"
             />
           </label>
+          <label>
+            <span>Danger</span>
+            <button
+              type="button"
+              class="pill-button pill-button--ghost"
+              @click="clearActiveLocationView"
+              :disabled="!activeLocation.view"
+              style="justify-content: center;"
+            >
+              <Icon icon="eraser">Unset camera</Icon>
+            </button>
+          </label>
         </div>
-        <div class="locations-panel__preview-actions locations-panel__preview-actions--compact">
-          <button
-            type="button"
-            class="pill-button"
-            @click="captureCameraViewForActiveLocation"
-            :disabled="disableCameraActions"
-          >
-            <Icon icon="camera">Use current camera</Icon>
-          </button>
-          <button
-            type="button"
-            class="pill-button pill-button--ghost"
-            @click="clearActiveLocationView"
-            :disabled="!activeLocation.view"
-          >
-            <Icon icon="eraser">Clear camera view</Icon>
-          </button>
-          <button
-            type="button"
-            class="pill-button pill-button--ghost"
-            @click="focusCameraOnActiveLocation"
-            :disabled="!activeLocation.view || isCameraFocusedOnActiveLocation"
-          >
-            <Icon :icon="isCameraFocusedOnActiveLocation ? 'camera' : 'camera-rotate'">Focus camera</Icon>
-          </button>
-        </div>
+        <h4>Style</h4>
         <label class="locations-panel__toggle">
           <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
           <span>Show label border</span>
         </label>
+        <h4>Danger</h4>
         <button type="button" class="pill-button pill-button--danger" @click="removeLocation(activeLocation)">
           <Icon icon="trash">Remove location</Icon>
         </button>
