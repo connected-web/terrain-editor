@@ -18,7 +18,6 @@ export type WorkspaceForm = {
 }
 
 export type WorkspaceActions = {
-  resetWorkspaceForm: () => void
   updateProjectLabel: (value: string) => void
   updateProjectAuthor: (value: string) => void
   applyMapSize: () => void
@@ -169,10 +168,6 @@ function delayedApplySeaLevel(value: number) {
   }, 250)
 }
 
-function resetWorkspaceForm() {
-  syncWorkspaceFormFromSnapshot()
-}
-
 function createScratchLegendInternal(): TerrainLegend {
   const width = Math.max(1, Math.floor(workspaceForm.width) || 512)
   const height = Math.max(1, Math.floor(workspaceForm.height) || 512)
@@ -192,7 +187,6 @@ function createScratchLegendInternal(): TerrainLegend {
 }
 
 const workspaceActions: WorkspaceActions = {
-  resetWorkspaceForm,
   updateProjectLabel,
   updateProjectAuthor,
   applyMapSize,

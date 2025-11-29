@@ -4,13 +4,6 @@
       <div class="panel-card__header-main">
         <Icon icon="compass-drafting">Workspace</Icon>
       </div>
-      <button
-        class="pill-button pill-button--ghost"
-        @click="workspaceActions.resetWorkspaceForm()"
-        :disabled="!hasActiveArchive"
-      >
-        Reset
-      </button>
     </header>
     <div v-if="!hasActiveArchive" class="workspace-form__starter">
       <button
