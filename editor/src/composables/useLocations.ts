@@ -98,7 +98,9 @@ export function useLocations() {
   }
 
   function openLocationPicker() {
-    if (!locationsList.value.length) return
+    if (!locationsList.value.length) {
+      return
+    }
     locationPickerOpen.value = true
   }
 

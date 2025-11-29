@@ -4,15 +4,11 @@
       <div class="panel-card__header-main">
         <Icon icon="palette">Theme</Icon>
       </div>
-      <button class="pill-button pill-button--ghost" @click="$emit('reset-theme')" :disabled="!hasActiveArchive">
-        Reset
-      </button>
     </header>
     <div class="theme-form">
       <section class="theme-form__section">
         <header>
-          <h4>Label styling</h4>
-          <p>Adjust sprite colors + border thickness.</p>
+          <h4>Labels</h4>
         </header>
         <label class="theme-form__field">
           <span>Text color</span>
@@ -70,7 +66,6 @@
       <section class="theme-form__section">
         <header>
           <h4>Typography & spacing</h4>
-          <p>Control font + padding used across label states.</p>
         </header>
         <label class="theme-form__field">
           <span>Font family</span>
@@ -141,22 +136,18 @@
         </div>
       </section>
       <section class="theme-form__section">
-        <header class="theme-form__section-header">
-          <div class="theme-form__section-text">
-            <h4>Hover state</h4>
-            <p class="theme-form__state-hint" v-if="!themeForm.hoverEnabled">
-              Inherits the default label styling until you edit a field.
-            </p>
-          </div>
+        <div class="row left">
+          <h4>Hover state</h4>
+          <span class="spacer"></span>
           <button
             type="button"
             class="pill-button pill-button--ghost"
             @click="$emit('reset-sprite', 'hover')"
             :disabled="!themeForm.hoverEnabled"
           >
-            Use default
+            <Icon icon="eraser">Use defaults</Icon>
           </button>
-        </header>
+        </div>
         <div class="theme-form__state-grid">
           <label class="theme-form__field">
             <span>Text</span>
@@ -195,22 +186,18 @@
         </div>
       </section>
       <section class="theme-form__section">
-        <header class="theme-form__section-header">
-          <div class="theme-form__section-text">
-            <h4>Focus state</h4>
-            <p class="theme-form__state-hint" v-if="!themeForm.focusEnabled">
-              Inherits the default label styling until you edit a field.
-            </p>
-          </div>
+        <div class="row">
+          <h4>Focus state</h4>
+          <span class="spacer"></span>
           <button
             type="button"
             class="pill-button pill-button--ghost"
             @click="$emit('reset-sprite', 'focus')"
             :disabled="!themeForm.focusEnabled"
           >
-            Use default
+            <Icon icon="eraser">Use defaults</Icon>
           </button>
-        </header>
+        </div>
         <div class="theme-form__state-grid">
           <label class="theme-form__field">
             <span>Text</span>
@@ -254,25 +241,25 @@
             <h4>Stems</h4>
             <p>Adjust stem shape and per-state colors.</p>
           </div>
-          <div class="theme-form__section-actions">
-            <button
-              type="button"
-              class="pill-button pill-button--ghost"
-              @click="$emit('reset-stem', 'hover')"
-              :disabled="!themeForm.stemHoverEnabled"
-            >
-              Reset hover
-            </button>
-            <button
-              type="button"
-              class="pill-button pill-button--ghost"
-              @click="$emit('reset-stem', 'focus')"
-              :disabled="!themeForm.stemFocusEnabled"
-            >
-              Reset focus
-            </button>
-          </div>
         </header>
+        <div class="row center">
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="$emit('reset-stem', 'hover')"
+            :disabled="!themeForm.stemHoverEnabled"
+          >
+            <Icon icon="eraser">Reset hover</Icon>
+          </button>
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="$emit('reset-stem', 'focus')"
+            :disabled="!themeForm.stemFocusEnabled"
+          >
+            <Icon icon="eraser">Reset focus</Icon>
+          </button>
+        </div>
         <label class="theme-form__field">
           <span>Shape</span>
           <select v-model="themeForm.stemShape" @change="$emit('schedule-update')">
@@ -339,9 +326,15 @@
           </label>
         </div>
       </section>
-      <p class="theme-form__hint">
-        Theme changes debounce automatically so rapid color tweaks don’t stall the viewer.
-      </p>
+      <div class="theme-form__section">
+        <h4>Danger</h4>
+        <div class="row left">
+          <button class="pill-button pill-button--ghost" @click="$emit('reset-theme')" :disabled="!hasActiveArchive">
+            <Icon icon="eraser">Reset all styles</Icon>
+          </button>
+          <span class="spacer"></span>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -403,3 +396,152 @@ defineEmits<{
   'reset-theme': []
 }>()
 </script>
+
+<style scoped>
+
+.theme-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.theme-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+.theme-form__section header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.theme-form__section h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(242, 237, 224, 0.8);
+}
+
+.theme-form__section p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.theme-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: rgba(242, 237, 224, 0.75);
+}
+
+.theme-form__field input[type='color'] {
+  width: 100%;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0;
+}
+
+.theme-form__field input[type='number'] {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.theme-form__field select {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.theme-form__field input[type='range'] {
+  width: 100%;
+}
+
+.theme-form__split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.theme-form__state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.theme-form__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+}
+
+.theme-form__hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+  text-align: center;
+}
+
+.theme-form__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-form__section-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.theme-form__state-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.theme-form__state-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.theme-form__state-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-form__state-header h5 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(242, 237, 224, 0.75);
+}
+
+</style>

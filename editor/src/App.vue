@@ -55,6 +55,7 @@
           :has-legend="Boolean(projectSnapshot?.legend)"
           :disable-camera-actions="!handle"
           @open-icon-picker="openIconPicker"
+          @open-picker="locationsApi.openLocationPicker"
           @clear-icon="clearLocationIcon"
           @drag-enter="onLocationsDragEnter"
           @drag-leave="onLocationsDragLeave"

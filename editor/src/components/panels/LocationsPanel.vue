@@ -161,7 +161,7 @@
             />
           </label>
           <label>
-            <span>Danger</span>
+            <span>Clear values</span>
             <button
               type="button"
               class="pill-button pill-button--ghost"
@@ -179,9 +179,12 @@
           <span>Show label border</span>
         </label>
         <h4>Danger</h4>
-        <button type="button" class="pill-button pill-button--danger" @click="removeLocation(activeLocation)">
-          <Icon icon="trash">Remove location</Icon>
-        </button>
+        <div class="row left">
+          <button type="button" class="pill-button pill-button--danger" @click="removeLocation(activeLocation)">
+            <Icon icon="trash">Remove location</Icon>
+          </button>
+          <span class="spacer"></span>
+        </div>
       </article>
     </div>
     <p v-else-if="locationsList.length" class="panel-card__placeholder">Select a location to edit.</p>

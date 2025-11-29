@@ -25,12 +25,11 @@
           :class="{ 'location-dialog__item--active': location.id === activeId }"
           @click="$emit('select', location.id!)"
         >
-          <div>
+          <div class="row left">
             <strong>{{ location.name || location.id }}</strong>
-            <small>{{ location.id }}</small>
           </div>
           <span class="location-dialog__coords">
-            {{ location.pixel.x }}, {{ location.pixel.y }}
+            <Icon icon="location-dot" :rtl="true">{{ location.pixel.x }}, {{ location.pixel.y }}</Icon>
           </span>
         </button>
         <p v-if="!filtered.length" class="location-dialog__empty">No locations match this search.</p>
@@ -101,6 +100,11 @@ const filtered = computed(() => {
   align-items: center;
 }
 
+.location-dialog__header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
 .location-dialog__search {
   display: flex;
   align-items: center;
@@ -154,8 +158,19 @@ const filtered = computed(() => {
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+.location-dialog__item:hover {
+  border-color: rgba(246, 231, 195, 0.4);
+  background: rgba(246, 231, 195, 0.05);
+}
+
+.location-dialog__item:active {
+  outline: none;
+  border-color: rgba(246, 231, 195, 0.5);
+  background: rgba(2, 2, 1, 0.06);
+}
+
 .location-dialog__item--active {
-  border-color: rgba(246, 231, 195, 0.6);
+  border-color: rgba(77, 70, 56, 0.6);
   background: rgba(246, 231, 195, 0.08);
 }
 

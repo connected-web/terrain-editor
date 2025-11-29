@@ -57,10 +57,9 @@ defineExpose({
   max-width: 50%;
   transition: width 0.2s ease;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(6, 11, 20, 0.92);
   backdrop-filter: blur(8px);
   height: 100%;
-  margin-left: 1.5rem;
+  margin-left: 5rem;
 }
 
 .panel-dock--mobile {
@@ -93,6 +92,12 @@ defineExpose({
   color: inherit;
   cursor: pointer;
   z-index: 2;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.panel-dock__toggle:hover {
+  background: rgba(7, 11, 18, 1);
+  border-color: rgba(196, 174, 53, 0.692);
 }
 
 .panel-dock__inner {
@@ -100,23 +105,16 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 10px;
-}
-
-.panel-dock__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.75rem 1rem 0;
 }
 
 .panel-dock__content {
+  box-sizing: border-box;
   flex: 1;
-  padding: 0 1rem 1rem;
+  padding: 1rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  max-height: 95vh;
+  max-height: 100vh;
 }
 
 .panel-dock__content::-webkit-scrollbar {
