@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   buildWynArchive,
   createLayerBrowserStore,
@@ -478,7 +478,6 @@ function toggleDock() {
 function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
 }
-
 
 function handleLocationSelect(id: string) {
   locationsApi.setActiveLocation(id)

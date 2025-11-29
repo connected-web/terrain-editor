@@ -153,11 +153,20 @@ function applySeaLevel() {
   const nextLegend = { ...legend, sea_level: seaLevel }
   deps.projectStore.setLegend(nextLegend)
   deps.layerBrowserStore.setLegend(nextLegend)
-  if (deps.datasetRef.value) {
-    deps.datasetRef.value.legend = nextLegend
-    deps.requestViewerRemount()
-  }
+  delayedApplySeaLevel(seaLevel)
   persistProject()
+}
+
+let applyDebounceHandle: number | null = null
+function delayedApplySeaLevel(value: number) {
+  if (applyDebounceHandle !== null) {
+    window.clearTimeout(applyDebounceHandle)
+  }
+  applyDebounceHandle = window.setTimeout(() => {
+    applyDebounceHandle = null
+    const deps = ensureDependencies()
+    deps.handle.value?.setSeaLevel(value)
+  }, 250)
 }
 
 function resetWorkspaceForm() {

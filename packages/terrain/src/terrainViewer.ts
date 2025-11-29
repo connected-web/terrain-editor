@@ -1258,7 +1258,9 @@ const markerMap = new Map<
   }
 
   function applySeaLevelUpdate(nextSeaLevel: number) {
-    if (!heightSampler) return
+    if (!heightSampler) {
+      return
+    }
     seaLevel = nextSeaLevel
     legend.sea_level = nextSeaLevel
     dataset.legend.sea_level = nextSeaLevel
