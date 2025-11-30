@@ -2,7 +2,6 @@
   <section class="panel-card">
     <header class="panel-card__header">
       <Icon icon="layer-group">Layers</Icon>
-      <span class="panel-card__hint">Toggle biome + overlay visibility</span>
     </header>
     <div v-if="layerEntries.length" class="panel-card__list">
       <button
@@ -18,16 +17,16 @@
       </button>
       <div class="panel-card__pill-actions">
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'biome', true)">
-          Show all biomes
+          <Icon icon="eye">Show all biomes</Icon>
         </button>
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'biome', false)">
-          Hide all biomes
+          <Icon icon="eye-slash">Hide all biomes</Icon>
         </button>
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'overlay', true)">
-          Show overlays
+          <Icon icon="plane">Show all overlays</Icon>
         </button>
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'overlay', false)">
-          Hide overlays
+          <Icon icon="plane-slash">Hide all overlays</Icon>
         </button>
       </div>
     </div>
