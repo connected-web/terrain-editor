@@ -7,6 +7,7 @@ export type LayerEntry = {
   label: string
   visible: boolean
   color: [number, number, number]
+  mask?: string
 }
 
 export function useLayersModel(options: {

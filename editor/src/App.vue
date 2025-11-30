@@ -344,7 +344,6 @@ function handleResize() {
   isCompactViewport.value = window.innerWidth < 800
 }
 
-
 async function persistCurrentProject(options: { base64?: string; label?: string } = {}) {
   const snapshot = projectStore.getSnapshot()
   if (!snapshot.legend) return
