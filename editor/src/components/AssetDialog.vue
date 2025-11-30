@@ -3,7 +3,7 @@
     <div class="asset-dialog__backdrop" @click="$emit('close')" />
     <section class="asset-dialog__panel">
       <header class="asset-dialog__header">
-        <h2>Asset library</h2>
+        <h2><Icon icon="image">Asset library</Icon></h2>
         <button type="button" class="pill-button pill-button--ghost" @click="$emit('close')">
           <Icon icon="xmark" />
         </button>
@@ -121,6 +121,11 @@ const filteredAssets = computed(() => {
 
 .asset-dialog__header h2 {
   margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(242, 237, 224, 0.7);
 }
 
 .asset-dialog__search {

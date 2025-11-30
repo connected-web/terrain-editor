@@ -2,6 +2,7 @@ import { reactive, ref, type Ref } from 'vue'
 import type {
   LayerBrowserState,
   LayerToggleState,
+  LegendLayer,
   TerrainDataset,
   TerrainHandle,
   TerrainLegend,
@@ -70,6 +71,7 @@ type WorkspaceDependencies = {
 
 type WorkspaceContext = WorkspaceDependencies & {
   viewerLocationResolver: ((list?: TerrainLocation[]) => TerrainLocation[]) | null
+  exportActiveLayerImage: () => void
 }
 
 const workspaceForm = reactive<WorkspaceForm>({
@@ -186,6 +188,61 @@ function createScratchLegendInternal(): TerrainLegend {
   }
 }
 
+function exportActiveLayerImage() {
+  const deps = ensureDependencies();
+  exportLayerImage().then(blob => {
+    if (blob) {
+      // Create a download link and trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'layer.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      deps.updateStatus?.('No active layer image to export.', 2000);
+    }
+  });
+}
+
+function exportLayerImage(): Promise<Blob | null> {
+  const deps = ensureDependencies();
+  const state = deps.layerBrowserStore.getState();
+  // Select the first entry as the active layer (since 'activeLayerId' does not exist)
+  const activeEntry = state.entries[0];
+  if (!activeEntry) return Promise.resolve(null);
+
+  // Assume the image is stored in datasetRef as an ImageBitmap or HTMLCanvasElement
+  const dataset = deps.datasetRef.value;
+  if (!dataset) return Promise.resolve(null);
+
+  // Assuming TerrainDataset has a getLayer(id: string) method or similar
+  // Access the layer directly from the dataset's layers property
+  const layer = (dataset as any).layers
+    ? (dataset as any).layers[activeEntry.id]
+    : (dataset as any)[activeEntry.id];
+
+  if (!layer || !layer.image) return Promise.resolve(null);
+
+  // If image is a canvas, use toBlob; if ImageBitmap, draw to canvas first
+  if (layer.image instanceof HTMLCanvasElement) {
+    return new Promise<Blob | null>(resolve => layer.image.toBlob((blob: Blob | null) => resolve(blob), 'image/png'));
+  } else if (layer.image instanceof ImageBitmap) {
+    const canvas = document.createElement('canvas');
+    canvas.width = layer.image.width;
+    canvas.height = layer.image.height;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(layer.image, 0, 0);
+    return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+  } else if (layer.image instanceof Blob) {
+    return Promise.resolve(layer.image);
+  }
+
+  return Promise.resolve(null);
+}
+
 const workspaceActions: WorkspaceActions = {
   updateProjectLabel,
   updateProjectAuthor,
@@ -197,7 +254,8 @@ export function initWorkspaceModel(options: WorkspaceDependencies) {
   dependencies = options
   workspaceContext = {
     ...options,
-    viewerLocationResolver
+    viewerLocationResolver,
+    exportActiveLayerImage
   }
   unsubscribeProject?.()
   unsubscribeLayerBrowser?.()
@@ -247,6 +305,7 @@ export function useWorkspaceContext() {
     setActivePanel: workspaceContext.setActivePanel,
     ensureDockExpanded: workspaceContext.ensureDockExpanded,
     updateStatus: workspaceContext.updateStatus,
+    exportActiveLayerImage: workspaceContext.exportActiveLayerImage,
     getViewerLocations: (list?: TerrainLocation[]) => {
       if (!viewerLocationResolver) {
         throw new Error('Viewer location resolver not registered.')

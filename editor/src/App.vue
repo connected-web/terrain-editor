@@ -27,8 +27,9 @@
 
         <LayersPanel
           v-else-if="activeDockPanel === 'layers'"
-          :layer-entries="layerEntries"
+          :layer-entries="layersApi.layerEntries.value"
           :color-to-css="rgb"
+          @open-layer-editor="layersApi.openLayerEditor"
           @toggle-layer="toggleLayer"
           @set-all="setAllLayers"
         />
@@ -80,6 +81,16 @@
         @upload="() => triggerLibraryUpload()"
         @remove="removeAsset"
         @close="closeIconPicker"
+      />
+      <LayerEditor
+        v-if="layersApi.layerEditorOpen.value"
+        :assets="projectAssets"
+        :get-preview="getIconPreview"
+        :filter-text="assetDialogFilter"
+        :active-layer="layersApi.activeLayer.value"
+        @update:filter-text="setAssetDialogFilter"
+        @export-layer="layersApi.exportActiveLayerImage"
+        @close="layersApi.closeLayerEditor()"
       />
       <LocationPickerDialog
         v-if="locationsApi.locationPickerOpen.value"
@@ -140,6 +151,7 @@ import { useLocations } from './composables/useLocations'
 import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
+import LayerEditor from './components/panels/LayerEditor.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LocationPickerDialog from './components/LocationPickerDialog.vue'
 import WorkspacePanel from './components/panels/WorkspacePanel.vue'
@@ -148,7 +160,7 @@ import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
 import { useUiActions } from './composables/useUiActions'
-import { useLayerSync } from './composables/useLayerSync'
+import { useLayersModel } from './composables/useLayersModel'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
@@ -184,7 +196,6 @@ const { localSettings, loadLocalSettings } = useLocalSettings()
 const {
   workspaceForm,
   projectSnapshot,
-  layerBrowserState,
   layerState,
   createScratchLegend
 } = useWorkspace({
@@ -202,7 +213,7 @@ const {
   updateStatus
 })
 
-useLayerSync({ layerState, handle })
+const layersApi = useLayersModel({ layerState, handle })
 
 const {
   themeForm,
@@ -300,8 +311,6 @@ const {
 
 const loadSample = loadSampleArchive
 const loadArchiveFromFile = loadArchiveFromFileInternal
-
-const layerEntries = computed(() => layerBrowserState.value.entries)
 
 const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
 const { uiActions } = useUiActions({

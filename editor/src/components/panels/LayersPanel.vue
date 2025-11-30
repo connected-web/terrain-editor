@@ -10,10 +10,16 @@
         type="button"
         class="pill-button panel-card__pill"
         :class="{ 'panel-card__pill--inactive': !entry.visible }"
-        @click="$emit('toggle-layer', entry.id)"
+        @click="$emit('open-layer-editor', entry.id)"
       >
         <span class="panel-card__pill-swatch" :style="{ backgroundColor: colorToCss(entry.color) }" />
         <span class="panel-card__pill-label">{{ entry.label }}</span>
+        <span class="spacer"></span>
+        <div 
+          title="Toggle layer visibility"
+          @click="$emit('toggle-layer', entry.id)">
+          <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" class="panel-card__pill-icon" />
+        </div>
       </button>
       <div class="panel-card__pill-actions">
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'biome', true)">
@@ -35,14 +41,8 @@
 </template>
 
 <script setup lang="ts">
+import { LayerEntry } from '../../composables/useLayersModel'
 import Icon from '../Icon.vue'
-
-type LayerEntry = {
-  id: string
-  label: string
-  visible: boolean
-  color: [number, number, number]
-}
 
 defineProps<{
   layerEntries: LayerEntry[]
@@ -51,6 +51,7 @@ defineProps<{
 
 defineEmits<{
   'toggle-layer': [id: string]
+  'open-layer-editor': [id: string]
   'set-all': [kind: 'biome' | 'overlay', visible: boolean]
 }>()
 </script>
