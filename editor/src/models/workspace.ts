@@ -75,8 +75,8 @@ type WorkspaceContext = WorkspaceDependencies & {
 const workspaceForm = reactive<WorkspaceForm>({
   label: '',
   author: '',
-  width: 1024,
-  height: 1536,
+  width: 512,
+  height: 512,
   seaLevel: 0
 })
 
@@ -106,8 +106,8 @@ function syncWorkspaceFormFromSnapshot() {
   const snapshot = projectSnapshotRef.value
   workspaceForm.label = snapshot.metadata.label ?? ''
   workspaceForm.author = snapshot.metadata.author ?? ''
-  workspaceForm.width = snapshot.legend?.size?.[0] ?? 1024
-  workspaceForm.height = snapshot.legend?.size?.[1] ?? 1536
+  workspaceForm.width = snapshot.legend?.size?.[0] ?? 512
+  workspaceForm.height = snapshot.legend?.size?.[1] ?? 512
   workspaceForm.seaLevel = snapshot.legend?.sea_level ?? 0
 }
 
