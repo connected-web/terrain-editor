@@ -2,52 +2,63 @@
   <div class="layer-editor">
     <section class="layer-editor__panel">
       <header class="layer-editor__header">
-        <h2><Icon icon="layer-group">Layer Editor</Icon></h2>
-        <button type="button" class="pill-button pill-button--ghost" @click="$emit('close')">
-          <Icon icon="xmark" />
-        </button>
+        <div>
+          <p class="layer-editor__eyebrow">Layer editor</p>
+          <h2>{{ activeLayer?.label ?? 'Select a layer' }}</h2>
+        </div>
+        <div class="layer-editor__header-actions">
+          <button
+            v-if="activeLayer"
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="$emit('export-layer')"
+          >
+            <Icon icon="file-export">Export layer</Icon>
+          </button>
+          <button type="button" class="pill-button pill-button--ghost" @click="$emit('close')">
+            <Icon icon="xmark" />
+          </button>
+        </div>
       </header>
 
-      <h4>{{ activeLayer?.label ?? 'No layer selected' }}</h4>
+      <div v-if="activeLayer" class="layer-editor__body">
+        <aside class="layer-editor__meta">
+          <label class="layer-editor__field">
+            <span>Biome colour</span>
+            <input
+              v-model="activeColourHex"
+              type="color"
+              aria-label="Biome colour"
+            >
+          </label>
+        </aside>
 
-      <div v-if="activeLayer" class="layer-editor__controls">
-        <label class="layer-editor__field">
-          <span>Biome colour</span>
-          <input
-            v-model="activeColourHex"
-            type="color"
-          >
-        </label>
+        <div class="layer-editor__workspace">
+          <LayerMaskEditor
+            v-if="maskUrl"
+            :src="maskUrl"
+            @update-mask="handleUpdateMask"
+          />
+          <p v-else class="layer-editor__placeholder">
+            No mask image found for this layer.
+          </p>
+        </div>
       </div>
 
-      <div class="layer-editor__image">
-        <LayerMaskEditor
-          v-if="maskUrl"
-          :src="maskUrl"
-          @update-mask="handleUpdateMask"
-        />
-        <p v-else class="layer-editor__placeholder">
-          No mask image found for this layer.
-        </p>
+      <div v-else class="layer-editor__empty">
+        <p>Select a layer from the sidebar to edit its mask and colour.</p>
       </div>
-
-      <footer class="layer-editor__footer">
-        <button class="pill-button" @click="$emit('export-layer')">
-          <Icon icon="file-export">Export layer</Icon>
-        </button>
-      </footer>
     </section>
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 import type { LayerEntry } from '../../composables/useLayersModel'
 import LayerMaskEditor from '../layers/LayerMaskEditor.vue'
 
 const props = defineProps<{
   assets: TerrainProjectFileEntry[]
-  getPreview: (path: string) => string
   filterText?: string
   activeLayer: LayerEntry | null
 }>()
@@ -66,10 +77,29 @@ const activeMaskAsset = computed(() => {
   return props.assets.find(entry => entry.path === props.activeLayer?.mask) ?? null
 })
 
-const maskUrl = computed(() => {
-  if (!activeMaskAsset.value) return null
-  return props.getPreview(activeMaskAsset.value.path)
+const maskObjectUrl = ref<string | null>(null)
+
+watch(
+  () => activeMaskAsset.value,
+  (asset) => {
+    if (maskObjectUrl.value) {
+      URL.revokeObjectURL(maskObjectUrl.value)
+      maskObjectUrl.value = null
+    }
+    if (!asset) return
+    const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
+    maskObjectUrl.value = URL.createObjectURL(blob)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  if (maskObjectUrl.value) {
+    URL.revokeObjectURL(maskObjectUrl.value)
+  }
 })
+
+const maskUrl = computed(() => maskObjectUrl.value)
 
 const activeColourHex = computed({
   get () {
@@ -122,13 +152,12 @@ async function handleUpdateMask (blob: Blob) {
   top: 1.5rem;
   right: 1.5rem;
   bottom: 1.5rem;
-  width: min(500px, 90vw);
+  width: min(620px, 95vw);
   background: rgba(5, 8, 17, 0.95);
   border-radius: 18px;
-  padding: 0.75rem 0.75rem 0.85rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -136,6 +165,7 @@ async function handleUpdateMask (blob: Blob) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
 }
 
 .layer-editor__header h2 {
@@ -147,34 +177,51 @@ async function handleUpdateMask (blob: Blob) {
   color: rgba(242, 237, 224, 0.7);
 }
 
-.layer-editor__image {
+.layer-editor__eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+}
+
+.layer-editor__header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.layer-editor__body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 1rem;
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .layer-editor__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.layer-editor__meta {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding-right: 0.5rem;
-  padding-top: 0.25rem;
 }
 
-.layer-editor__image::-webkit-scrollbar {
-  width: 8px;
-}
-
-.layer-editor__image::-webkit-scrollbar-thumb {
-  background: rgba(246, 231, 195, 0.35);
-}
-
-.layer-editor__actions {
-  grid-column: span 2;
+.layer-editor__workspace {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.75rem;
+  background: rgba(5, 8, 17, 0.65);
+  min-height: 0;
   display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
 }
 
-.layer-editor__footer {
-  display: flex;
-  justify-content: flex-end;
+.layer-editor__workspace > * {
+  flex: 1;
+  min-height: 0;
 }
 
 @media  (max-width: 1024px) {
@@ -186,16 +233,9 @@ async function handleUpdateMask (blob: Blob) {
   }
 }
 
-.layer-editor__controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
 .layer-editor__field {
   display: flex;
-  align-items: centre;
+  align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
 }
@@ -214,19 +254,25 @@ async function handleUpdateMask (blob: Blob) {
   cursor: pointer;
 }
 
-.layer-editor__image {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-right: 0.5rem;
-  padding-top: 0.25rem;
-}
-
 .layer-editor__placeholder {
   margin: 0;
   opacity: 0.7;
   font-size: 0.85rem;
+}
+
+.layer-editor__workspace .layer-editor__placeholder {
+  text-align: center;
+  width: 100%;
+}
+
+.layer-editor__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 2rem;
 }
 
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="layer-mask-editor">
     <div class="layer-mask-editor__toolbar">
-      <div class="row">
+      <div class="row row--slider">
         <span class="layer-mask-editor__label">Brush</span>
         <input
           v-model.number="brushSize"
@@ -12,43 +12,54 @@
         <span class="layer-mask-editor__value">{{ brushSize }} px</span>
       </div>
 
-      <div class="row">
+      <div class="row row--mode">
         <span class="layer-mask-editor__label">Mode</span>
-      </div>
-      
-      <div class="row">
-        <button
-          type="button"
-          class="pill-button"
-          :class="{ 'pill-button--active': brushMode === 'paint' }"
-          @click="brushMode = 'paint'"
-        >
-          <Icon icon="paint-brush">Paint (white)</Icon>
-        </button>
-        <button
-          type="button"
-          class="pill-button pill-button--ghost"
-          :class="{ 'pill-button--active': brushMode === 'erase' }"
-          @click="brushMode = 'erase'"
-        >
-          <Icon icon="eraser">Erase (black)</Icon>
-        </button>
+        <div class="layer-mask-editor__mode-buttons">
+          <button
+            type="button"
+            class="pill-button"
+            :class="{ 'pill-button--active': brushMode === 'paint' }"
+            title="Paint (white)"
+            aria-label="Paint (white)"
+            @click="brushMode = 'paint'"
+          >
+            <Icon icon="paint-brush" aria-hidden="true" />
+            <span class="sr-only">Paint (white)</span>
+          </button>
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            :class="{ 'pill-button--active': brushMode === 'erase' }"
+            title="Erase (black)"
+            aria-label="Erase (black)"
+            @click="brushMode = 'erase'"
+          >
+            <Icon icon="eraser" aria-hidden="true" />
+            <span class="sr-only">Erase (black)</span>
+          </button>
+        </div>
       </div>
 
-      <div class="layer-mask-editor__toolbar-group">
+      <div class="row layer-mask-editor__toolbar-group">
         <button
           type="button"
           class="pill-button pill-button--ghost"
+          title="Reset mask"
+          aria-label="Reset mask"
           @click="handleReset"
         >
-          <Icon icon="recycle">Reset</Icon>
+          <Icon icon="recycle" aria-hidden="true" />
+          <span class="sr-only">Reset</span>
         </button>
         <button
           type="button"
           class="pill-button"
+          title="Apply changes"
+          aria-label="Apply changes"
           @click="handleApply"
         >
-          <Icon icon="shuffle">Apply changes</Icon>
+          <Icon icon="shuffle" aria-hidden="true" />
+          <span class="sr-only">Apply changes</span>
         </button>
       </div>
     </div>
@@ -90,7 +101,7 @@ const brushMode = ref<'paint' | 'erase'>('paint')
 function getContext () {
   const canvas = canvasRef.value
   if (!canvas) return null
-  return canvas.getContext('2d')
+  return canvas.getContext('2d', { willReadFrequently: true })
 }
 
 function loadImage () {
@@ -217,6 +228,23 @@ onBeforeUnmount(() => {
   gap: 0.5rem;
 }
 
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.row--slider {
+  width: 100%;
+}
+
+.layer-mask-editor__mode-buttons {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .layer-mask-editor__toolbar-group {
   display: flex;
   align-items: center;
@@ -242,8 +270,8 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: radial-gradient(circle at top, #111827 0, #020617 55%);
   display: flex;
-  align-items: centre;
-  justify-content: centre;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem;
 }
 

@@ -85,7 +85,6 @@
       <LayerEditor
         v-if="layersApi.layerEditorOpen.value"
         :assets="projectAssets"
-        :get-preview="getIconPreview"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
         @update:filter-text="setAssetDialogFilter"
@@ -448,8 +447,9 @@ function setAllLayers(kind: 'biome' | 'overlay', visible: boolean) {
   layerBrowserStore.setAll(kind, visible)
 }
 
-function rgb(color: [number, number, number]) {
-  return `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+function rgb(color: [number, number, number] | undefined) {
+  const next = color ?? [255, 255, 255]
+  return `rgb(${next[0]}, ${next[1]}, ${next[2]})`
 }
 
 async function toggleEditorFullscreen() {
@@ -676,7 +676,14 @@ function getViewerMountContext(): ViewerMountContext | null {
 }
 
 async function handleLayerAssetReplace(asset: TerrainProjectFileEntry) {
-  await replaceAssetWithFileHelper(asset.path, new File([asset.data], asset.sourceFileName ?? asset.path))
+  await replaceAssetWithFileHelper(
+    asset.path,
+    new File([asset.data], asset.sourceFileName ?? asset.path)
+  )
+  if (handle.value && layerState.value) {
+    await handle.value.updateLayers(layerState.value)
+  }
+  await persistCurrentProject()
 }
 
 function handleLayerColourUpdate(payload: { id: string; color: [number, number, number] }) {
@@ -684,13 +691,20 @@ function handleLayerColourUpdate(payload: { id: string; color: [number, number, 
   const legend = snapshot.legend
   if (!legend) return
 
+  const [rawKind, rawKey] = payload.id.split(':')
+  const targetKind = rawKind === 'overlay' ? 'overlays' : 'biomes'
+  const key = rawKey ?? rawKind
+  const targetGroup = targetKind === 'overlays' ? legend.overlays : legend.biomes
+  const targetLayer = targetGroup?.[key]
+  if (!targetLayer) return
+
   const nextLegend = {
     ...legend,
-    biomes: {
-      ...legend.biomes,
-      [payload.id]: {
-        ...(legend.biomes?.[payload.id] ?? {}),
-        color: payload.color
+    [targetKind]: {
+      ...legend[targetKind],
+      [key]: {
+        ...targetLayer,
+        rgb: payload.color
       }
     }
   }
