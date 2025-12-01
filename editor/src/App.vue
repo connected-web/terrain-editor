@@ -680,6 +680,7 @@ async function handleLayerAssetReplace(asset: TerrainProjectFileEntry) {
     asset.path,
     new File([asset.data], asset.sourceFileName ?? asset.path)
   )
+  handle.value?.invalidateLayerMasks?.([asset.path])
   if (handle.value && layerState.value) {
     await handle.value.updateLayers(layerState.value)
   }
@@ -711,6 +712,19 @@ function handleLayerColourUpdate(payload: { id: string; color: [number, number, 
 
   projectStore.setLegend(nextLegend)
   layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    const datasetLegend = datasetRef.value.legend
+    const datasetGroup = targetKind === 'overlays' ? datasetLegend.overlays : datasetLegend.biomes
+    if (datasetGroup?.[key]) {
+      datasetGroup[key] = {
+        ...datasetGroup[key],
+        rgb: payload.color
+      }
+    }
+  }
+  if (handle.value && layerState.value) {
+    void handle.value.updateLayers(layerState.value)
+  }
   persistCurrentProject()
 }
 

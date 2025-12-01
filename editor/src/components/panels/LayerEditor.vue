@@ -26,9 +26,10 @@
           <label class="layer-editor__field">
             <span>Biome colour</span>
             <input
-              v-model="activeColourHex"
+              :value="activeColourHex"
               type="color"
               aria-label="Biome colour"
+              @change="handleColourChange"
             >
           </label>
         </aside>
@@ -86,7 +87,7 @@ watch(
       URL.revokeObjectURL(maskObjectUrl.value)
       maskObjectUrl.value = null
     }
-    if (!asset) return
+    if (!asset || !asset.data) return
     const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
     maskObjectUrl.value = URL.createObjectURL(blob)
   },
@@ -101,28 +102,16 @@ onBeforeUnmount(() => {
 
 const maskUrl = computed(() => maskObjectUrl.value)
 
-const activeColourHex = computed({
-  get () {
-    const colour = props.activeLayer?.color
-    if (!colour) return '#ffffff'
-    const [r, g, b] = colour
-    return (
-      '#' +
-      [r, g, b]
-        .map(v => v.toString(16).padStart(2, '0'))
-        .join('')
-    )
-  },
-  set (value: string) {
-    if (!props.activeLayer) return
-    const r = parseInt(value.slice(1, 3), 16)
-    const g = parseInt(value.slice(3, 5), 16)
-    const b = parseInt(value.slice(5, 7), 16)
-    emit('update-colour', {
-      id: props.activeLayer.id,
-      color: [r, g, b]
-    })
-  }
+const activeColourHex = computed(() => {
+  const colour = props.activeLayer?.color
+  if (!colour) return '#ffffff'
+  const [r, g, b] = colour
+  return (
+    '#' +
+    [r, g, b]
+      .map(v => v.toString(16).padStart(2, '0'))
+      .join('')
+  )
 })
 
 async function handleUpdateMask (blob: Blob) {
@@ -135,6 +124,19 @@ async function handleUpdateMask (blob: Blob) {
     lastModified: Date.now()
   })
 }
+
+function handleColourChange (event: Event) {
+  const input = event.target as HTMLInputElement | null
+  if (!input || !props.activeLayer) return
+  const value = input.value
+  const r = parseInt(value.slice(1, 3), 16)
+  const g = parseInt(value.slice(3, 5), 16)
+  const b = parseInt(value.slice(5, 7), 16)
+  emit('update-colour', {
+    id: props.activeLayer.id,
+    color: [r, g, b]
+  })
+}
 </script>
 
 <style scoped>
@@ -144,7 +146,8 @@ async function handleUpdateMask (blob: Blob) {
   top: 0;
   bottom: 0;
   right: 0;
-  width: 50vw;
+  left: auto;
+  pointer-events: none;
 }
 
 .layer-editor__panel {
@@ -159,6 +162,8 @@ async function handleUpdateMask (blob: Blob) {
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  pointer-events: auto;
+  margin-left: auto;
 }
 
 .layer-editor__header {

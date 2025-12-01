@@ -115,6 +115,7 @@ export type TerrainHandle = {
   setTheme: (overrides?: TerrainThemeOverrides) => void
   setSeaLevel: (level: number) => void
   invalidateIconTextures: (paths?: string[]) => void
+  invalidateLayerMasks: (paths?: string[]) => void
 }
 
 export type Cleanup = () => void
@@ -817,6 +818,18 @@ export async function initTerrainViewer(
   let stemRadius = computeStemRadius(markerTheme.stem)
   const layerImageCache = new Map<string, HTMLImageElement>()
   const maskCanvasCache = new Map<string, HTMLCanvasElement>()
+
+  function invalidateLayerMaskCache(paths?: string[]) {
+    if (!paths || paths.length === 0) {
+      layerImageCache.clear()
+      maskCanvasCache.clear()
+      return
+    }
+    paths.forEach((path) => {
+      layerImageCache.delete(path)
+      maskCanvasCache.delete(path)
+    })
+  }
 
   function pixelToUV(pixel: { x: number; y: number }) {
     const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
@@ -1664,6 +1677,9 @@ const markerMap = new Map<
     invalidateIconTextures: (paths?: string[]) => {
       invalidateIconCache(paths)
       setLocationMarkers(currentLocations, currentFocusId)
+    },
+    invalidateLayerMasks: (paths?: string[]) => {
+      invalidateLayerMaskCache(paths)
     }
   }
 }
