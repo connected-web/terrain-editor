@@ -90,6 +90,8 @@
         :active-layer="layersApi.activeLayer.value"
         @update:filter-text="setAssetDialogFilter"
         @export-layer="layersApi.exportActiveLayerImage"
+        @replace="handleLayerAssetReplace"
+        @update-colour="handleLayerColourUpdate"
         @close="layersApi.closeLayerEditor()"
       />
       <LocationPickerDialog
@@ -671,6 +673,31 @@ function getViewerMountContext(): ViewerMountContext | null {
     onLocationPick: locationsApi.handleLocationPick,
     onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId)
   }
+}
+
+async function handleLayerAssetReplace(asset: TerrainProjectFileEntry) {
+  await replaceAssetWithFileHelper(asset.path, new File([asset.data], asset.sourceFileName ?? asset.path))
+}
+
+function handleLayerColourUpdate(payload: { id: string; color: [number, number, number] }) {
+  const snapshot = projectStore.getSnapshot()
+  const legend = snapshot.legend
+  if (!legend) return
+
+  const nextLegend = {
+    ...legend,
+    biomes: {
+      ...legend.biomes,
+      [payload.id]: {
+        ...(legend.biomes?.[payload.id] ?? {}),
+        color: payload.color
+      }
+    }
+  }
+
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  persistCurrentProject()
 }
 
 function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
