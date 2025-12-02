@@ -768,7 +768,8 @@ export async function initTerrainViewer(
       onCameraMove: () => {},
       setTheme: () => {},
       setSeaLevel: () => {},
-      invalidateIconTextures: () => {}
+      invalidateIconTextures: () => {},
+      invalidateLayerMasks: () => {}
     }
   }
 

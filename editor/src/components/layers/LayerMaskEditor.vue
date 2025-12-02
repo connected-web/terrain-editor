@@ -101,7 +101,11 @@
       @pointerleave="handleViewportPointerUp"
       @wheel="handleViewportWheel"
     >
+      <div v-if="!hasValidImage" class="layer-mask-editor__placeholder">
+        <p>{{ props.src ? 'Loading mask image...' : 'No mask image available' }}</p>
+      </div>
       <canvas
+        v-show="hasValidImage"
         ref="canvasRef"
         class="layer-mask-editor__canvas"
         :style="canvasStyle"
@@ -116,6 +120,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import Icon from '../Icon.vue'
 
 const props = defineProps<{
   src: string | null
@@ -128,6 +133,10 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const originalImageData = ref<ImageData | null>(null)
+
+const hasValidImage = computed(() => {
+  return Boolean(props.src && image.value && originalImageData.value)
+})
 
 const isDrawing = ref(false)
 const lastX = ref(0)
@@ -167,7 +176,23 @@ function getContext () {
 
 function loadImage () {
   const canvas = canvasRef.value
-  if (!canvas || !props.src) return
+  if (!canvas) {
+    return
+  }
+
+  // Clear canvas and reset state if no src is provided
+  if (!props.src) {
+    const ctx = getContext()
+    if (ctx) {
+      // Set canvas to a minimal size and clear it
+      canvas.width = 1
+      canvas.height = 1
+      ctx.clearRect(0, 0, 1, 1)
+    }
+    originalImageData.value = null
+    image.value = null
+    return
+  }
 
   const img = new Image()
   img.crossOrigin = 'anonymous'
@@ -189,6 +214,18 @@ function loadImage () {
     }
 
     image.value = img
+  }
+
+  img.onerror = () => {
+    // Handle image loading errors by clearing the canvas
+    const ctx = getContext()
+    if (ctx) {
+      canvas.width = 1
+      canvas.height = 1
+      ctx.clearRect(0, 0, 1, 1)
+    }
+    originalImageData.value = null
+    image.value = null
   }
 }
 
@@ -308,7 +345,7 @@ function handleViewportWheel(event: WheelEvent) {
 }
 
 watch(
-  () => props.src,
+  () => [props.src, canvasRef.value] as const,
   () => loadImage(),
   { immediate: true }
 )
@@ -406,9 +443,25 @@ onBeforeUnmount(() => {
 }
 
 .layer-mask-editor__canvas {
+  max-width: 100%;
+  max-height: 100%;
   image-rendering: pixelated;
-  background: #000;
+  background: transparent;
   display: block;
   transform-origin: top left;
+}
+
+.layer-mask-editor__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.layer-mask-editor__placeholder p {
+  margin: 0;
 }
 </style>
