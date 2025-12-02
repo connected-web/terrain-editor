@@ -22,24 +22,24 @@
       </header>
 
       <div v-if="activeLayer" class="layer-editor__body">
-        <aside class="layer-editor__meta">
-          <label class="layer-editor__field">
-            <span>Biome colour</span>
-            <input
-              :value="activeColourHex"
-              type="color"
-              aria-label="Biome colour"
-              @change="handleColourChange"
-            >
-          </label>
-        </aside>
-
         <div class="layer-editor__workspace">
           <LayerMaskEditor
             v-if="maskUrl"
             :src="maskUrl"
             @update-mask="handleUpdateMask"
-          />
+          >
+            <template #toolbar-prefix>
+              <label class="layer-editor__colour">
+                <span class="sr-only">Biome colour</span>
+                <input
+                  :value="activeColourHex"
+                  type="color"
+                  aria-label="Biome colour"
+                  @change="handleColourChange"
+                >
+              </label>
+            </template>
+          </LayerMaskEditor>
           <p v-else class="layer-editor__placeholder">
             No mask image found for this layer.
           </p>
@@ -54,12 +54,14 @@
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import type { TerrainProjectFileEntry } from '@connected-web/terrain-editor'
+import type { TerrainDataset, TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 import type { LayerEntry } from '../../composables/useLayersModel'
 import LayerMaskEditor from '../layers/LayerMaskEditor.vue'
 
 const props = defineProps<{
   assets: TerrainProjectFileEntry[]
+  getPreview?: (path: string) => string
+  dataset?: TerrainDataset | null
   filterText?: string
   activeLayer: LayerEntry | null
 }>()
@@ -79,25 +81,102 @@ const activeMaskAsset = computed(() => {
 })
 
 const maskObjectUrl = ref<string | null>(null)
+const maskUrlOwned = ref(false)
+const maskSignature = ref<string | null>(null)
+let maskLoadToken = 0
+
+function setMaskUrl(url: string | null, ownsUrl: boolean) {
+  if (maskUrlOwned.value && maskObjectUrl.value) {
+    URL.revokeObjectURL(maskObjectUrl.value)
+  }
+  maskObjectUrl.value = url
+  maskUrlOwned.value = ownsUrl
+}
+
+async function preloadUrl(url: string) {
+  await new Promise<void>((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Failed to load mask preview'))
+    img.src = url
+  })
+}
 
 watch(
-  () => activeMaskAsset.value,
-  (asset) => {
-    if (maskObjectUrl.value) {
-      URL.revokeObjectURL(maskObjectUrl.value)
-      maskObjectUrl.value = null
+  () => {
+    const asset = activeMaskAsset.value
+    const path = props.activeLayer?.mask ?? null
+    return {
+      path,
+      assetSignature: asset
+        ? `${asset.path}:${asset.lastModified ?? 0}:${asset.data?.byteLength ?? 0}`
+        : null,
+      hasAssetData: Boolean(asset?.data?.byteLength),
+      asset
     }
-    if (!asset || !asset.data) return
-    const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
-    maskObjectUrl.value = URL.createObjectURL(blob)
+  },
+  async ({ path, assetSignature, hasAssetData, asset }) => {
+    const requestId = ++maskLoadToken
+    if (!path) {
+      setMaskUrl(null, false)
+      maskSignature.value = null
+      return
+    }
+
+    if (hasAssetData && assetSignature === maskSignature.value && maskObjectUrl.value) {
+      return
+    }
+
+    if (hasAssetData && asset?.data) {
+      const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
+      const url = URL.createObjectURL(blob)
+      try {
+        await preloadUrl(url)
+        if (maskLoadToken === requestId) {
+          setMaskUrl(url, true)
+          maskSignature.value = assetSignature
+        } else {
+          URL.revokeObjectURL(url)
+        }
+      } catch {
+        URL.revokeObjectURL(url)
+      }
+      return
+    }
+
+    const datasetUrl =
+      (props.dataset ? await Promise.resolve(props.dataset.resolveAssetUrl(path)).catch(() => null) : null) ??
+      (props.getPreview ? props.getPreview(path) : '')
+    if (!datasetUrl) {
+      if (maskLoadToken === requestId) {
+        setMaskUrl(null, false)
+        maskSignature.value = null
+      }
+      return
+    }
+    try {
+      await preloadUrl(datasetUrl)
+      if (maskLoadToken === requestId) {
+        setMaskUrl(datasetUrl, false)
+        maskSignature.value = `preview:${path}`
+      }
+    } catch {
+      if (maskLoadToken === requestId) {
+        setMaskUrl(null, false)
+        maskSignature.value = null
+      }
+    }
   },
   { immediate: true }
 )
 
 onBeforeUnmount(() => {
-  if (maskObjectUrl.value) {
+  if (maskUrlOwned.value && maskObjectUrl.value) {
     URL.revokeObjectURL(maskObjectUrl.value)
   }
+  maskObjectUrl.value = null
+  maskSignature.value = null
 })
 
 const maskUrl = computed(() => maskObjectUrl.value)
@@ -142,20 +221,20 @@ function handleColourChange (event: Event) {
 <style scoped>
 .layer-editor {
   position: fixed;
+  inset: 0;
   z-index: 200;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  left: auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
   pointer-events: none;
+  padding: 0;
 }
 
 .layer-editor__panel {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  bottom: 1.5rem;
+  margin: 1.5rem;
   width: min(620px, 95vw);
+  max-width: calc(100vw - 2rem);
+  height: calc(100vh - 3rem);
   background: rgba(5, 8, 17, 0.95);
   border-radius: 18px;
   padding: 1rem;
@@ -196,30 +275,17 @@ function handleColourChange (event: Event) {
 }
 
 .layer-editor__body {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
-@media (max-width: 760px) {
-  .layer-editor__body {
-    grid-template-columns: 1fr;
-  }
-}
-
-.layer-editor__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
 .layer-editor__workspace {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0.75rem;
-  background: rgba(5, 8, 17, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.5rem 0.75rem 0.75rem;
+  background: rgba(5, 8, 17, 0.82);
   min-height: 0;
   display: flex;
 }
@@ -227,14 +293,14 @@ function handleColourChange (event: Event) {
 .layer-editor__workspace > * {
   flex: 1;
   min-height: 0;
+  max-width: 100%;
 }
 
 @media  (max-width: 1024px) {
   .layer-editor__panel {
-    top: 1rem;
-    right: 1rem;
-    bottom: 1rem;
+    margin: 1rem;
     width: calc(100vw - 2rem);
+    height: calc(100vh - 2rem);
   }
 }
 
@@ -245,11 +311,17 @@ function handleColourChange (event: Event) {
   font-size: 0.85rem;
 }
 
-.layer-editor__field span {
-  opacity: 0.8;
+.layer-editor__colour {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding-right: 0.5rem;
+  margin-right: 0.5rem;
 }
 
-.layer-editor__field input[type='color'] {
+.layer-editor__field input[type='color'],
+.layer-editor__colour input[type='color'] {
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;

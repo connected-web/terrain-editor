@@ -84,7 +84,9 @@
       />
       <LayerEditor
         v-if="layersApi.layerEditorOpen.value"
-        :assets="projectAssets"
+        :assets="layerEditorAssets"
+        :get-preview="getIconPreview"
+        :dataset="datasetRef.value"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
         @update:filter-text="setAssetDialogFilter"
@@ -215,6 +217,12 @@ const {
 })
 
 const layersApi = useLayersModel({ layerState, handle })
+const layerEditorAssets = computed(
+  () =>
+    ((projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]).map((entry) => ({
+      ...entry
+    }))
+)
 
 const {
   themeForm,
