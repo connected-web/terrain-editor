@@ -2,9 +2,20 @@
   <div class="layer-editor">
     <section class="layer-editor__panel">
       <header class="layer-editor__header">
-        <div>
+        <div class="layer-editor__title-block">
           <p class="layer-editor__eyebrow">Layer editor</p>
-          <h2>{{ activeLayer?.label ?? 'Select a layer' }}</h2>
+          <template v-if="activeLayer">
+            <input
+              v-model="layerName"
+              class="layer-editor__title-input"
+              type="text"
+              :placeholder="activeLayer?.label ?? 'Layer name'"
+              @keydown.enter.prevent="submitLayerName"
+              @keydown.esc.prevent="resetLayerName"
+              @blur="submitLayerName"
+            >
+          </template>
+          <h2 v-else>Select a layer</h2>
         </div>
         <div class="layer-editor__header-actions">
           <button
@@ -73,6 +84,7 @@ const emit = defineEmits<{
   (ev: 'close'): void
   (ev: 'replace', asset: TerrainProjectFileEntry): void
   (ev: 'update-colour', payload: { id: string; color: [number, number, number] }): void
+  (ev: 'update-layer-name', payload: { id: string; label: string }): void
 }>()
 
 const activeMaskAsset = computed(() => {
@@ -181,6 +193,15 @@ onBeforeUnmount(() => {
 
 const maskUrl = computed(() => maskObjectUrl.value)
 
+const layerName = ref('')
+watch(
+  () => props.activeLayer,
+  (next) => {
+    layerName.value = next?.label ?? ''
+  },
+  { immediate: true }
+)
+
 const activeColourHex = computed(() => {
   const colour = props.activeLayer?.color
   if (!colour) return '#ffffff'
@@ -192,6 +213,23 @@ const activeColourHex = computed(() => {
       .join('')
   )
 })
+
+function submitLayerName () {
+  if (!props.activeLayer) return
+  const trimmed = layerName.value.trim()
+  if (!trimmed || trimmed === props.activeLayer.label) {
+    layerName.value = props.activeLayer.label
+    return
+  }
+  emit('update-layer-name', {
+    id: props.activeLayer.id,
+    label: trimmed
+  })
+}
+
+function resetLayerName () {
+  layerName.value = props.activeLayer?.label ?? ''
+}
 
 async function handleUpdateMask (blob: Blob) {
   if (!activeMaskAsset.value) return
@@ -273,6 +311,31 @@ function handleColourChange (event: Event) {
 .layer-editor__header-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.layer-editor__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.layer-editor__title-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0.3rem 0.65rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.layer-editor__title-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
 .layer-editor__body {

@@ -78,9 +78,9 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 
 * [ ] Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
 * [ ] Topology editor (greyscale) with brush support
-* [ ] Ensure mask preview never loads blank (dataset fallback reliability)
+* [x] Ensure mask preview never loads blank (dataset fallback reliability)
 * [ ] Preserve unsaved strokes on biome colour change (temp buffer + warnings)
-* [ ] Editable layer titles persisted into `legend`
+* [x] Editable layer titles persisted into `legend`
 * [ ] Add biome / overlay dialogs (generate legend entry + seed mask asset)
 * [ ] Layer reorder via drag/drop
 * [ ] Create/delete layer flows (with confirmation)
@@ -114,6 +114,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] Additional mask visualization modes
 * [ ] Advanced onion-skin controls
 * [ ] High-level sculpting workflow (to pair with future topology editing)
+* [ ] Break up `App.vue` into targeted composables/models (`useLayerEditor`, `useLayerAssets`, viewer helpers) so cross-cutting logic lives outside the root component
 
 ### Viewer Backlog
 

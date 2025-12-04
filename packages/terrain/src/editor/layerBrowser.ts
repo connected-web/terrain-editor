@@ -47,7 +47,7 @@ function buildEntries(legend: TerrainLegend | undefined, visibility: VisibilityM
     entries.push({
       id,
       kind: 'biome',
-      label: key,
+      label: layer.label ?? key,
       mask: layer.mask,
       color: layer.rgb,
       visible: visibility.get(id) ?? true
@@ -58,7 +58,7 @@ function buildEntries(legend: TerrainLegend | undefined, visibility: VisibilityM
     entries.push({
       id,
       kind: 'overlay',
-      label: key,
+      label: layer.label ?? key,
       mask: layer.mask,
       color: layer.rgb,
       visible: visibility.get(id) ?? true

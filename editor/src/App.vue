@@ -93,6 +93,7 @@
         @export-layer="layersApi.exportActiveLayerImage"
         @replace="handleLayerAssetReplace"
         @update-colour="handleLayerColourUpdate"
+        @update-layer-name="handleLayerNameUpdate"
         @close="layersApi.closeLayerEditor()"
       />
       <LocationPickerDialog
@@ -732,6 +733,44 @@ function handleLayerColourUpdate(payload: { id: string; color: [number, number, 
   }
   if (handle.value && layerState.value) {
     void handle.value.updateLayers(layerState.value)
+  }
+  persistCurrentProject()
+}
+
+function handleLayerNameUpdate(payload: { id: string; label: string }) {
+  const snapshot = projectStore.getSnapshot()
+  const legend = snapshot.legend
+  if (!legend) return
+
+  const [rawKind, rawKey] = payload.id.split(':')
+  const targetKind = rawKind === 'overlay' ? 'overlays' : 'biomes'
+  const key = rawKey ?? rawKind
+  const targetGroup = targetKind === 'overlays' ? legend.overlays : legend.biomes
+  const targetLayer = targetGroup?.[key]
+  if (!targetLayer) return
+
+  const nextLegend = {
+    ...legend,
+    [targetKind]: {
+      ...legend[targetKind],
+      [key]: {
+        ...targetLayer,
+        label: payload.label
+      }
+    }
+  }
+
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    const datasetLegend = datasetRef.value.legend
+    const datasetGroup = targetKind === 'overlays' ? datasetLegend.overlays : datasetLegend.biomes
+    if (datasetGroup?.[key]) {
+      datasetGroup[key] = {
+        ...datasetGroup[key],
+        label: payload.label
+      }
+    }
   }
   persistCurrentProject()
 }

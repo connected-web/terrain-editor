@@ -125,6 +125,7 @@ type Resolvable<T> = T | Promise<T>
 export type LegendLayer = {
   mask: string
   rgb: [number, number, number]
+  label?: string
 }
 
 export type TerrainLegend = {
