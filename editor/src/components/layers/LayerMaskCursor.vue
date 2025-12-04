@@ -5,7 +5,9 @@
     :class="`layer-mask-cursor--${mode}`"
     :style="style"
   >
-    <Icon :icon="icon" aria-hidden="true" />
+    <span class="layer-mask-cursor__icon" :style="iconStyle">
+      <Icon :icon="icon" aria-hidden="true" />
+    </span>
     <span class="layer-mask-cursor__brush" :style="brushStyle" />
   </div>
 </template>
@@ -27,16 +29,26 @@ const props = withDefaults(defineProps<{
   icon: 'paint-brush'
 })
 
+const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
 const style = computed(() => ({
   left: `${props.x}px`,
   top: `${props.y}px`
 }))
 
-const brushStyle = computed(() => {
-  const diameter = Math.max(4, props.brushSize * props.zoom)
+const brushStyle = computed(() => ({
+  width: `${diameter.value}px`,
+  height: `${diameter.value}px`,
+  transform: `translate(-50%, -50%)`
+}))
+
+const ICON_PADDING = 6
+const iconStyle = computed(() => {
+  const radius = diameter.value / 2
+  const offset = radius + ICON_PADDING
   return {
-    width: `${diameter}px`,
-    height: `${diameter}px`
+    left: '50%',
+    top: '50%',
+    transform: `translate(-75%, -75%) translate(${offset}px, ${offset}px)`
   }
 })
 </script>
@@ -46,18 +58,24 @@ const brushStyle = computed(() => {
   position: absolute;
   pointer-events: none;
   color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   transform: translate(-50%, -50%);
   z-index: 5;
+}
+
+.layer-mask-cursor__icon {
+  position: absolute;
+  font-size: 0.85rem;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.75);
 }
 
 .layer-mask-cursor__brush {
   position: absolute;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.85);
 }
 
 .layer-mask-cursor--erase .layer-mask-cursor__brush {
