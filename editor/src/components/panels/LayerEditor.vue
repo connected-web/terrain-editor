@@ -231,6 +231,9 @@ function handleColourChange (event: Event) {
 }
 
 .layer-editor__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   margin: 1.5rem;
   width: min(620px, 95vw);
   max-width: calc(100vw - 2rem);
@@ -238,8 +241,6 @@ function handleColourChange (event: Event) {
   background: rgba(5, 8, 17, 0.95);
   border-radius: 18px;
   padding: 1rem;
-  display: flex;
-  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: auto;
   margin-left: auto;

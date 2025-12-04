@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-mask-editor">
+  <div class="layer-mask-editor" ref="editorRootRef">
     <div class="layer-mask-editor__toolbar">
       <slot name="toolbar-prefix" />
       <div class="layer-mask-editor__control">
@@ -26,10 +26,10 @@
           v-for="action in actionButtons"
           :key="action.id"
           type="button"
-          class="pill-button"
+          class="pill-button layer-mask-editor__action-button"
           :class="{
-            'pill-button--active': activeAction === action.id,
-            'pill-button--ghost': activeAction !== action.id
+            'pill-button--ghost': activeAction !== action.id,
+            'layer-mask-editor__action-button--active': activeAction === action.id
           }"
           :title="action.label"
           :aria-label="action.label"
@@ -94,33 +94,52 @@
 
     <div
       class="layer-mask-editor__viewport"
+      :class="viewportClasses"
       ref="viewportRef"
       @pointerdown="handleViewportPointerDown"
       @pointermove="handleViewportPointerMove"
       @pointerup="handleViewportPointerUp"
-      @pointerleave="handleViewportPointerUp"
+      @pointerleave="handleViewportPointerLeave"
+      @pointerenter="handleViewportPointerEnter"
       @wheel="handleViewportWheel"
     >
+      <div
+        v-show="hasValidImage"
+        class="layer-mask-editor__canvas-wrapper"
+        :style="canvasWrapperStyle"
+      >
+        <canvas
+          ref="canvasRef"
+          class="layer-mask-editor__canvas"
+          :style="canvasStyle"
+          draggable="false"
+          @dragstart.prevent
+          @mousedown="handlePointerDown"
+          @mousemove="handlePointerMove"
+          @mouseup="handlePointerUp"
+          @mouseleave="handlePointerUp"
+        />
+      </div>
       <div v-if="!hasValidImage" class="layer-mask-editor__placeholder">
         <p>{{ props.src ? 'Loading mask image...' : 'No mask image available' }}</p>
       </div>
-      <canvas
-        v-show="hasValidImage"
-        ref="canvasRef"
-        class="layer-mask-editor__canvas"
-        :style="canvasStyle"
-        @mousedown="handlePointerDown"
-        @mousemove="handlePointerMove"
-        @mouseup="handlePointerUp"
-        @mouseleave="handlePointerUp"
-      />
     </div>
+    <LayerMaskCursor
+      :visible="cursorState.visible && showCustomCursor"
+      :x="cursorState.position.x"
+      :y="cursorState.position.y"
+      :brush-size="brushSize"
+      :zoom="zoom"
+      :mode="activeAction.value"
+      :icon="activeCursorIcon"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '../Icon.vue'
+import LayerMaskCursor from './LayerMaskCursor.vue'
 
 const props = defineProps<{
   src: string | null
@@ -130,6 +149,7 @@ const emit = defineEmits<{
   (ev: 'update-mask', blob: Blob): void
 }>()
 
+const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const originalImageData = ref<ImageData | null>(null)
@@ -151,21 +171,58 @@ const actionButtons = [
 function setAction(action: (typeof actionButtons)[number]['id']) {
   activeAction.value = action
 }
+const activeCursorIcon = computed(() => actionButtons.find((item) => item.id === activeAction.value)?.icon ?? 'paint-brush')
 const zoom = ref(1)
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
-const zoomPercent = computed(() => `${Math.round(zoom.value * 100)}%`)
+const canvasDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+const canvasWrapperStyle = computed(() => ({
+  width: `${Math.max(1, canvasDimensions.value.width * zoom.value)}px`,
+  height: `${Math.max(1, canvasDimensions.value.height * zoom.value)}px`
+}))
 const canvasStyle = computed(() => ({
-  transform: `scale(${zoom.value})`,
-  transformOrigin: 'top left'
+  width: '100%',
+  height: '100%'
 }))
 
-function setZoom(value: number) {
-  zoom.value = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+function clampZoom(value: number) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+}
+
+function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
+  const viewport = viewportRef.value
+  if (!viewport || !canvasDimensions.value.width || !canvasDimensions.value.height) {
+    zoom.value = clampZoom(nextZoom)
+    return
+  }
+  const previousZoom = zoom.value
+  const clamped = clampZoom(nextZoom)
+  if (clamped === previousZoom) return
+  const baseWidth = canvasDimensions.value.width
+  const baseHeight = canvasDimensions.value.height
+  const prevDisplayWidth = baseWidth * previousZoom
+  const prevDisplayHeight = baseHeight * previousZoom
+  const nextDisplayWidth = baseWidth * clamped
+  const nextDisplayHeight = baseHeight * clamped
+  const clientWidth = viewport.clientWidth
+  const clientHeight = viewport.clientHeight
+  const pivotX = pivot?.x ?? clientWidth / 2
+  const pivotY = pivot?.y ?? clientHeight / 2
+  const prevScrollLeft = viewport.scrollLeft
+  const prevScrollTop = viewport.scrollTop
+  const prevOffsetX = prevScrollLeft + pivotX
+  const prevOffsetY = prevScrollTop + pivotY
+  const ratioX = prevDisplayWidth ? prevOffsetX / prevDisplayWidth : 0
+  const ratioY = prevDisplayHeight ? prevOffsetY / prevDisplayHeight : 0
+  zoom.value = clamped
+  const nextScrollLeft = ratioX * nextDisplayWidth - pivotX
+  const nextScrollTop = ratioY * nextDisplayHeight - pivotY
+  viewport.scrollLeft = Math.max(0, nextScrollLeft)
+  viewport.scrollTop = Math.max(0, nextScrollTop)
 }
 
 function adjustZoom(delta: number) {
-  setZoom(zoom.value + delta)
+  applyZoom(zoom.value + delta)
 }
 
 function getContext () {
@@ -176,21 +233,18 @@ function getContext () {
 
 function loadImage () {
   const canvas = canvasRef.value
-  if (!canvas) {
-    return
-  }
+  if (!canvas) return
 
-  // Clear canvas and reset state if no src is provided
   if (!props.src) {
     const ctx = getContext()
     if (ctx) {
-      // Set canvas to a minimal size and clear it
       canvas.width = 1
       canvas.height = 1
       ctx.clearRect(0, 0, 1, 1)
     }
     originalImageData.value = null
     image.value = null
+    canvasDimensions.value = { width: 0, height: 0 }
     return
   }
 
@@ -214,10 +268,10 @@ function loadImage () {
     }
 
     image.value = img
+    canvasDimensions.value = { width: canvas.width, height: canvas.height }
   }
 
   img.onerror = () => {
-    // Handle image loading errors by clearing the canvas
     const ctx = getContext()
     if (ctx) {
       canvas.width = 1
@@ -226,10 +280,11 @@ function loadImage () {
     }
     originalImageData.value = null
     image.value = null
+    canvasDimensions.value = { width: 0, height: 0 }
   }
 }
 
-function canvasCoordsFromEvent (event: MouseEvent) {
+function canvasCoordsFromEvent(event: MouseEvent) {
   const canvas = canvasRef.value
   if (!canvas) return { x: 0, y: 0 }
 
@@ -285,9 +340,12 @@ const isPanning = ref(false)
 const panState = ref({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
 
 function handleViewportPointerDown(event: PointerEvent) {
-  if (activeAction.value !== 'pan') return
   const viewport = viewportRef.value
   if (!viewport) return
+  if (activeAction.value !== 'pan') {
+    updateCursorPosition(event)
+    return
+  }
   event.preventDefault()
   isPanning.value = true
   panState.value = {
@@ -300,6 +358,7 @@ function handleViewportPointerDown(event: PointerEvent) {
 }
 
 function handleViewportPointerMove(event: PointerEvent) {
+  updateCursorPosition(event)
   if (!isPanning.value) return
   const viewport = viewportRef.value
   if (!viewport) return
@@ -326,6 +385,7 @@ function handleReset () {
   canvas.width = originalImageData.value.width
   canvas.height = originalImageData.value.height
   ctx.putImageData(originalImageData.value, 0, 0)
+  canvasDimensions.value = { width: canvas.width, height: canvas.height }
 }
 
 function handleApply () {
@@ -340,9 +400,61 @@ function handleApply () {
 function handleViewportWheel(event: WheelEvent) {
   if (!event.ctrlKey && !event.metaKey) return
   event.preventDefault()
+  const viewport = viewportRef.value
+  if (!viewport) return
+  const rect = viewport.getBoundingClientRect()
+  const pivot = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  }
   const direction = event.deltaY > 0 ? -0.1 : 0.1
-  adjustZoom(direction)
+  applyZoom(zoom.value + direction, pivot)
+  updateCursorPosition(event)
 }
+
+watch(
+  () => [props.src, canvasRef.value] as const,
+  () => loadImage(),
+  { immediate: true }
+)
+
+const showCustomCursor = computed(() => hasValidImage.value && activeAction.value !== 'pan')
+const viewportClasses = computed(() => ({
+  'layer-mask-editor__viewport--draw': showCustomCursor.value,
+  'layer-mask-editor__viewport--pan': activeAction.value === 'pan'
+}))
+
+const cursorState = ref({
+  position: { x: 0, y: 0 },
+  visible: false
+})
+const cursorInside = ref(false)
+
+function updateCursorPosition(event: PointerEvent | MouseEvent) {
+  const root = editorRootRef.value
+  if (!root) return
+  const rect = root.getBoundingClientRect()
+  cursorState.value.position = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  }
+  cursorState.value.visible = cursorInside.value && showCustomCursor.value
+}
+
+function handleViewportPointerEnter(event: PointerEvent) {
+  cursorInside.value = true
+  updateCursorPosition(event)
+}
+
+function handleViewportPointerLeave(event: PointerEvent) {
+  cursorInside.value = false
+  cursorState.value.visible = false
+  handleViewportPointerUp(event)
+}
+
+watch(showCustomCursor, (canShow) => {
+  cursorState.value.visible = canShow && cursorInside.value
+})
 
 watch(
   () => [props.src, canvasRef.value] as const,
@@ -363,6 +475,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.5rem;
   height: 100%;
+  position: relative;
 }
 
 .layer-mask-editor__toolbar {
@@ -404,6 +517,12 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
 }
 
+.layer-mask-editor__action-button--active {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
 .layer-mask-editor__toolbar-group {
   display: flex;
   gap: 0.35rem;
@@ -433,32 +552,69 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.04);
   background: radial-gradient(circle at top, #121829 0, #050914 55%);
   padding: 0.5rem;
-  cursor: grab;
+  position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
-.layer-mask-editor__viewport:active {
+.layer-mask-editor__viewport--draw {
+  cursor: none;
+}
+
+.layer-mask-editor__viewport--pan {
+  cursor: grab;
+}
+
+.layer-mask-editor__viewport--pan:active {
   cursor: grabbing;
 }
 
+.layer-mask-editor__canvas-wrapper {
+  position: relative;
+}
+
 .layer-mask-editor__canvas {
-  max-width: 100%;
-  max-height: 100%;
   image-rendering: pixelated;
   background: transparent;
   display: block;
-  transform-origin: top left;
+}
+
+.layer-mask-editor__cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+}
+
+.layer-mask-editor__cursor-brush {
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.layer-mask-editor__cursor--erase .layer-mask-editor__cursor-brush {
+  border-style: dashed;
 }
 
 .layer-mask-editor__placeholder {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 200px;
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.85rem;
   text-align: center;
+  pointer-events: none;
 }
 
 .layer-mask-editor__placeholder p {
