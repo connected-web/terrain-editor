@@ -86,7 +86,7 @@
         v-if="layersApi.layerEditorOpen.value"
         :assets="layerEditorAssets"
         :get-preview="getIconPreview"
-        :dataset="datasetRef.value"
+        :dataset="datasetRef"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
         @update:filter-text="setAssetDialogFilter"
@@ -168,6 +168,7 @@ import { useLayersModel } from './composables/useLayersModel'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
+import { useLayerEditor } from './composables/useLayerEditor'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
@@ -286,6 +287,16 @@ const {
   locationsList: locationsApi.locationsList,
   handle,
   commitLocations: locationsApi.commitLocations
+})
+
+const layerEditorHelpers = useLayerEditor({
+  projectStore,
+  layerBrowserStore,
+  datasetRef,
+  layerState,
+  handle,
+  persistCurrentProject,
+  replaceAssetWithFile: replaceAssetWithFileHelper
 })
 
 const {
@@ -684,96 +695,9 @@ function getViewerMountContext(): ViewerMountContext | null {
   }
 }
 
-async function handleLayerAssetReplace(asset: TerrainProjectFileEntry) {
-  await replaceAssetWithFileHelper(
-    asset.path,
-    new File([asset.data], asset.sourceFileName ?? asset.path)
-  )
-  handle.value?.invalidateLayerMasks?.([asset.path])
-  if (handle.value && layerState.value) {
-    await handle.value.updateLayers(layerState.value)
-  }
-  await persistCurrentProject()
-}
-
-function handleLayerColourUpdate(payload: { id: string; color: [number, number, number] }) {
-  const snapshot = projectStore.getSnapshot()
-  const legend = snapshot.legend
-  if (!legend) return
-
-  const [rawKind, rawKey] = payload.id.split(':')
-  const targetKind = rawKind === 'overlay' ? 'overlays' : 'biomes'
-  const key = rawKey ?? rawKind
-  const targetGroup = targetKind === 'overlays' ? legend.overlays : legend.biomes
-  const targetLayer = targetGroup?.[key]
-  if (!targetLayer) return
-
-  const nextLegend = {
-    ...legend,
-    [targetKind]: {
-      ...legend[targetKind],
-      [key]: {
-        ...targetLayer,
-        rgb: payload.color
-      }
-    }
-  }
-
-  projectStore.setLegend(nextLegend)
-  layerBrowserStore.setLegend(nextLegend)
-  if (datasetRef.value) {
-    const datasetLegend = datasetRef.value.legend
-    const datasetGroup = targetKind === 'overlays' ? datasetLegend.overlays : datasetLegend.biomes
-    if (datasetGroup?.[key]) {
-      datasetGroup[key] = {
-        ...datasetGroup[key],
-        rgb: payload.color
-      }
-    }
-  }
-  if (handle.value && layerState.value) {
-    void handle.value.updateLayers(layerState.value)
-  }
-  persistCurrentProject()
-}
-
-function handleLayerNameUpdate(payload: { id: string; label: string }) {
-  const snapshot = projectStore.getSnapshot()
-  const legend = snapshot.legend
-  if (!legend) return
-
-  const [rawKind, rawKey] = payload.id.split(':')
-  const targetKind = rawKind === 'overlay' ? 'overlays' : 'biomes'
-  const key = rawKey ?? rawKind
-  const targetGroup = targetKind === 'overlays' ? legend.overlays : legend.biomes
-  const targetLayer = targetGroup?.[key]
-  if (!targetLayer) return
-
-  const nextLegend = {
-    ...legend,
-    [targetKind]: {
-      ...legend[targetKind],
-      [key]: {
-        ...targetLayer,
-        label: payload.label
-      }
-    }
-  }
-
-  projectStore.setLegend(nextLegend)
-  layerBrowserStore.setLegend(nextLegend)
-  if (datasetRef.value) {
-    const datasetLegend = datasetRef.value.legend
-    const datasetGroup = targetKind === 'overlays' ? datasetLegend.overlays : datasetLegend.biomes
-    if (datasetGroup?.[key]) {
-      datasetGroup[key] = {
-        ...datasetGroup[key],
-        label: payload.label
-      }
-    }
-  }
-  persistCurrentProject()
-}
+const handleLayerAssetReplace = layerEditorHelpers.replaceLayerAsset
+const handleLayerColourUpdate = layerEditorHelpers.updateLayerColour
+const handleLayerNameUpdate = layerEditorHelpers.updateLayerName
 
 function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
   const baseResolve = dataset.resolveAssetUrl.bind(dataset)
