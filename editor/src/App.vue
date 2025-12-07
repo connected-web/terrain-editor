@@ -89,7 +89,6 @@
         :dataset="datasetRef.value"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
-        :preview-luminance="localSettings.layerPreviewLuminance"
         :show-grid="localSettings.showLayerTransparencyGrid"
         @update:filter-text="setAssetDialogFilter"
         @export-layer="layersApi.exportActiveLayerImage"

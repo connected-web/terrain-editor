@@ -33,14 +33,7 @@
         <span>Show checker background</span>
       </label>
       <p class="panel-card__hint">
-        Display a checkerboard pattern behind layer masks to indicate transparent areas.
-      </p>
-      <label class="locations-panel__toggle">
-        <input type="checkbox" v-model="localSettings.layerPreviewLuminance" />
-        <span>View mask with luminance transparency</span>
-      </label>
-      <p class="panel-card__hint">
-        When enabled, layer masks are previewed using their luminance values to represent transparency levels.
+        Toggle between a checkerboard transparency grid and a solid black background in the layer mask editor.
       </p>
     </div>
   </section>

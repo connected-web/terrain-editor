@@ -130,13 +130,18 @@
       >
         <canvas
           ref="canvasRef"
-          :class="['layer-mask-editor__canvas', { 'layer-mask-editor__canvas--luminance': props.previewLuminance !== false }]"
+          class="layer-mask-editor__canvas layer-mask-editor__canvas--base"
           draggable="false"
           @dragstart.prevent
           @mousedown="handlePointerDown"
           @mousemove="handlePointerMove"
           @mouseup="handlePointerUp"
           @mouseleave="handlePointerUp"
+        />
+        <canvas
+          ref="previewCanvasRef"
+          class="layer-mask-editor__canvas layer-mask-editor__canvas--preview"
+          draggable="false"
         />
         <canvas
           ref="overlayCanvasRef"
@@ -170,7 +175,6 @@ import LayerMaskCursor from './LayerMaskCursor.vue'
 
 const props = defineProps<{
   src: string | null
-  previewLuminance?: boolean
   showGrid?: boolean
 }>()
 
@@ -180,12 +184,14 @@ const emit = defineEmits<{
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
 const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
-const originalImageData = ref<ImageData | null>(null)
+const maskValues = ref<Float32Array | null>(null)
+const initialMaskValues = ref<Float32Array | null>(null)
 
 const hasValidImage = computed(() => {
-  return Boolean(props.src && image.value && originalImageData.value)
+  return Boolean(props.src && maskValues.value && maskValues.value.length)
 })
 
 const isDrawing = ref(false)
@@ -193,6 +199,7 @@ const lastX = ref(0)
 const lastY = ref(0)
 const brushSize = ref(8)
 const brushOpacity = ref(1)
+const currentStrokeMode = ref<'paint' | 'erase'>('paint')
 const activeAction = ref<'paint' | 'erase' | 'pan'>('paint')
 const actionButtons = [
   { id: 'paint', icon: 'paint-brush', label: 'Paint (white)' },
@@ -255,9 +262,13 @@ function adjustZoom(delta: number) {
   applyZoom(zoom.value + delta)
 }
 
-function getContext(target: 'main' | 'overlay' = 'main') {
+function getContext(target: 'main' | 'overlay' | 'preview' = 'main') {
   if (target === 'overlay') {
     const canvas = overlayCanvasRef.value
+    return canvas ? canvas.getContext('2d') : null
+  }
+  if (target === 'preview') {
+    const canvas = previewCanvasRef.value
     return canvas ? canvas.getContext('2d') : null
   }
   const canvas = canvasRef.value
@@ -269,21 +280,30 @@ function loadImage () {
   const canvas = canvasRef.value
   if (!canvas) return
   const overlay = overlayCanvasRef.value
+  const preview = previewCanvasRef.value
+
+  function resetCanvases(width: number, height: number) {
+    canvas.width = width
+    canvas.height = height
+    const ctx = getContext()
+    ctx?.clearRect(0, 0, width, height)
+    if (overlay) {
+      overlay.width = width
+      overlay.height = height
+      getContext('overlay')?.clearRect(0, 0, width, height)
+    }
+    if (preview) {
+      preview.width = width
+      preview.height = height
+      getContext('preview')?.clearRect(0, 0, width, height)
+    }
+  }
 
   if (!props.src) {
-    const ctx = getContext()
-    if (ctx) {
-      canvas.width = 1
-      canvas.height = 1
-      ctx.clearRect(0, 0, 1, 1)
-    }
-    originalImageData.value = null
+    resetCanvases(1, 1)
+    maskValues.value = new Float32Array(1)
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
-    if (overlay) {
-      overlay.width = canvas.width
-      overlay.height = canvas.height
-    }
     return
   }
 
@@ -292,45 +312,63 @@ function loadImage () {
   img.src = props.src
 
   img.onload = () => {
+    resetCanvases(img.width, img.height)
     const ctx = getContext()
     if (!ctx) return
-
-    canvas.width = img.width
-    canvas.height = img.height
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0)
-    if (overlay) {
-      overlay.width = canvas.width
-      overlay.height = canvas.height
-      getContext('overlay')?.clearRect(0, 0, overlay.width, overlay.height)
+    const imageData = ctx.getImageData(0, 0, img.width, img.height)
+    const values = new Float32Array(img.width * img.height)
+    for (let i = 0; i < values.length; i++) {
+      values[i] = imageData.data[i * 4] / 255
     }
-
-    try {
-      originalImageData.value = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    } catch {
-      originalImageData.value = null
-    }
-
+    maskValues.value = values
+    initialMaskValues.value = new Float32Array(values)
+    canvasDimensions.value = { width: img.width, height: img.height }
     image.value = img
-    canvasDimensions.value = { width: canvas.width, height: canvas.height }
+    renderMaskCanvas()
+    renderPreviewCanvas()
   }
 
   img.onerror = () => {
-    const ctx = getContext()
-    if (ctx) {
-      canvas.width = 1
-      canvas.height = 1
-      ctx.clearRect(0, 0, 1, 1)
-    }
-    originalImageData.value = null
+    resetCanvases(1, 1)
+    maskValues.value = new Float32Array(1)
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
-    if (overlay) {
-      overlay.width = canvas.width
-      overlay.height = canvas.height
-      getContext('overlay')?.clearRect(0, 0, overlay.width, overlay.height)
-    }
   }
+}
+
+function renderMaskCanvas() {
+  const ctx = getContext()
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!ctx || !values || !width || !height) return
+  const imageData = ctx.createImageData(width, height)
+  for (let i = 0; i < values.length; i++) {
+    const v = Math.max(0, Math.min(1, values[i])) * 255
+    const offset = i * 4
+    imageData.data[offset] = v
+    imageData.data[offset + 1] = v
+    imageData.data[offset + 2] = v
+    imageData.data[offset + 3] = 255
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
+function renderPreviewCanvas() {
+  const ctx = getContext('preview')
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!ctx || !values || !width || !height) return
+  const imageData = ctx.createImageData(width, height)
+  for (let i = 0; i < values.length; i++) {
+    const v = Math.max(0, Math.min(1, values[i])) * 255
+    const offset = i * 4
+    imageData.data[offset] = 255
+    imageData.data[offset + 1] = 255
+    imageData.data[offset + 2] = 255
+    imageData.data[offset + 3] = v
+  }
+  ctx.putImageData(imageData, 0, 0)
 }
 
 function canvasCoordsFromEvent(event: MouseEvent) {
@@ -361,11 +399,11 @@ function beginStroke() {
   const ctx = getContext('overlay')
   if (!ctx) return
   ctx.globalCompositeOperation = 'source-over'
-  ctx.strokeStyle = activeAction.value === 'erase' ? '#000000' : '#ffffff'
+  ctx.strokeStyle = '#ffffff'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.globalAlpha = Math.min(1, Math.max(0.01, brushOpacity.value))
+  ctx.globalAlpha = 1
 }
 
 function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
@@ -380,6 +418,7 @@ function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
 function handlePointerDown (event: MouseEvent) {
   if (activeAction.value === 'pan') return
   const { x, y } = canvasCoordsFromEvent(event)
+  currentStrokeMode.value = activeAction.value === 'erase' ? 'erase' : 'paint'
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
@@ -405,18 +444,29 @@ function handlePointerUp () {
 function commitOverlay() {
   const overlay = overlayCanvasRef.value
   if (!overlay) return
-  const mainCtx = getContext('main')
   const overlayCtx = getContext('overlay')
-  if (!mainCtx || !overlayCtx) return
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!overlayCtx || !values || !width || !height) return
   const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
-  mainCtx.globalAlpha = opacity
-  mainCtx.globalCompositeOperation = 'source-over'
-  mainCtx.drawImage(overlay, 0, 0)
-  mainCtx.globalCompositeOperation = 'source-over'
-  mainCtx.globalAlpha = 1
+  const overlayData = overlayCtx.getImageData(0, 0, width, height)
+  const data = overlayData.data
+  const erase = currentStrokeMode.value === 'erase'
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = (data[i + 3] / 255) * opacity
+    if (alpha <= 0) continue
+    const idx = i / 4
+    const current = values[idx]
+    if (erase) {
+      values[idx] = Math.max(0, current - alpha * current)
+    } else {
+      values[idx] = Math.min(1, current + alpha * (1 - current))
+    }
+  }
+  renderMaskCanvas()
+  renderPreviewCanvas()
   clearOverlay()
 }
-
 const viewportRef = ref<HTMLDivElement | null>(null)
 const isPanning = ref(false)
 const panState = ref({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
@@ -460,14 +510,11 @@ function handleViewportPointerUp(event: PointerEvent) {
 }
 
 function handleReset () {
-  const canvas = canvasRef.value
-  const ctx = getContext()
-  if (!canvas || !ctx || !originalImageData.value) return
-
-  canvas.width = originalImageData.value.width
-  canvas.height = originalImageData.value.height
-  ctx.putImageData(originalImageData.value, 0, 0)
-  canvasDimensions.value = { width: canvas.width, height: canvas.height }
+  const values = initialMaskValues.value
+  if (!values) return
+  maskValues.value = new Float32Array(values)
+  renderMaskCanvas()
+  renderPreviewCanvas()
 }
 
 function handleApply () {
@@ -538,12 +585,6 @@ function handleViewportPointerLeave(event: PointerEvent) {
 watch(showCustomCursor, (canShow) => {
   cursorState.value.visible = canShow && cursorInside.value
 })
-
-watch(
-  () => [props.src, canvasRef.value] as const,
-  () => loadImage(),
-  { immediate: true }
-)
 
 onBeforeUnmount(() => {
   if (image.value?.src) {
@@ -633,7 +674,7 @@ onBeforeUnmount(() => {
   overflow: auto;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.04);
-  background-color: #03050a;
+  background-color: #000;
   padding: 0.5rem;
   position: relative;
   scrollbar-width: thin;
@@ -669,6 +710,10 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.layer-mask-editor__canvas--base {
+  opacity: 0;
+}
+
 .layer-mask-editor__canvas--luminance {
   mix-blend-mode: lighten;
 }
@@ -677,6 +722,14 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.layer-mask-editor__canvas--preview {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: normal;
 }
 
 .layer-mask-editor__cursor {

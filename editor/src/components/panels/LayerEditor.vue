@@ -37,7 +37,6 @@
           <LayerMaskEditor
             v-if="maskUrl"
             :src="maskUrl"
-            :preview-luminance="previewLuminance"
             :show-grid="showGrid"
             @update-mask="handleUpdateMask"
           >
@@ -77,7 +76,6 @@ const props = defineProps<{
   dataset?: TerrainDataset | null
   filterText?: string
   activeLayer: LayerEntry | null
-  previewLuminance?: boolean
   showGrid?: boolean
 }>()
 

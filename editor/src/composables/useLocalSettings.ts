@@ -5,14 +5,12 @@ export type LocalSettings = {
   cameraTracking: boolean
   openLocationsOnSelect: boolean
   showLayerTransparencyGrid: boolean
-  layerPreviewLuminance: boolean
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   cameraTracking: true,
   openLocationsOnSelect: true,
-  showLayerTransparencyGrid: true,
-  layerPreviewLuminance: true
+  showLayerTransparencyGrid: true
 }
 
 export function useLocalSettings() {
@@ -27,8 +25,6 @@ export function useLocalSettings() {
       saved.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
     localSettings.showLayerTransparencyGrid =
       saved.showLayerTransparencyGrid ?? DEFAULT_LOCAL_SETTINGS.showLayerTransparencyGrid
-    localSettings.layerPreviewLuminance =
-      saved.layerPreviewLuminance ?? DEFAULT_LOCAL_SETTINGS.layerPreviewLuminance
   }
 
   function persistSettings() {
@@ -39,8 +35,7 @@ export function useLocalSettings() {
     () => [
       localSettings.cameraTracking,
       localSettings.openLocationsOnSelect,
-      localSettings.showLayerTransparencyGrid,
-      localSettings.layerPreviewLuminance
+      localSettings.showLayerTransparencyGrid
     ],
     () => persistSettings()
   )
