@@ -22,6 +22,16 @@
       <p class="panel-card__hint">
         Turn off to keep the current panel open when clicking markers in the viewer.
       </p>
+      <hr class="settings-panel__divider">
+      <p class="panel-card__hint">Layer Editor Preview</p>
+      <label class="locations-panel__toggle">
+        <input type="checkbox" v-model="localSettings.showLayerTransparencyGrid" />
+        <span>Show checker background</span>
+      </label>
+      <label class="locations-panel__toggle">
+        <input type="checkbox" v-model="localSettings.layerPreviewLuminance" />
+        <span>View mask with luminance transparency</span>
+      </label>
     </div>
   </section>
 </template>

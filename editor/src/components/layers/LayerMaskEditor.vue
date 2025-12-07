@@ -130,7 +130,7 @@
       >
         <canvas
           ref="canvasRef"
-          class="layer-mask-editor__canvas"
+          :class="['layer-mask-editor__canvas', { 'layer-mask-editor__canvas--luminance': props.previewLuminance !== false }]"
           draggable="false"
           @dragstart.prevent
           @mousedown="handlePointerDown"
@@ -170,6 +170,8 @@ import LayerMaskCursor from './LayerMaskCursor.vue'
 
 const props = defineProps<{
   src: string | null
+  previewLuminance?: boolean
+  showGrid?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -358,7 +360,7 @@ function beginStroke() {
   if (!overlay) return
   const ctx = getContext('overlay')
   if (!ctx) return
-  ctx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
+  ctx.globalCompositeOperation = 'source-over'
   ctx.strokeStyle = activeAction.value === 'erase' ? '#000000' : '#ffffff'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
@@ -408,7 +410,7 @@ function commitOverlay() {
   if (!mainCtx || !overlayCtx) return
   const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
   mainCtx.globalAlpha = opacity
-  mainCtx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
+  mainCtx.globalCompositeOperation = 'source-over'
   mainCtx.drawImage(overlay, 0, 0)
   mainCtx.globalCompositeOperation = 'source-over'
   mainCtx.globalAlpha = 1
@@ -501,7 +503,8 @@ watch(
 const showCustomCursor = computed(() => hasValidImage.value && activeAction.value !== 'pan')
 const viewportClasses = computed(() => ({
   'layer-mask-editor__viewport--draw': showCustomCursor.value,
-  'layer-mask-editor__viewport--pan': activeAction.value === 'pan'
+  'layer-mask-editor__viewport--pan': activeAction.value === 'pan',
+  'layer-mask-editor__viewport--grid': props.showGrid !== false
 }))
 
 const cursorState = ref({
@@ -630,11 +633,16 @@ onBeforeUnmount(() => {
   overflow: auto;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.04);
-  background: radial-gradient(circle at top, #121829 0, #050914 55%);
+  background-color: #03050a;
   padding: 0.5rem;
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.layer-mask-editor__viewport--grid {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 12px, transparent 12px 24px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 0 12px, transparent 12px 24px);
 }
 
 .layer-mask-editor__viewport--draw {
@@ -659,6 +667,10 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.layer-mask-editor__canvas--luminance {
+  mix-blend-mode: lighten;
 }
 
 .layer-mask-editor__canvas--overlay {
