@@ -45,6 +45,11 @@ export function useLayersModel(options: {
     layerEditorOpen.value = false
   }
 
+  function resetLayerEditor() {
+    layerEditorSelectedLayerId.value = null
+    layerEditorOpen.value = false
+  }
+
   function exportActiveLayerImage() {
     workspace.exportActiveLayerImage()
   }
@@ -56,6 +61,7 @@ export function useLayersModel(options: {
     layerEditorSelectedLayerId,
     openLayerEditor,
     closeLayerEditor,
+    resetLayerEditor,
     exportActiveLayerImage,
   }
 }

@@ -22,6 +22,7 @@
           :has-active-archive="hasActiveArchive"
           @load-sample="loadSample"
           @load-map="triggerFileSelect"
+          @start-new="startNewMap()"
           @export-archive="exportArchive"
         />
 
@@ -171,6 +172,7 @@ import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
 import { useLayerEditor } from './composables/useLayerEditor'
 import { useUrlState } from './composables/useUrlState'
+import { buildScratchDataset } from './utils/scratchDataset'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
@@ -354,7 +356,9 @@ const { uiActions } = useUiActions({
   },
   loadSample,
   triggerFileSelect: () => viewerShell.value?.triggerFileSelect(),
-  startNewMap,
+  startNewMap: () => {
+    void startNewMap()
+  },
   exportArchive,
   promptCloseArchive
 })
@@ -403,6 +407,7 @@ function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
 function closeActiveArchive() {
   disposeViewer()
   cleanupDataset()
+  layersApi.resetLayerEditor()
   layerBrowserStore.setLegend(undefined)
   projectStore.reset()
   layerState.value = layerBrowserStore.getLayerToggles()
@@ -430,16 +435,32 @@ function promptCloseArchive() {
   requestConfirm('Unload the current map? Unsaved changes may be lost.', () => closeActiveArchive())
 }
 
-function startNewMap() {
+async function startNewMap() {
   closeActiveArchive()
   const scratchLegend = createScratchLegend()
   projectStore.setLegend(scratchLegend)
   layerBrowserStore.setLegend(scratchLegend)
+  const scratchLayerState = layerBrowserStore.getLayerToggles()
+  layerState.value = scratchLayerState
+  const scratchDataset = buildScratchDataset(scratchLegend)
+  scratchDataset.files.forEach((entry) => {
+    projectStore.upsertFile(entry)
+  })
+  datasetRef.value = scratchDataset.dataset
   workspaceForm.width = scratchLegend.size[0]
   workspaceForm.height = scratchLegend.size[1]
   workspaceForm.seaLevel = scratchLegend.sea_level ?? 0
   setActivePanel('workspace')
   isDockCollapsed.value = false
+  await mountViewer({
+    dataset: scratchDataset.dataset,
+    layerState: scratchLayerState,
+    locations: getViewerLocations(),
+    interactive: locationsApi.interactive.value,
+    theme: projectSnapshot.value.theme as DeepPartial<TerrainTheme> | undefined,
+    onLocationPick: locationsApi.handleLocationPick,
+    onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId)
+  })
   updateStatus('New project ready. Import layers to begin editing.')
   persistedProject.value = null
   clearPersistedProject()
