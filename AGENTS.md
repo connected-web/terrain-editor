@@ -87,7 +87,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] Fill tool (paint bucket)
 * [ ] Mask view toggle: B/W vs colour-coded
 * [ ] Onion-skin neighbouring layers with fading alpha
-* [ ] Brush opacity slider
+* [x] Brush opacity slider
 * [ ] Brush type menu (basic, spray, Perlin noise)
 * [ ] Save/load custom brushes (name + icon)
 * [ ] Layer import via drag/drop or file upload

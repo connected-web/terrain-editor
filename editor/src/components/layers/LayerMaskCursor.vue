@@ -24,9 +24,11 @@ const props = withDefaults(defineProps<{
   zoom: number
   mode?: 'paint' | 'erase' | 'pan'
   icon?: string
+  opacity?: number
 }>(), {
   mode: 'paint',
-  icon: 'paint-brush'
+  icon: 'paint-brush',
+  opacity: 1
 })
 
 const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
@@ -38,7 +40,8 @@ const style = computed(() => ({
 const brushStyle = computed(() => ({
   width: `${diameter.value}px`,
   height: `${diameter.value}px`,
-  transform: `translate(-50%, -50%)`
+  transform: `translate(-50%, -50%)`,
+  opacity: Math.max(0.35, props.opacity ?? 1)
 }))
 
 const ICON_PADDING = 6

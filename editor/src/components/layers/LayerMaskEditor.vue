@@ -21,6 +21,26 @@
         <span class="layer-mask-editor__value">{{ brushSize }} px</span>
       </div>
 
+      <div class="layer-mask-editor__control">
+        <button
+          type="button"
+          class="circle-button"
+          title="Brush opacity"
+          aria-label="Brush opacity"
+          disabled
+        >
+          <Icon icon="droplet" aria-hidden="true" />
+        </button>
+        <input
+          v-model.number="brushOpacity"
+          type="range"
+          min="0.05"
+          max="1"
+          step="0.05"
+        >
+        <span class="layer-mask-editor__value">{{ Math.round(brushOpacity * 100) }}%</span>
+      </div>
+
       <div class="layer-mask-editor__mode-buttons">
         <button
           v-for="action in actionButtons"
@@ -132,6 +152,7 @@
       :zoom="zoom"
       :mode="activeAction.value"
       :icon="activeCursorIcon"
+      :opacity="brushOpacity"
     />
   </div>
 </template>
@@ -162,6 +183,7 @@ const isDrawing = ref(false)
 const lastX = ref(0)
 const lastY = ref(0)
 const brushSize = ref(8)
+const brushOpacity = ref(1)
 const activeAction = ref<'paint' | 'erase' | 'pan'>('paint')
 const actionButtons = [
   { id: 'paint', icon: 'paint-brush', label: 'Paint (white)' },
@@ -306,11 +328,13 @@ function drawLine (fromX: number, fromY: number, toX: number, toY: number) {
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
+  ctx.globalAlpha = Math.min(1, Math.max(0.01, brushOpacity.value))
 
   ctx.beginPath()
   ctx.moveTo(fromX, fromY)
   ctx.lineTo(toX, toY)
   ctx.stroke()
+  ctx.globalAlpha = 1
 }
 
 function handlePointerDown (event: MouseEvent) {
