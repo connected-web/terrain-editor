@@ -153,10 +153,10 @@ body {
 }
 
 .panel-card__hint {
-  margin-left: auto;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: rgba(242, 237, 224, 0.45);
+  margin: 0.3rem 0.3rem;
 }
 
 .panel-card--placeholder p {
