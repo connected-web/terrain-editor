@@ -265,7 +265,7 @@ function adjustZoom(delta: number) {
 function getContext(target: 'main' | 'overlay' | 'preview' = 'main') {
   if (target === 'overlay') {
     const canvas = overlayCanvasRef.value
-    return canvas ? canvas.getContext('2d') : null
+    return canvas ? canvas.getContext('2d', { willReadFrequently: true }) : null
   }
   if (target === 'preview') {
     const canvas = previewCanvasRef.value
@@ -399,7 +399,7 @@ function beginStroke() {
   const ctx = getContext('overlay')
   if (!ctx) return
   ctx.globalCompositeOperation = 'source-over'
-  ctx.strokeStyle = '#ffffff'
+  ctx.strokeStyle = currentStrokeMode.value === 'erase' ? '#fb6b6b' : '#ffffff'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
