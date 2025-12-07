@@ -38,6 +38,7 @@
             v-if="maskUrl"
             :src="maskUrl"
             :show-grid="showGrid"
+            :onion-layers="onionLayerSources"
             :value-mode="activeLayer?.kind === 'heightmap' ? 'heightmap' : 'mask'"
             @update-mask="handleUpdateMask"
           >
@@ -81,6 +82,7 @@ const props = defineProps<{
   filterText?: string
   activeLayer: LayerEntry | null
   showGrid?: boolean
+  onionLayers?: Array<{ id: string; mask?: string | null; color: [number, number, number] }>
 }>()
 
 const emit = defineEmits<{
@@ -103,6 +105,11 @@ const maskUrlOwned = ref(false)
 const maskSignature = ref<string | null>(null)
 let maskLoadToken = 0
 
+type OnionLayerSource = { id: string; color: [number, number, number]; src: string | null }
+const onionLayerSources = ref<OnionLayerSource[]>([])
+const onionCache = new Map<string, { path: string | null; url: string | null; owned: boolean }>()
+let onionLoadToken = 0
+
 function setMaskUrl(url: string | null, ownsUrl: boolean) {
   if (maskUrlOwned.value && maskObjectUrl.value) {
     URL.revokeObjectURL(maskObjectUrl.value)
@@ -119,6 +126,36 @@ async function preloadUrl(url: string) {
     img.onerror = () => reject(new Error('Failed to load mask preview'))
     img.src = url
   })
+}
+
+async function resolveMaskSource(path: string | null) {
+  if (!path) {
+    return { url: null, owned: false }
+  }
+  const asset = props.assets.find((entry) => entry.path === path)
+  if (asset?.data?.byteLength) {
+    const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
+    const url = URL.createObjectURL(blob)
+    try {
+      await preloadUrl(url)
+      return { url, owned: true }
+    } catch {
+      URL.revokeObjectURL(url)
+      return { url: null, owned: false }
+    }
+  }
+  const datasetUrl =
+    (props.dataset ? await Promise.resolve(props.dataset.resolveAssetUrl(path)).catch(() => null) : null) ??
+    (props.getPreview ? props.getPreview(path) : '')
+  if (!datasetUrl) {
+    return { url: null, owned: false }
+  }
+  try {
+    await preloadUrl(datasetUrl)
+    return { url: datasetUrl, owned: false }
+  } catch {
+    return { url: null, owned: false }
+  }
 }
 
 watch(
@@ -189,12 +226,59 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => props.onionLayers ?? [],
+  async (layers) => {
+    const token = ++onionLoadToken
+    const nextSources: OnionLayerSource[] = []
+    const nextIds = new Set(layers.map((layer) => layer.id))
+    for (const [id, cached] of Array.from(onionCache.entries())) {
+      if (!nextIds.has(id)) {
+        if (cached.owned && cached.url) {
+          URL.revokeObjectURL(cached.url)
+        }
+        onionCache.delete(id)
+      }
+    }
+    for (const layer of layers) {
+      const maskPath = layer.mask ?? null
+      const cached = onionCache.get(layer.id)
+      if (cached && cached.path === maskPath) {
+        nextSources.push({ id: layer.id, color: layer.color, src: cached.url })
+        continue
+      }
+      if (cached && cached.owned && cached.url) {
+        URL.revokeObjectURL(cached.url)
+      }
+      const result = await resolveMaskSource(maskPath)
+      if (token !== onionLoadToken) {
+        if (result.owned && result.url) {
+          URL.revokeObjectURL(result.url)
+        }
+        return
+      }
+      onionCache.set(layer.id, { path: maskPath, url: result.url, owned: result.owned })
+      nextSources.push({ id: layer.id, color: layer.color, src: result.url })
+    }
+    if (token === onionLoadToken) {
+      onionLayerSources.value = nextSources
+    }
+  },
+  { immediate: true, deep: true }
+)
+
 onBeforeUnmount(() => {
   if (maskUrlOwned.value && maskObjectUrl.value) {
     URL.revokeObjectURL(maskObjectUrl.value)
   }
   maskObjectUrl.value = null
   maskSignature.value = null
+  onionCache.forEach((entry) => {
+    if (entry.owned && entry.url) {
+      URL.revokeObjectURL(entry.url)
+    }
+  })
+  onionCache.clear()
 })
 
 const maskUrl = computed(() => maskObjectUrl.value)

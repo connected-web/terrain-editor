@@ -26,6 +26,9 @@
           @click="$emit('toggle-layer', entry.id)">
           <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" class="panel-card__pill-icon" />
         </div>
+        <div title="Toggle onion skin for this layer" @click.stop="$emit('toggle-onion', entry.id)">
+          <Icon icon="film" :style="{ opacity: entry.onionEnabled ? '1.0' : '0.4' }" />
+        </div>
       </button>
       <div class="panel-card__pill-actions">
         <button class="pill-button panel-card__pill-small" @click="$emit('set-all', 'biome', true)">
@@ -73,6 +76,7 @@ const emit = defineEmits<{
   'set-all': [kind: 'biome' | 'overlay', visible: boolean]
   'add-layer': []
   'reorder-layer': [{ sourceId: string; targetId: string | null }]
+  'toggle-onion': [id: string]
 }>()
 
 const draggingId = ref<string | null>(null)

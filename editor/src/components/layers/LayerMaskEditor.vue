@@ -143,6 +143,12 @@
           class="layer-mask-editor__canvas layer-mask-editor__canvas--preview"
           draggable="false"
         />
+        <div
+          v-for="layer in onionLayerEntries"
+          :key="`onion-${layer.id}`"
+          class="layer-mask-editor__onion"
+          :style="getOnionStyle(layer)"
+        />
         <canvas
           ref="overlayCanvasRef"
           class="layer-mask-editor__canvas layer-mask-editor__canvas--overlay"
@@ -173,10 +179,13 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '../Icon.vue'
 import LayerMaskCursor from './LayerMaskCursor.vue'
 
+type OnionLayerOverlay = { id: string; src: string | null; color: [number, number, number] }
+
 const props = defineProps<{
   src: string | null
   showGrid?: boolean
   valueMode?: 'mask' | 'heightmap'
+  onionLayers?: OnionLayerOverlay[]
 }>()
 
 const emit = defineEmits<{
@@ -577,6 +586,7 @@ const viewportClasses = computed(() => ({
   'layer-mask-editor__viewport--pan': activeAction.value === 'pan',
   'layer-mask-editor__viewport--grid': props.showGrid !== false
 }))
+const onionLayerEntries = computed(() => props.onionLayers ?? [])
 
 const cursorState = ref({
   position: { x: 0, y: 0 },
@@ -615,6 +625,24 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(image.value.src)
   }
 })
+
+function colorToRgba(color: [number, number, number], alpha = 1) {
+  return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`
+}
+
+function getOnionStyle(layer: OnionLayerOverlay) {
+  if (!layer.src) {
+    return { opacity: 0 }
+  }
+  const color = colorToRgba(layer.color, 0.5)
+  return {
+    opacity: 0.5,
+    backgroundColor: color,
+    backgroundImage: `url(${layer.src})`,
+    backgroundSize: '100% 100%',
+    backgroundRepeat: 'no-repeat'
+  }
+}
 </script>
 
 <style scoped>
@@ -754,6 +782,13 @@ onBeforeUnmount(() => {
   pointer-events: none;
   z-index: 1;
   mix-blend-mode: normal;
+}
+
+.layer-mask-editor__onion {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .layer-mask-editor__cursor {

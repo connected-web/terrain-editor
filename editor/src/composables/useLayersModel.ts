@@ -6,10 +6,11 @@ export type LayerEntry = {
   id: string
   label: string
   visible: boolean
-  icon?: string,
+  icon?: string
   color: [number, number, number]
   mask?: string
   kind: 'biome' | 'overlay' | 'heightmap'
+  onionEnabled?: boolean
 }
 
 export function useLayersModel(options: {
@@ -28,10 +29,11 @@ export function useLayersModel(options: {
   )
   const layerEntries = computed<LayerEntry[]>(() => {
     const legend = workspace.projectSnapshot.value.legend
-    const baseEntries = workspace.layerBrowserState.value.entries.map((entry) => ({
-      ...entry,
-      kind: entry.kind
-    }))
+    const baseEntries =
+      workspace.layerBrowserState.value?.entries?.map((entry) => ({
+        ...entry,
+        kind: entry.kind
+      })) ?? []
     if (!legend) {
       return baseEntries
     }

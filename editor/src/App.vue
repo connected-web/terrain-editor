@@ -28,11 +28,12 @@
 
         <LayersPanel
           v-else-if="activeDockPanel === 'layers'"
-          :layer-entries="layersApi.layerEntries.value"
+          :layer-entries="layerEntriesWithOnion"
           :color-to-css="rgb"
           @open-layer-editor="layersApi.openLayerEditor"
           @toggle-layer="toggleLayer"
           @set-all="setAllLayers"
+          @toggle-onion="toggleOnionLayer"
           @add-layer="openLayerCreateDialog()"
           @reorder-layer="handleLayerReorder"
         />
@@ -89,10 +90,11 @@
         v-if="layersApi.layerEditorOpen.value"
         :assets="layerEditorAssets"
         :get-preview="getIconPreview"
-        :dataset="datasetRef"
+        :dataset="datasetRef.value"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
         :show-grid="localSettings.showLayerTransparencyGrid"
+        :onion-layers="onionLayersForEditor"
         @update:filter-text="setAssetDialogFilter"
         @export-layer="layersApi.exportActiveLayerImage"
         @replace="handleLayerAssetReplace"
@@ -123,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   buildWynArchive,
   createLayerBrowserStore,
@@ -233,6 +235,40 @@ const {
 })
 
 const layersApi = useLayersModel({ layerState, handle })
+const onionLayerState = reactive<Record<string, boolean>>({})
+const layerEntriesWithOnion = computed(() =>
+  Array.isArray(layersApi.layerEntries.value)
+    ? layersApi.layerEntries.value.map(entry => ({
+        ...entry,
+        onionEnabled: onionLayerState[entry.id] ?? false
+      }))
+    : []
+)
+const onionLayersForEditor = computed(() => {
+  const activeId = layersApi.activeLayer.value?.id
+  return layerEntriesWithOnion.value
+    .filter(entry => entry.onionEnabled && entry.id !== activeId && entry.mask)
+    .map(entry => ({
+      id: entry.id,
+      mask: entry.mask,
+      color: entry.color
+    }))
+})
+function toggleOnionLayer(id: string) {
+  onionLayerState[id] = !onionLayerState[id]
+}
+watch(
+  () => (layersApi.layerEntries.value ?? []).map((entry) => entry.id),
+  (ids) => {
+    const allowed = new Set(ids)
+    Object.keys(onionLayerState).forEach((key) => {
+      if (!allowed.has(key)) {
+        delete onionLayerState[key]
+      }
+    })
+  },
+  { immediate: true }
+)
 const layerEditorAssets = computed(
   () =>
     ((projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]).map((entry) => ({
