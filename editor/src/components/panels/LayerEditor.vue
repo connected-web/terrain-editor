@@ -38,15 +38,19 @@
             v-if="maskUrl"
             :src="maskUrl"
             :show-grid="showGrid"
+            :value-mode="activeLayer?.kind === 'heightmap' ? 'heightmap' : 'mask'"
             @update-mask="handleUpdateMask"
           >
             <template #toolbar-prefix>
-              <label class="layer-editor__colour">
-                <span class="sr-only">Biome colour</span>
+              <label
+                v-if="activeLayer?.kind !== 'heightmap'"
+                class="layer-editor__colour"
+              >
+                <span class="sr-only">Layer colour</span>
                 <input
                   :value="activeColourHex"
                   type="color"
-                  aria-label="Biome colour"
+                  aria-label="Layer colour"
                   @change="handleColourChange"
                 >
               </label>
@@ -246,7 +250,7 @@ async function handleUpdateMask (blob: Blob) {
 
 function handleColourChange (event: Event) {
   const input = event.target as HTMLInputElement | null
-  if (!input || !props.activeLayer) return
+  if (!input || !props.activeLayer || props.activeLayer.kind === 'heightmap') return
   const value = input.value
   const r = parseInt(value.slice(1, 3), 16)
   const g = parseInt(value.slice(3, 5), 16)

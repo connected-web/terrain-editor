@@ -33,6 +33,8 @@
           @open-layer-editor="layersApi.openLayerEditor"
           @toggle-layer="toggleLayer"
           @set-all="setAllLayers"
+          @add-layer="openLayerCreateDialog()"
+          @reorder-layer="handleLayerReorder"
         />
 
         <ThemePanel
@@ -111,6 +113,11 @@
         @confirm="handleConfirmDialog"
         @cancel="dismissConfirmDialog"
       />
+      <LayerCreateDialog
+        v-if="layerCreateDialogOpen"
+        @create="handleCreateLayer"
+        @cancel="closeLayerCreateDialog"
+      />
     </div>
   </div>
 </template>
@@ -147,7 +154,7 @@ import {
   stemShapeOptions
 } from './utils/theme'
 import { useTheme } from './composables/useTheme'
-import { buildIconPath } from './utils/assets'
+import { buildIconPath, buildLayerMaskPath } from './utils/assets'
 import { ensureLocationId } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
@@ -158,6 +165,7 @@ import EditorViewer from './components/EditorViewer.vue'
 import PanelDock from './components/PanelDock.vue'
 import AssetDialog from './components/AssetDialog.vue'
 import LayerEditor from './components/panels/LayerEditor.vue'
+import LayerCreateDialog from './components/LayerCreateDialog.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import LocationPickerDialog from './components/LocationPickerDialog.vue'
 import WorkspacePanel from './components/panels/WorkspacePanel.vue'
@@ -173,6 +181,7 @@ import { useIconPicker } from './composables/useIconPicker'
 import { useLayerEditor } from './composables/useLayerEditor'
 import { useUrlState } from './composables/useUrlState'
 import { buildScratchDataset } from './utils/scratchDataset'
+import { createSolidImageData } from './utils/imageFactory'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
@@ -312,6 +321,15 @@ const layerEditorHelpers = useLayerEditor({
   persistCurrentProject,
   replaceAssetWithFile: replaceAssetWithFileHelper
 })
+const layerCreateDialogOpen = ref(false)
+
+function openLayerCreateDialog() {
+  layerCreateDialogOpen.value = true
+}
+
+function closeLayerCreateDialog() {
+  layerCreateDialogOpen.value = false
+}
 
 const {
   iconPickerTarget,
@@ -493,6 +511,7 @@ async function exportArchive() {
 }
 
 function toggleLayer(id: string) {
+  if (id === 'heightmap') return
   layerBrowserStore.toggleVisibility(id)
 }
 
@@ -622,6 +641,96 @@ async function handleLibraryUpload(event: Event) {
     return
   }
   await importAsset()
+}
+
+async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'overlay'; color: [number, number, number] }) {
+  const snapshot = projectStore.getSnapshot()
+  const legend = snapshot.legend
+  if (!legend) {
+    closeLayerCreateDialog()
+    return
+  }
+  const baseLabel = payload.label?.trim() || 'New Layer'
+  const groupKey = payload.kind === 'overlay' ? 'overlays' : 'biomes'
+  const group = { ...(legend[groupKey] ?? {}) }
+  let baseKey = normalizeAssetFileName(baseLabel).replace(/\.[^.]+$/, '')
+  if (!baseKey) baseKey = `${payload.kind}-layer`
+  let key = baseKey
+  let counter = 1
+  while (group[key]) {
+    key = `${baseKey}-${counter++}`
+  }
+  const maskPath = buildLayerMaskPath(key)
+  const [width, height] = legend.size ?? [512, 512]
+  const image = createSolidImageData(width, height, 0)
+  const file = new File([image.buffer], maskPath, { type: 'image/png' })
+  await replaceAssetWithFileHelper(maskPath, file)
+  const newLayer = {
+    label: baseLabel,
+    mask: maskPath,
+    rgb: payload.color
+  }
+  const nextLegend = {
+    ...legend,
+    [groupKey]: {
+      ...group,
+      [key]: newLayer
+    }
+  }
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    if (groupKey === 'overlays') {
+      datasetRef.value.legend.overlays = { ...(datasetRef.value.legend.overlays ?? {}), [key]: newLayer }
+    } else {
+      datasetRef.value.legend.biomes = { ...(datasetRef.value.legend.biomes ?? {}), [key]: newLayer }
+    }
+  }
+  await persistCurrentProject()
+  requestViewerRemount()
+  layersApi.openLayerEditor(`${payload.kind}:${key}`)
+  closeLayerCreateDialog()
+}
+
+function handleLayerReorder(payload: { sourceId: string; targetId: string | null }) {
+  const { sourceId, targetId } = payload
+  if (!sourceId || sourceId === 'heightmap') return
+  const [kind, key] = sourceId.split(':')
+  if (!key || (kind !== 'biome' && kind !== 'overlay')) return
+  if (targetId === sourceId) return
+  const snapshot = projectStore.getSnapshot()
+  const legend = snapshot.legend
+  if (!legend) return
+  const groupKey = kind === 'overlay' ? 'overlays' : 'biomes'
+  const group = legend[groupKey]
+  if (!group || !group[key]) return
+  const targetKey = targetId && targetId !== 'heightmap' ? targetId.split(':')[1] ?? null : null
+  if (targetKey && !group[targetKey]) return
+  const keys = Object.keys(group)
+  const sourceIndex = keys.indexOf(key)
+  if (sourceIndex === -1) return
+  keys.splice(sourceIndex, 1)
+  if (targetKey) {
+    const insertIndex = keys.indexOf(targetKey)
+    keys.splice(insertIndex >= 0 ? insertIndex : keys.length, 0, key)
+  } else {
+    keys.push(key)
+  }
+  const reordered: typeof group = {} as typeof group
+  keys.forEach((entryKey) => {
+    reordered[entryKey] = group[entryKey]
+  })
+  const nextLegend = {
+    ...legend,
+    [groupKey]: reordered
+  }
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    datasetRef.value.legend[groupKey] = { ...reordered }
+  }
+  requestViewerRemount()
+  void persistCurrentProject()
 }
 
 async function importLocationIcon(location: TerrainLocation, file: File) {

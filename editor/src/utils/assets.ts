@@ -13,3 +13,9 @@ export function normalizeAssetFileName(name: string) {
 export function buildIconPath(name: string) {
   return `icons/${normalizeAssetFileName(name)}`
 }
+
+export function buildLayerMaskPath(name: string) {
+  const normalized = normalizeAssetFileName(name)
+  const base = normalized.replace(/\.[^.]+$/, '')
+  return `layers/${base || 'layer'}.png`
+}

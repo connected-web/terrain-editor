@@ -8,6 +8,7 @@ export type LayerEntry = {
   visible: boolean
   color: [number, number, number]
   mask?: string
+  kind: 'biome' | 'overlay' | 'heightmap'
 }
 
 export function useLayersModel(options: {
@@ -24,7 +25,25 @@ export function useLayersModel(options: {
     },
     { immediate: true }
   )
-  const layerEntries = computed(() => workspace.layerBrowserState.value.entries)
+  const layerEntries = computed<LayerEntry[]>(() => {
+    const legend = workspace.projectSnapshot.value.legend
+    const baseEntries = workspace.layerBrowserState.value.entries.map((entry) => ({
+      ...entry,
+      kind: entry.kind
+    }))
+    if (!legend) {
+      return baseEntries
+    }
+    const heightEntry: LayerEntry = {
+      id: 'heightmap',
+      label: 'Heightmap',
+      visible: true,
+      color: [255, 255, 255],
+      mask: legend.heightmap,
+      kind: 'heightmap'
+    }
+    return [heightEntry, ...baseEntries]
+  })
   const layerEditorOpen = ref(false)
   const layerEditorSelectedLayerId = ref<string | null>(null)
 

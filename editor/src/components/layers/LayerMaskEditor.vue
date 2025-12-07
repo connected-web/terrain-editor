@@ -176,6 +176,7 @@ import LayerMaskCursor from './LayerMaskCursor.vue'
 const props = defineProps<{
   src: string | null
   showGrid?: boolean
+  valueMode?: 'mask' | 'heightmap'
 }>()
 
 const emit = defineEmits<{
@@ -201,15 +202,26 @@ const brushSize = ref(8)
 const brushOpacity = ref(1)
 const currentStrokeMode = ref<'paint' | 'erase'>('paint')
 const activeAction = ref<'paint' | 'erase' | 'pan'>('paint')
-const actionButtons = [
-  { id: 'paint', icon: 'paint-brush', label: 'Paint (white)' },
-  { id: 'erase', icon: 'eraser', label: 'Erase (black)' },
-  { id: 'pan', icon: 'up-down-left-right', label: 'Pan/Move' }
-] as const
-function setAction(action: (typeof actionButtons)[number]['id']) {
+const actionButtons = computed(() => {
+  if (props.valueMode === 'heightmap') {
+    return [
+      { id: 'paint', icon: 'plus', label: 'Raise terrain' },
+      { id: 'erase', icon: 'minus', label: 'Lower terrain' },
+      { id: 'pan', icon: 'up-down-left-right', label: 'Pan/Move' }
+    ] as const
+  }
+  return [
+    { id: 'paint', icon: 'paint-brush', label: 'Paint (white)' },
+    { id: 'erase', icon: 'eraser', label: 'Erase (black)' },
+    { id: 'pan', icon: 'up-down-left-right', label: 'Pan/Move' }
+  ] as const
+})
+function setAction(action: 'paint' | 'erase' | 'pan') {
   activeAction.value = action
 }
-const activeCursorIcon = computed(() => actionButtons.find((item) => item.id === activeAction.value)?.icon ?? 'paint-brush')
+const activeCursorIcon = computed(
+  () => actionButtons.value.find((item) => item.id === activeAction.value)?.icon ?? 'paint-brush'
+)
 const zoom = ref(1)
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
@@ -399,7 +411,14 @@ function beginStroke() {
   const ctx = getContext('overlay')
   if (!ctx) return
   ctx.globalCompositeOperation = 'source-over'
-  ctx.strokeStyle = currentStrokeMode.value === 'erase' ? '#fb6b6b' : '#ffffff'
+  ctx.strokeStyle =
+    props.valueMode === 'heightmap'
+      ? currentStrokeMode.value === 'erase'
+        ? '#5ea9ff'
+        : '#ffffff'
+      : currentStrokeMode.value === 'erase'
+      ? '#fb6b6b'
+      : '#ffffff'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -457,7 +476,10 @@ function commitOverlay() {
     if (alpha <= 0) continue
     const idx = i / 4
     const current = values[idx]
-    if (erase) {
+    if (props.valueMode === 'heightmap') {
+      const delta = alpha * Math.min(1, brushOpacity.value)
+      values[idx] = erase ? Math.max(0, current - delta) : Math.min(1, current + delta)
+    } else if (erase) {
       values[idx] = Math.max(0, current - alpha * current)
     } else {
       values[idx] = Math.min(1, current + alpha * (1 - current))
