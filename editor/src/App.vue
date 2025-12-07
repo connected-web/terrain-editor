@@ -170,6 +170,7 @@ import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
 import { useLayerEditor } from './composables/useLayerEditor'
+import { useUrlState } from './composables/useUrlState'
 
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
@@ -220,6 +221,16 @@ const {
 })
 
 const layersApi = useLayersModel({ layerState, handle })
+useUrlState({
+  activePanel: activeDockPanel,
+  setActivePanel,
+  isDockCollapsed,
+  layerEditorOpen: layersApi.layerEditorOpen,
+  layerEditorSelectedLayerId: layersApi.layerEditorSelectedLayerId,
+  openLayerEditor: layersApi.openLayerEditor,
+  layerEntries: layersApi.layerEntries,
+  layerBrowserStore
+})
 const layerEditorAssets = computed(
   () =>
     ((projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]).map((entry) => ({

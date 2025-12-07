@@ -241,17 +241,21 @@ export function useLocations() {
     { deep: true, immediate: true }
   )
 
+  let hasSyncedInitialLocationSelection = false
   watch(
     () => selectedLocationId.value,
     (id) => {
       if (id) {
         focusLocationInViewer(id)
-        if (workspace.localSettings?.openLocationsOnSelect) {
+        if (hasSyncedInitialLocationSelection && workspace.localSettings?.openLocationsOnSelect) {
           workspace.setActivePanel?.('locations')
           workspace.ensureDockExpanded?.()
         }
       } else if (workspace.handle.value) {
         workspace.handle.value.updateLocations(workspace.getViewerLocations())
+      }
+      if (!hasSyncedInitialLocationSelection) {
+        hasSyncedInitialLocationSelection = true
       }
     }
   )
@@ -382,4 +386,3 @@ export function useLocations() {
 }
 
 export type LocationsApi = ReturnType<typeof useLocations>
-
