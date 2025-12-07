@@ -361,11 +361,11 @@ function beginStroke() {
   const ctx = getContext('overlay')
   if (!ctx) return
   ctx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
-  ctx.strokeStyle = activeAction.value === 'erase' ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)'
+  ctx.strokeStyle = activeAction.value === 'erase' ? '#000000' : '#ffffff'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.globalAlpha = Math.min(1, Math.max(0.01, brushOpacity.value))
+  ctx.globalAlpha = 1
 }
 
 function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
@@ -408,9 +408,12 @@ function commitOverlay() {
   const mainCtx = getContext('main')
   const overlayCtx = getContext('overlay')
   if (!mainCtx || !overlayCtx) return
+  const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
+  mainCtx.globalAlpha = opacity
   mainCtx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
   mainCtx.drawImage(overlay, 0, 0)
   mainCtx.globalCompositeOperation = 'source-over'
+  mainCtx.globalAlpha = 1
   clearOverlay()
 }
 
