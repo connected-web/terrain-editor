@@ -16,7 +16,7 @@
           v-model.number="brushSize"
           type="range"
           min="1"
-          max="64"
+          max="256"
         >
         <span class="layer-mask-editor__value">{{ brushSize }} px</span>
       </div>
@@ -131,7 +131,6 @@
         <canvas
           ref="canvasRef"
           class="layer-mask-editor__canvas"
-          :style="canvasStyle"
           draggable="false"
           @dragstart.prevent
           @mousedown="handlePointerDown"
@@ -142,7 +141,7 @@
         <canvas
           ref="overlayCanvasRef"
           class="layer-mask-editor__canvas layer-mask-editor__canvas--overlay"
-          :style="canvasStyle"
+          :style="overlayCanvasStyle"
           draggable="false"
           @dragstart.prevent
         />
@@ -210,9 +209,8 @@ const canvasWrapperStyle = computed(() => ({
   width: `${Math.max(1, canvasDimensions.value.width * zoom.value)}px`,
   height: `${Math.max(1, canvasDimensions.value.height * zoom.value)}px`
 }))
-const canvasStyle = computed(() => ({
-  width: '100%',
-  height: '100%'
+const overlayCanvasStyle = computed(() => ({
+  opacity: Math.min(1, Math.max(0.01, brushOpacity.value))
 }))
 
 function clampZoom(value: number) {
@@ -365,7 +363,7 @@ function beginStroke() {
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.globalAlpha = 1
+  ctx.globalAlpha = Math.min(1, Math.max(0.01, brushOpacity.value))
 }
 
 function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
@@ -659,6 +657,8 @@ onBeforeUnmount(() => {
   image-rendering: pixelated;
   background: transparent;
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .layer-mask-editor__canvas--overlay {
