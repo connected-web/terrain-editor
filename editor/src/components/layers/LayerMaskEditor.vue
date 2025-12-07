@@ -1,117 +1,5 @@
 <template>
   <div class="layer-mask-editor" ref="editorRootRef">
-    <div class="layer-mask-editor__toolbar">
-      <slot name="toolbar-prefix" />
-      <div class="layer-mask-editor__control">
-        <button
-          type="button"
-          class="circle-button"
-          title="Brush size"
-          aria-label="Brush size"
-          disabled
-        >
-          <Icon icon="paintbrush" aria-hidden="true" />
-        </button>
-        <input
-          v-model.number="brushSize"
-          type="range"
-          min="1"
-          max="256"
-        >
-        <span class="layer-mask-editor__value">{{ brushSize }} px</span>
-      </div>
-
-      <div class="layer-mask-editor__control">
-        <button
-          type="button"
-          class="circle-button"
-          title="Brush opacity"
-          aria-label="Brush opacity"
-          disabled
-        >
-          <Icon icon="droplet" aria-hidden="true" />
-        </button>
-        <input
-          v-model.number="brushOpacity"
-          type="range"
-          min="0.05"
-          max="1"
-          step="0.05"
-        >
-        <span class="layer-mask-editor__value">{{ Math.round(brushOpacity * 100) }}%</span>
-      </div>
-
-      <div class="layer-mask-editor__mode-buttons">
-        <button
-          v-for="action in actionButtons"
-          :key="action.id"
-          type="button"
-          class="pill-button layer-mask-editor__action-button"
-          :class="{
-            'pill-button--ghost': activeAction !== action.id,
-            'layer-mask-editor__action-button--active': activeAction === action.id
-          }"
-          :title="action.label"
-          :aria-label="action.label"
-          @click="setAction(action.id)"
-        >
-          <Icon :icon="action.icon" aria-hidden="true" />
-          <span class="sr-only">{{ action.label }}</span>
-        </button>
-      </div>
-
-      <div class="layer-mask-editor__control layer-mask-editor__zoom">
-        <button
-          type="button"
-          class="circle-button"
-          title="Zoom out"
-          aria-label="Zoom out"
-          @click="adjustZoom(-0.25)"
-        >
-          <Icon icon="magnifying-glass-minus" aria-hidden="true" />
-        </button>
-        <input
-          v-model.number="zoom"
-          type="range"
-          min="0.5"
-          max="4"
-          step="0.25"
-        >
-        <button
-          type="button"
-          class="circle-button"
-          title="Zoom in"
-          aria-label="Zoom in"
-          @click="adjustZoom(0.25)"
-        >
-          <Icon icon="magnifying-glass-plus" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div class="layer-mask-editor__toolbar-group">
-        <button
-          type="button"
-          class="pill-button pill-button--ghost"
-          title="Reset mask"
-          aria-label="Reset mask"
-          @click="handleReset"
-        >
-          <Icon icon="recycle" aria-hidden="true" />
-          <span class="sr-only">Reset</span>
-        </button>
-        <button
-          type="button"
-          class="pill-button"
-          title="Apply changes"
-          aria-label="Apply changes"
-          @click="handleApply"
-        >
-          <Icon icon="shuffle" aria-hidden="true" />
-          <span class="sr-only">Apply changes</span>
-        </button>
-      </div>
-    </div>
-
     <div
       class="layer-mask-editor__viewport"
       :class="viewportClasses"
@@ -167,7 +55,7 @@
       :y="cursorState.position.y"
       :brush-size="brushSize"
       :zoom="zoom"
-      :mode="activeAction"
+      :mode="cursorMode"
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
     />
@@ -176,7 +64,6 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import Icon from '../Icon.vue'
 import LayerMaskCursor from './LayerMaskCursor.vue'
 
 type OnionLayerOverlay = { id: string; src: string | null; color: [number, number, number] }
@@ -186,10 +73,17 @@ const props = defineProps<{
   showGrid?: boolean
   valueMode?: 'mask' | 'heightmap'
   onionLayers?: OnionLayerOverlay[]
+  tool?: string
+  brushSize?: number
+  brushOpacity?: number
+  brushSoftness?: number
+  flatLevel?: number
 }>()
 
 const emit = defineEmits<{
   (ev: 'update-mask', blob: Blob): void
+  (ev: 'zoom-change', value: number): void
+  (ev: 'cursor-move', coords: { x: number; y: number }): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -207,30 +101,35 @@ const hasValidImage = computed(() => {
 const isDrawing = ref(false)
 const lastX = ref(0)
 const lastY = ref(0)
-const brushSize = ref(8)
-const brushOpacity = ref(1)
-const currentStrokeMode = ref<'paint' | 'erase'>('paint')
-const activeAction = ref<'paint' | 'erase' | 'pan'>('paint')
-const actionButtons = computed(() => {
-  if (props.valueMode === 'heightmap') {
-    return [
-      { id: 'paint', icon: 'plus', label: 'Raise terrain' },
-      { id: 'erase', icon: 'minus', label: 'Lower terrain' },
-      { id: 'pan', icon: 'up-down-left-right', label: 'Pan/Move' }
-    ] as const
-  }
-  return [
-    { id: 'paint', icon: 'paint-brush', label: 'Paint (white)' },
-    { id: 'erase', icon: 'eraser', label: 'Erase (black)' },
-    { id: 'pan', icon: 'up-down-left-right', label: 'Pan/Move' }
-  ] as const
+const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
+const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
+const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
+const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
+const toolMode = computed(() => props.tool ?? 'brush')
+const panModeActive = computed(() => toolMode.value === 'hand' || toolMode.value === 'pan')
+const currentStrokeMode = computed<'paint' | 'erase' | 'flat'>(() => {
+  if (toolMode.value === 'erase') return 'erase'
+  if (toolMode.value === 'flat' && props.valueMode === 'heightmap') return 'flat'
+  return 'paint'
 })
-function setAction(action: 'paint' | 'erase' | 'pan') {
-  activeAction.value = action
-}
-const activeCursorIcon = computed(
-  () => actionButtons.value.find((item) => item.id === activeAction.value)?.icon ?? 'paint-brush'
-)
+const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
+  if (panModeActive.value) return 'pan'
+  return currentStrokeMode.value === 'erase' ? 'erase' : 'paint'
+})
+
+const activeCursorIcon = computed(() => {
+  switch (toolMode.value) {
+    case 'erase':
+      return 'minus'
+    case 'flat':
+      return 'equals'
+    case 'hand':
+    case 'pan':
+      return 'hand'
+    default:
+      return 'paint-brush'
+  }
+})
 const zoom = ref(1)
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
@@ -251,6 +150,7 @@ function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
   const viewport = viewportRef.value
   if (!viewport || !canvasDimensions.value.width || !canvasDimensions.value.height) {
     zoom.value = clampZoom(nextZoom)
+    emit('zoom-change', zoom.value)
     return
   }
   const previousZoom = zoom.value
@@ -277,6 +177,7 @@ function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
   const nextScrollTop = ratioY * nextDisplayHeight - pivotY
   viewport.scrollLeft = Math.max(0, nextScrollLeft)
   viewport.scrollTop = Math.max(0, nextScrollTop)
+  emit('zoom-change', clamped)
 }
 
 function adjustZoom(delta: number) {
@@ -416,57 +317,59 @@ function clearOverlay() {
   }
 }
 
-function beginStroke() {
+function stampBrush(x: number, y: number) {
+  const ctx = getContext('overlay')
   const overlay = overlayCanvasRef.value
-  if (!overlay) return
-  const ctx = getContext('overlay')
-  if (!ctx) return
+  if (!ctx || !overlay) return
+  const radius = brushSize.value / 2
+  if (radius <= 0) return
+  const softness = brushSoftness.value
+  const hardness = Math.max(0, 1 - softness)
+  const innerRadius = Math.max(0, radius * hardness)
+  const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius)
+  gradient.addColorStop(0, '#ffffff')
+  gradient.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = gradient
   ctx.globalCompositeOperation = 'source-over'
-  ctx.strokeStyle =
-    props.valueMode === 'heightmap'
-      ? currentStrokeMode.value === 'erase'
-        ? '#5ea9ff'
-        : '#ffffff'
-      : currentStrokeMode.value === 'erase'
-      ? '#fb6b6b'
-      : '#ffffff'
-  ctx.lineWidth = brushSize.value
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.globalAlpha = 1
-}
-
-function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
-  const ctx = getContext('overlay')
-  if (!ctx) return
   ctx.beginPath()
-  ctx.moveTo(fromX, fromY)
-  ctx.lineTo(toX, toY)
-  ctx.stroke()
+  ctx.arc(x, y, radius, 0, Math.PI * 2)
+  ctx.fill()
 }
 
-function handlePointerDown (event: MouseEvent) {
-  if (activeAction.value === 'pan') return
+function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
+  const steps = Math.max(
+    1,
+    Math.ceil(Math.hypot(toX - fromX, toY - fromY) / Math.max(1, brushSize.value / 4))
+  )
+  for (let i = 0; i <= steps; i += 1) {
+    const t = steps === 0 ? 0 : i / steps
+    const x = fromX + (toX - fromX) * t
+    const y = fromY + (toY - fromY) * t
+    stampBrush(x, y)
+  }
+}
+
+function handlePointerDown(event: MouseEvent) {
+  if (panModeActive.value || event.button !== 0) return
   const { x, y } = canvasCoordsFromEvent(event)
-  currentStrokeMode.value = activeAction.value === 'erase' ? 'erase' : 'paint'
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
   clearOverlay()
-  beginStroke()
-  drawLine(x, y, x, y)
+  stampBrush(x, y)
 }
 
-function handlePointerMove (event: MouseEvent) {
-  if (activeAction.value === 'pan') return
+function handlePointerMove(event: MouseEvent) {
+  if (panModeActive.value) return
   if (!isDrawing.value) return
   const { x, y } = canvasCoordsFromEvent(event)
-  drawLine(lastX.value, lastY.value, x, y)
+  drawStroke(lastX.value, lastY.value, x, y)
   lastX.value = x
   lastY.value = y
 }
 
-function handlePointerUp () {
+function handlePointerUp() {
+  if (!isDrawing.value) return
   isDrawing.value = false
   commitOverlay()
 }
@@ -481,17 +384,17 @@ function commitOverlay() {
   const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
   const overlayData = overlayCtx.getImageData(0, 0, width, height)
   const data = overlayData.data
-  const erase = currentStrokeMode.value === 'erase'
+  const mode = currentStrokeMode.value
   for (let i = 0; i < data.length; i += 4) {
     const alpha = (data[i + 3] / 255) * opacity
     if (alpha <= 0) continue
     const idx = i / 4
     const current = values[idx]
-    if (props.valueMode === 'heightmap') {
-      const delta = alpha * Math.min(1, brushOpacity.value)
-      values[idx] = erase ? Math.max(0, current - delta) : Math.min(1, current + delta)
-    } else if (erase) {
+    if (mode === 'erase') {
       values[idx] = Math.max(0, current - alpha * current)
+    } else if (mode === 'flat') {
+      const target = flatLevel.value
+      values[idx] = current + (target - current) * alpha
     } else {
       values[idx] = Math.min(1, current + alpha * (1 - current))
     }
@@ -507,7 +410,7 @@ const panState = ref({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
 function handleViewportPointerDown(event: PointerEvent) {
   const viewport = viewportRef.value
   if (!viewport) return
-  if (activeAction.value !== 'pan') {
+  if (!panModeActive.value) {
     updateCursorPosition(event)
     return
   }
@@ -574,16 +477,37 @@ function handleViewportWheel(event: WheelEvent) {
   updateCursorPosition(event)
 }
 
+function fitView() {
+  const viewport = viewportRef.value
+  zoom.value = 1
+  if (viewport) {
+    viewport.scrollLeft = 0
+    viewport.scrollTop = 0
+  }
+  emit('zoom-change', zoom.value)
+}
+
+function setZoom(value: number) {
+  applyZoom(value)
+}
+
+defineExpose({
+  fitView,
+  setZoom,
+  resetMask: handleReset,
+  applyMask: handleApply
+})
+
 watch(
   () => [props.src, canvasRef.value] as const,
   () => loadImage(),
   { immediate: true }
 )
 
-const showCustomCursor = computed(() => hasValidImage.value && activeAction.value !== 'pan')
+const showCustomCursor = computed(() => hasValidImage.value && !panModeActive.value)
 const viewportClasses = computed(() => ({
   'layer-mask-editor__viewport--draw': showCustomCursor.value,
-  'layer-mask-editor__viewport--pan': activeAction.value === 'pan',
+  'layer-mask-editor__viewport--pan': panModeActive.value,
   'layer-mask-editor__viewport--grid': props.showGrid !== false
 }))
 const onionLayerEntries = computed(() => props.onionLayers ?? [])
@@ -603,6 +527,13 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
     y: event.clientY - rect.top
   }
   cursorState.value.visible = cursorInside.value && showCustomCursor.value
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const coords = canvasCoordsFromEvent(event as MouseEvent)
+  emit('cursor-move', {
+    x: Math.round(coords.x),
+    y: Math.round(coords.y)
+  })
 }
 
 function handleViewportPointerEnter(event: PointerEvent) {
@@ -652,73 +583,6 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   gap: 0.5rem;
   height: 100%;
   position: relative;
-}
-
-.layer-mask-editor__toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 0.35rem;
-}
-
-.layer-mask-editor__control {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.circle-button {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: transparent;
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.circle-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.layer-mask-editor__mode-buttons {
-  display: flex;
-  gap: 0.35rem;
-}
-
-.layer-mask-editor__action-button--active {
-  border-color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
-.layer-mask-editor__toolbar-group {
-  display: flex;
-  gap: 0.35rem;
-  margin-left: auto;
-}
-
-.layer-mask-editor__label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.75;
-}
-
-.layer-mask-editor__value {
-  font-size: 0.75rem;
-  opacity: 0.85;
-}
-
-.layer-mask-editor__zoom input[type='range'] {
-  width: 140px;
 }
 
 .layer-mask-editor__viewport {
