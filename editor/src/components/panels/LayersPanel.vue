@@ -17,7 +17,7 @@
         @drop.prevent="handleDrop(entry)"
         @dragend="handleDragEnd"
       >
-        <span class="panel-card__pill-swatch" :style="{ backgroundColor: colorToCss(entry.color) }" />
+        <Icon :icon="entry?.icon ?? 'circle'" class="panel-card__pill-icon" :style="{ color: colorToCss(entry.color) }" />
         <span class="panel-card__pill-label">{{ entry.label }}</span>
         <span class="spacer"></span>
         <div

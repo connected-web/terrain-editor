@@ -89,7 +89,7 @@
         v-if="layersApi.layerEditorOpen.value"
         :assets="layerEditorAssets"
         :get-preview="getIconPreview"
-        :dataset="datasetRef.value"
+        :dataset="datasetRef"
         :filter-text="assetDialogFilter"
         :active-layer="layersApi.activeLayer.value"
         :show-grid="localSettings.showLayerTransparencyGrid"
@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   buildWynArchive,
   createLayerBrowserStore,
@@ -133,7 +133,8 @@ import {
   type TerrainLocation,
   type TerrainProjectFileEntry,
   type TerrainThemeOverrides,
-  type ViewerOverlayLoadingState
+  type ViewerOverlayLoadingState,
+  type LocationViewState
 } from '@connected-web/terrain-editor'
 import {
   base64ToArrayBuffer,
@@ -232,16 +233,6 @@ const {
 })
 
 const layersApi = useLayersModel({ layerState, handle })
-useUrlState({
-  activePanel: activeDockPanel,
-  setActivePanel,
-  isDockCollapsed,
-  layerEditorOpen: layersApi.layerEditorOpen,
-  layerEditorSelectedLayerId: layersApi.layerEditorSelectedLayerId,
-  openLayerEditor: layersApi.openLayerEditor,
-  layerEntries: layersApi.layerEntries,
-  layerBrowserStore
-})
 const layerEditorAssets = computed(
   () =>
     ((projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]).map((entry) => ({
@@ -280,6 +271,51 @@ function resetStemState(state: StemStateKey) {
   resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
 }
 const locationsApi = useLocations()
+const pendingCameraOverride = ref<LocationViewState | null>(null)
+
+function applyCameraOverride(state: LocationViewState) {
+  pendingCameraOverride.value = state
+  locationsApi.applyCameraViewOverride(state)
+  tryApplyCameraOverride()
+}
+
+function tryApplyCameraOverride() {
+  const pending = pendingCameraOverride.value
+  const viewerHandle = handle.value
+  if (!pending || !viewerHandle) return
+  const fallbackPixel = {
+    x: workspaceForm.width / 2,
+    y: workspaceForm.height / 2
+  }
+  viewerHandle.navigateTo({
+    pixel: pending.targetPixel ?? fallbackPixel,
+    view: pending
+  })
+  pendingCameraOverride.value = null
+}
+
+useUrlState({
+  activePanel: activeDockPanel,
+  setActivePanel,
+  isDockCollapsed,
+  layerEditorOpen: layersApi.layerEditorOpen,
+  layerEditorSelectedLayerId: layersApi.layerEditorSelectedLayerId,
+  openLayerEditor: layersApi.openLayerEditor,
+  layerEntries: layersApi.layerEntries,
+  layerBrowserStore,
+  cameraViewState: locationsApi.cameraViewState,
+  setCameraViewState: applyCameraOverride
+})
+
+watch(
+  () => handle.value,
+  (next) => {
+    if (next) {
+      tryApplyCameraOverride()
+    }
+  },
+  { immediate: true }
+)
 const persistedProject = ref<PersistedProject | null>(null)
 const hasActiveArchive = computed(
   () => Boolean(datasetRef.value) || Boolean(projectSnapshot?.value?.legend)
@@ -824,6 +860,7 @@ type ViewerMountContext = {
   theme?: DeepPartial<TerrainTheme>
   onLocationPick: (payload: { pixel: { x: number; y: number } }) => void
   onLocationClick: (locationId: string) => void
+  initialCameraView?: LocationViewState
 }
 
 function getViewerMountContext(): ViewerMountContext | null {
@@ -835,7 +872,8 @@ function getViewerMountContext(): ViewerMountContext | null {
     interactive: locationsApi.interactive.value,
     theme: projectSnapshot.value.theme as DeepPartial<TerrainTheme> | undefined,
     onLocationPick: locationsApi.handleLocationPick,
-    onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId)
+    onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId),
+    initialCameraView: locationsApi.cameraViewState.value
   }
 }
 

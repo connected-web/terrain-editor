@@ -6,6 +6,7 @@ export type LayerEntry = {
   id: string
   label: string
   visible: boolean
+  icon?: string,
   color: [number, number, number]
   mask?: string
   kind: 'biome' | 'overlay' | 'heightmap'
@@ -36,8 +37,9 @@ export function useLayersModel(options: {
     }
     const heightEntry: LayerEntry = {
       id: 'heightmap',
-      label: 'Heightmap',
+      label: 'Height Map',
       visible: true,
+      icon: 'mountain',
       color: [255, 255, 255],
       mask: legend.heightmap,
       kind: 'heightmap'

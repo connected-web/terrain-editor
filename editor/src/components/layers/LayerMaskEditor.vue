@@ -161,7 +161,7 @@
       :y="cursorState.position.y"
       :brush-size="brushSize"
       :zoom="zoom"
-      :mode="activeAction.value"
+      :mode="activeAction"
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
     />
@@ -295,8 +295,10 @@ function loadImage () {
   const preview = previewCanvasRef.value
 
   function resetCanvases(width: number, height: number) {
-    canvas.width = width
-    canvas.height = height
+    if (canvas != null) {
+      canvas.width = width
+      canvas.height = height
+    }
     const ctx = getContext()
     ctx?.clearRect(0, 0, width, height)
     if (overlay) {

@@ -3,6 +3,13 @@ import type { LayerBrowserStore } from '@connected-web/terrain-editor'
 import type { LayerEntry } from './useLayersModel'
 import type { DockPanel } from '../models/workspace'
 
+type CameraState = {
+  distance: number
+  polar: number
+  azimuth: number
+  targetPixel?: { x: number; y: number }
+}
+
 type Options = {
   activePanel: Ref<DockPanel>
   setActivePanel: (panel: DockPanel) => void
@@ -12,6 +19,8 @@ type Options = {
   openLayerEditor: (id: string) => void
   layerEntries: ComputedRef<LayerEntry[]>
   layerBrowserStore: LayerBrowserStore
+  cameraViewState: Ref<CameraState>
+  setCameraViewState: (state: CameraState) => void
 }
 
 type InitialRouteState = {
@@ -19,13 +28,14 @@ type InitialRouteState = {
   dockCollapsed: boolean | null
   layerId: string | null
   layerVisSignature: string | null
+  cameraState: CameraState | null
 }
 
 const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations']
 
 function parseInitialState(): InitialRouteState {
   if (typeof window === 'undefined') {
-    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null }
+    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null }
   }
   const params = new URLSearchParams(window.location.search)
   const panelParam = params.get('panel')
@@ -35,11 +45,33 @@ function parseInitialState(): InitialRouteState {
     dockParam === '1' ? true : dockParam === '0' ? false : dockParam === null ? null : Boolean(dockParam)
   const layerId = params.get('layer')
   const layerVisSignature = params.get('layers')
+  const cameraParam = params.get('camera')
+  let cameraState: CameraState | null = null
+  if (cameraParam) {
+    const parts = cameraParam.split(',').map((value) => Number(value))
+    if (parts.length >= 3) {
+      const [distanceRaw, polarRaw, azimuthRaw, xRaw, yRaw] = parts
+      const distance = Number.isFinite(distanceRaw) ? distanceRaw : 1
+      const polar = Number.isFinite(polarRaw) ? polarRaw : Math.PI / 3
+      const azimuth = Number.isFinite(azimuthRaw) ? azimuthRaw : 0
+      const targetPixel =
+        Number.isFinite(xRaw) && Number.isFinite(yRaw)
+          ? { x: xRaw, y: yRaw }
+          : undefined
+      cameraState = {
+        distance,
+        polar,
+        azimuth,
+        targetPixel
+      }
+    }
+  }
   return {
     panel,
     dockCollapsed,
     layerId,
-    layerVisSignature
+    layerVisSignature,
+    cameraState
   }
 }
 
@@ -116,11 +148,30 @@ export function useUrlState(options: Options) {
   if (initial.dockCollapsed !== null) {
     options.isDockCollapsed.value = initial.dockCollapsed
   }
+  if (initial.cameraState) {
+    options.setCameraViewState(initial.cameraState)
+  }
   const pendingLayerId = ref<string | null>(initial.layerId)
   const pendingLayerVisibility = ref<string | null>(initial.layerVisSignature)
   const layerVisibilitySignature = computed(() =>
     options.layerEntries.value.map((entry) => (entry.visible ? '1' : '0')).join('')
   )
+  const cameraSignature = computed(() => {
+    const state = options.cameraViewState.value
+    if (!state) return ''
+    const parts = [
+      Number.isFinite(state.distance) ? state.distance.toFixed(3) : '0',
+      Number.isFinite(state.polar) ? state.polar.toFixed(3) : '0',
+      Number.isFinite(state.azimuth) ? state.azimuth.toFixed(3) : '0'
+    ]
+    if (state.targetPixel) {
+      parts.push(
+        Number.isFinite(state.targetPixel.x) ? state.targetPixel.x.toFixed(1) : '0',
+        Number.isFinite(state.targetPixel.y) ? state.targetPixel.y.toFixed(1) : '0'
+      )
+    }
+    return parts.join(',')
+  })
 
   watch(
     () => options.layerEntries.value,
@@ -153,6 +204,20 @@ export function useUrlState(options: Options) {
     syncUrl()
   })
 
+  let pendingSyncHandle: number | null = null
+  const SYNC_DELAY = 500
+
+  function scheduleSync() {
+    if (suppressUpdates) return
+    if (pendingSyncHandle !== null) {
+      window.clearTimeout(pendingSyncHandle)
+    }
+    pendingSyncHandle = window.setTimeout(() => {
+      pendingSyncHandle = null
+      syncUrl()
+    }, SYNC_DELAY)
+  }
+
   function syncUrl() {
     if (suppressUpdates) return
     const params = new URLSearchParams(window.location.search)
@@ -169,6 +234,7 @@ export function useUrlState(options: Options) {
     updateQueryParam('layer', layerId, params)
     const visibilityString = encodeLayerVisibility(options.layerEntries.value)
     updateQueryParam('layers', visibilityString || null, params)
+    updateQueryParam('camera', cameraSignature.value || null, params)
     const query = params.toString()
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
     window.history.replaceState({}, '', nextUrl)
@@ -180,9 +246,10 @@ export function useUrlState(options: Options) {
       options.isDockCollapsed,
       () => options.layerEditorOpen.value,
       () => options.layerEditorSelectedLayerId.value,
-      layerVisibilitySignature
+      layerVisibilitySignature,
+      cameraSignature
     ],
-    () => syncUrl(),
+    () => scheduleSync(),
     { deep: false }
   )
 

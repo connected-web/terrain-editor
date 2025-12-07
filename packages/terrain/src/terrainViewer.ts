@@ -67,6 +67,7 @@ export type LocationViewState = {
   distance: number
   polar: number
   azimuth: number
+  targetPixel?: { x: number; y: number }
 }
 
 export type TerrainLocation = {
@@ -97,6 +98,7 @@ type TerrainInitOptions = {
   onLocationClick?: (locationId: string) => void
   locations?: TerrainLocation[]
   theme?: TerrainThemeOverrides
+  cameraView?: LocationViewState
 }
 
 export type TerrainHandle = {
@@ -170,6 +172,21 @@ function uvToWorld(
   const z = (v - 0.5) * dimensions.depth
   const y = (heightSample - seaLevel) * heightScale
   return new THREE.Vector3(x, y, z)
+}
+
+function worldToPixel(
+  point: THREE.Vector3,
+  dimensions: { width: number; depth: number },
+  mapSize: { width: number; height: number }
+) {
+  const width = dimensions.width || 1
+  const depth = dimensions.depth || 1
+  const u = THREE.MathUtils.clamp(point.x / width + 0.5, 0, 1)
+  const v = THREE.MathUtils.clamp(point.z / depth + 0.5, 0, 1)
+  return {
+    x: u * mapSize.width,
+    y: v * mapSize.height
+  }
 }
 
 function easeInOut(t: number) {
@@ -1006,16 +1023,16 @@ const markerMap = new Map<
     const hit = surfaceRaycaster.intersectObject(terrain, true)
     return hit[0]?.point.clone() ?? world.clone()
   }
-  function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3) {
-    cameraTween = {
-      startPos: camera.position.clone(),
-      endPos,
-      startTarget: controls.target.clone(),
-      endTarget,
-      start: performance.now(),
-      duration: 650
-    }
+function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, duration = 650) {
+  cameraTween = {
+    startPos: camera.position.clone(),
+    endPos,
+    startTarget: controls.target.clone(),
+    endTarget,
+    start: performance.now(),
+    duration
   }
+}
   const locationWorldCache = new Map<string, THREE.Vector3>()
   let markerGeneration = 0
 
@@ -1597,6 +1614,16 @@ const markerMap = new Map<
   if (options.layers) await updateLayers(options.layers)
   if (options.locations?.length) setLocationMarkers(options.locations)
   if (interactiveEnabled) setInteractiveMode(true)
+  if (options.cameraView) {
+    const fallbackPixel = {
+      x: options.cameraView.targetPixel?.x ?? mapWidth / 2,
+      y: options.cameraView.targetPixel?.y ?? mapHeight / 2
+    }
+    navigateToLocation({
+      pixel: fallbackPixel,
+      view: options.cameraView
+    })
+  }
 
   function normalizeWorld(value?: THREE.Vector3 | { x: number; y: number; z: number }) {
     if (!value) return null
@@ -1628,7 +1655,8 @@ const markerMap = new Map<
     const endTarget = baseTarget.clone()
     const endPos = basePos.clone()
     cameraOffset.current = cameraOffset.target
-    startCameraTween(endPos, endTarget)
+    const duration = payload.view ? 0 : 650
+    startCameraTween(endPos, endTarget, duration)
     if (locationId) currentFocusId = locationId
   }
 
@@ -1666,10 +1694,16 @@ const markerMap = new Map<
     },
     onCameraMove: (callback: (newState: LocationViewState) => void) => {
       const handler = () => {
+        const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+        const targetPixel = worldToPixel(controls.target, terrainDimensions, {
+          width: mapWidth,
+          height: mapHeight
+        })
         callback({
-          distance: Math.max(camera.position.distanceTo(controls.target), 0.1),
+          distance,
           polar: controls.getPolarAngle(),
-          azimuth: controls.getAzimuthalAngle()
+          azimuth: controls.getAzimuthalAngle(),
+          targetPixel
         })
       }
       controls.addEventListener('change', handler)
@@ -1677,11 +1711,19 @@ const markerMap = new Map<
         controls.removeEventListener('change', handler)
       }
     },
-    getViewState: () => ({
-      distance: Math.max(camera.position.distanceTo(controls.target), 0.1),
-      polar: controls.getPolarAngle(),
-      azimuth: controls.getAzimuthalAngle()
-    }),
+    getViewState: () => {
+      const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+      const targetPixel = worldToPixel(controls.target, terrainDimensions, {
+        width: mapWidth,
+        height: mapHeight
+      })
+      return {
+        distance,
+        polar: controls.getPolarAngle(),
+        azimuth: controls.getAzimuthalAngle(),
+        targetPixel
+      }
+    },
     setTheme: applyThemeUpdate,
     setSeaLevel: applySeaLevelUpdate,
     invalidateIconTextures: (paths?: string[]) => {

@@ -5,7 +5,8 @@ import {
   type TerrainDataset,
   type TerrainHandle,
   type TerrainLocation,
-  type TerrainThemeOverrides
+  type TerrainThemeOverrides,
+  type LocationViewState
 } from '@connected-web/terrain-editor'
 
 type MountContext = {
@@ -16,6 +17,7 @@ type MountContext = {
   theme?: TerrainThemeOverrides
   onLocationPick: (payload: any) => void
   onLocationClick: (id: string) => void
+  initialCameraView?: LocationViewState
 }
 
 export function useViewer(options: {
@@ -59,6 +61,7 @@ export function useViewer(options: {
       locations: nextContext.locations,
       interactive: nextContext.interactive,
       theme: nextContext.theme,
+      cameraView: nextContext.initialCameraView,
       onLocationPick: nextContext.onLocationPick,
       onLocationClick: nextContext.onLocationClick
     })

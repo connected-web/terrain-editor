@@ -18,8 +18,13 @@ export function useLocations() {
   const pendingLocationDraft = ref<TerrainLocation | null>(null)
   const locationsDragActive = ref(false)
   const interactive = ref(false)
-  // --- Camera view state is now reactive ---
   const cameraViewState = ref<LocationViewState>(getFallbackViewState())
+  const cameraViewSource = ref<'default' | 'override' | 'handle'>('default')
+
+  function setCameraViewStateRef(state: LocationViewState, source: 'default' | 'override' | 'handle') {
+    cameraViewSource.value = source
+    cameraViewState.value = state
+  }
 
   // Listen for camera movement and update cameraViewState reactively
   let unsubscribeCameraMove: (() => void) | undefined
@@ -32,10 +37,12 @@ export function useLocations() {
       }
       if (handle && typeof handle.onCameraMove === 'function') {
         const maybeCleanup = handle.onCameraMove((newState: LocationViewState) => {
-          cameraViewState.value = newState
+          setCameraViewStateRef(newState, 'handle')
         })
         unsubscribeCameraMove = typeof maybeCleanup === 'function' ? maybeCleanup : () => {}
-        cameraViewState.value = handle.getViewState()
+        if (cameraViewSource.value !== 'override') {
+          setCameraViewStateRef(handle.getViewState(), 'handle')
+        }
         onCleanup(() => {
           if (unsubscribeCameraMove) unsubscribeCameraMove()
         })
@@ -294,7 +301,11 @@ export function useLocations() {
       workspace.handle.value?.getViewState() ?? {
         distance: 1,
         polar: Math.PI / 3,
-        azimuth: 0
+        azimuth: 0,
+        targetPixel: {
+          x: workspaceForm.width / 2,
+          y: workspaceForm.height / 2
+        }
       }
     )
   }
@@ -353,6 +364,10 @@ export function useLocations() {
     commitLocations()
   }
 
+  function applyCameraViewOverride(state: LocationViewState) {
+    setCameraViewStateRef(state, 'override')
+  }
+
   return {
     locationsList,
     selectedLocationId,
@@ -381,7 +396,8 @@ export function useLocations() {
     focusCameraOnActiveLocation,
     openLocationPicker,
     closeLocationPicker,
-    cameraViewState
+    cameraViewState,
+    applyCameraViewOverride
   }
 }
 
