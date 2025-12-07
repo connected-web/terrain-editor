@@ -139,6 +139,13 @@
           @mouseup="handlePointerUp"
           @mouseleave="handlePointerUp"
         />
+        <canvas
+          ref="overlayCanvasRef"
+          class="layer-mask-editor__canvas layer-mask-editor__canvas--overlay"
+          :style="canvasStyle"
+          draggable="false"
+          @dragstart.prevent
+        />
       </div>
       <div v-if="!hasValidImage" class="layer-mask-editor__placeholder">
         <p>{{ props.src ? 'Loading mask image...' : 'No mask image available' }}</p>
@@ -172,6 +179,7 @@ const emit = defineEmits<{
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const originalImageData = ref<ImageData | null>(null)
 
@@ -247,7 +255,11 @@ function adjustZoom(delta: number) {
   applyZoom(zoom.value + delta)
 }
 
-function getContext () {
+function getContext(target: 'main' | 'overlay' = 'main') {
+  if (target === 'overlay') {
+    const canvas = overlayCanvasRef.value
+    return canvas ? canvas.getContext('2d') : null
+  }
   const canvas = canvasRef.value
   if (!canvas) return null
   return canvas.getContext('2d', { willReadFrequently: true })
@@ -256,6 +268,7 @@ function getContext () {
 function loadImage () {
   const canvas = canvasRef.value
   if (!canvas) return
+  const overlay = overlayCanvasRef.value
 
   if (!props.src) {
     const ctx = getContext()
@@ -267,6 +280,10 @@ function loadImage () {
     originalImageData.value = null
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
+    if (overlay) {
+      overlay.width = canvas.width
+      overlay.height = canvas.height
+    }
     return
   }
 
@@ -282,6 +299,11 @@ function loadImage () {
     canvas.height = img.height
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0)
+    if (overlay) {
+      overlay.width = canvas.width
+      overlay.height = canvas.height
+      getContext('overlay')?.clearRect(0, 0, overlay.width, overlay.height)
+    }
 
     try {
       originalImageData.value = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -303,6 +325,11 @@ function loadImage () {
     originalImageData.value = null
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
+    if (overlay) {
+      overlay.width = canvas.width
+      overlay.height = canvas.height
+      getContext('overlay')?.clearRect(0, 0, overlay.width, overlay.height)
+    }
   }
 }
 
@@ -320,21 +347,34 @@ function canvasCoordsFromEvent(event: MouseEvent) {
   }
 }
 
-function drawLine (fromX: number, fromY: number, toX: number, toY: number) {
-  const ctx = getContext()
-  if (!ctx) return
+function clearOverlay() {
+  const ctx = getContext('overlay')
+  const overlay = overlayCanvasRef.value
+  if (ctx && overlay) {
+    ctx.clearRect(0, 0, overlay.width, overlay.height)
+  }
+}
 
-  ctx.strokeStyle = activeAction.value === 'erase' ? '#000000' : '#ffffff'
+function beginStroke() {
+  const overlay = overlayCanvasRef.value
+  if (!overlay) return
+  const ctx = getContext('overlay')
+  if (!ctx) return
+  ctx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
+  ctx.strokeStyle = activeAction.value === 'erase' ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)'
   ctx.lineWidth = brushSize.value
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.globalAlpha = Math.min(1, Math.max(0.01, brushOpacity.value))
+}
 
+function drawLine(fromX: number, fromY: number, toX: number, toY: number) {
+  const ctx = getContext('overlay')
+  if (!ctx) return
   ctx.beginPath()
   ctx.moveTo(fromX, fromY)
   ctx.lineTo(toX, toY)
   ctx.stroke()
-  ctx.globalAlpha = 1
 }
 
 function handlePointerDown (event: MouseEvent) {
@@ -343,6 +383,8 @@ function handlePointerDown (event: MouseEvent) {
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
+  clearOverlay()
+  beginStroke()
   drawLine(x, y, x, y)
 }
 
@@ -357,6 +399,19 @@ function handlePointerMove (event: MouseEvent) {
 
 function handlePointerUp () {
   isDrawing.value = false
+  commitOverlay()
+}
+
+function commitOverlay() {
+  const overlay = overlayCanvasRef.value
+  if (!overlay) return
+  const mainCtx = getContext('main')
+  const overlayCtx = getContext('overlay')
+  if (!mainCtx || !overlayCtx) return
+  mainCtx.globalCompositeOperation = activeAction.value === 'erase' ? 'destination-out' : 'source-over'
+  mainCtx.drawImage(overlay, 0, 0)
+  mainCtx.globalCompositeOperation = 'source-over'
+  clearOverlay()
 }
 
 const viewportRef = ref<HTMLDivElement | null>(null)
@@ -601,6 +656,12 @@ onBeforeUnmount(() => {
   image-rendering: pixelated;
   background: transparent;
   display: block;
+}
+
+.layer-mask-editor__canvas--overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .layer-mask-editor__cursor {
