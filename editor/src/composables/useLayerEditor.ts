@@ -15,6 +15,7 @@ type UseLayerEditorOptions = {
   } | null>
   persistCurrentProject: () => Promise<void>
   replaceAssetWithFile: (path: string, file: File) => Promise<void>
+  requestViewerRemount: () => void
 }
 
 export function useLayerEditor(options: UseLayerEditorOptions) {
@@ -26,6 +27,11 @@ export function useLayerEditor(options: UseLayerEditorOptions) {
     options.handle.value?.invalidateLayerMasks?.([asset.path])
     if (options.handle.value && options.layerState.value) {
       await options.handle.value.updateLayers(options.layerState.value)
+    }
+    const snapshot = options.projectStore.getSnapshot()
+    const heightPath = snapshot.legend?.heightmap
+    if (asset.path === heightPath) {
+      options.requestViewerRemount()
     }
     await options.persistCurrentProject()
   }

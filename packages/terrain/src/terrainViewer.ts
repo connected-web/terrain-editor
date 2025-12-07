@@ -23,7 +23,9 @@ const DEFAULT_MAP_HEIGHT = 512
 const DEFAULT_MAP_RATIO = DEFAULT_MAP_HEIGHT / DEFAULT_MAP_WIDTH
 const DEFAULT_TERRAIN_WIDTH = 4.2
 const DEFAULT_TERRAIN_DEPTH = DEFAULT_TERRAIN_WIDTH * DEFAULT_MAP_RATIO
-const SEGMENTS_X = 256
+const DEFAULT_SEGMENTS_X = 256
+const MIN_TERRAIN_SEGMENTS = 64
+const MAX_TERRAIN_SEGMENTS = 512
 const EDGE_RIM = 0.25
 const BASE_THICKNESS = 0.65
 
@@ -792,7 +794,13 @@ export async function initTerrainViewer(
     safeLegendWidth > 0 ? safeLegendHeight / safeLegendWidth : DEFAULT_MAP_RATIO
   const terrainWidth = DEFAULT_TERRAIN_WIDTH
   const terrainDepth = terrainWidth * mapRatio
-  const terrainSegmentsZ = Math.max(1, Math.round(SEGMENTS_X * mapRatio))
+  const desiredSegments = THREE.MathUtils.clamp(
+    safeLegendWidth,
+    MIN_TERRAIN_SEGMENTS,
+    MAX_TERRAIN_SEGMENTS
+  )
+  const terrainSegmentsX = Math.max(DEFAULT_SEGMENTS_X, Math.round(desiredSegments))
+  const terrainSegmentsZ = Math.max(1, Math.round(terrainSegmentsX * mapRatio))
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
   const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
   function computeMarkerStemHeight() {
@@ -1315,7 +1323,7 @@ const markerMap = new Map<
   const terrainGeometry = new THREE.PlaneGeometry(
     terrainWidth,
     terrainDepth,
-    SEGMENTS_X,
+    terrainSegmentsX,
     terrainSegmentsZ
   )
   terrainGeometry.rotateX(-Math.PI / 2)

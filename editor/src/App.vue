@@ -319,7 +319,8 @@ const layerEditorHelpers = useLayerEditor({
   layerState,
   handle,
   persistCurrentProject,
-  replaceAssetWithFile: replaceAssetWithFileHelper
+  replaceAssetWithFile: replaceAssetWithFileHelper,
+  requestViewerRemount
 })
 const layerCreateDialogOpen = ref(false)
 
@@ -679,6 +680,7 @@ async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'over
   }
   projectStore.setLegend(nextLegend)
   layerBrowserStore.setLegend(nextLegend)
+  layerState.value = layerBrowserStore.getLayerToggles()
   if (datasetRef.value) {
     if (groupKey === 'overlays') {
       datasetRef.value.legend.overlays = { ...(datasetRef.value.legend.overlays ?? {}), [key]: newLayer }
@@ -843,6 +845,8 @@ const handleLayerNameUpdate = layerEditorHelpers.updateLayerName
 
 function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
   const baseResolve = dataset.resolveAssetUrl.bind(dataset)
+  const baseHeightMap = dataset.getHeightMapUrl.bind(dataset)
+  const baseTopology = dataset.getTopologyMapUrl.bind(dataset)
   return {
     ...dataset,
     resolveAssetUrl: (path: string) => {
@@ -850,6 +854,20 @@ function wrapDatasetWithOverrides(dataset: TerrainDataset): TerrainDataset {
         return assetOverrides.get(path)!
       }
       return baseResolve(path)
+    },
+    getHeightMapUrl: () => {
+      const heightPath = dataset.legend.heightmap
+      if (heightPath && assetOverrides.has(heightPath)) {
+        return assetOverrides.get(heightPath)!
+      }
+      return baseHeightMap()
+    },
+    getTopologyMapUrl: () => {
+      const topoPath = dataset.legend.topology ?? dataset.legend.heightmap
+      if (topoPath && assetOverrides.has(topoPath)) {
+        return assetOverrides.get(topoPath)!
+      }
+      return baseTopology()
     }
   }
 }
