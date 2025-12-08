@@ -1075,6 +1075,13 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.35rem;
 }
 
+.layer-editor__slider-field span {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
 .layer-editor__slider-input {
   display: flex;
   align-items: center;
