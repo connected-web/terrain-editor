@@ -77,12 +77,14 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 ### Layer & Mask Tooling
 
 * [ ] Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
-* [ ] Topology editor (greyscale) with brush support
+* [x] Topology editor (greyscale) with brush support
+* [ ] Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
 * [x] Ensure mask preview never loads blank (dataset fallback reliability)
 * [ ] Preserve unsaved strokes on biome colour change (temp buffer + warnings)
 * [x] Editable layer titles persisted into `legend`
-* [ ] Add biome / overlay dialogs (generate legend entry + seed mask asset)
-* [ ] Layer reorder via drag/drop
+* [x] Add biome / overlay dialogs (generate legend entry + seed mask asset)
+* [ ] Layer reorder via drag/drop (needs between-item drop + better z-indexing)
+* [ ] Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
 * [ ] Create/delete layer flows (with confirmation)
 * [ ] Fill tool (paint bucket)
 * [ ] Mask view toggle: B/W vs colour-coded
@@ -119,6 +121,8 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [x] Brush spacing/flow controls + advanced panel menu for mask tooling
 * [ ] Grid snap + measurement settings for mask tools
 * [ ] Transform tool interactions (translate/scale/rotate selections)
+* [ ] Layer editor + layers panel integration (shared layout, collapsible tools, dock-aware)
+* [ ] Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background
 
 ### Viewer Backlog
 
