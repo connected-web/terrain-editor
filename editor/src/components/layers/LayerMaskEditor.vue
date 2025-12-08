@@ -86,7 +86,7 @@ const emit = defineEmits<{
   (ev: 'update-mask', blob: Blob): void
   (ev: 'zoom-change', value: number): void
   (ev: 'cursor-move', coords: { x: number; y: number }): void
-  (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean }): void
+  (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean; undoSteps: number; redoSteps: number }): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -130,7 +130,12 @@ const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
 function updateHistoryState() {
   canUndo.value = undoStack.length > 1
   canRedo.value = redoStack.length > 0
-  emit('history-change', { canUndo: canUndo.value, canRedo: canRedo.value })
+  emit('history-change', {
+    canUndo: canUndo.value,
+    canRedo: canRedo.value,
+    undoSteps: Math.max(0, undoStack.length - 1),
+    redoSteps: Math.max(0, redoStack.length)
+  })
 }
 
 function snapshotValues(values = maskValues.value) {
@@ -398,14 +403,22 @@ function stampBrush(x: number, y: number) {
   const softness = brushSoftness.value
   const hardness = Math.max(0, 1 - softness)
   const innerRadius = Math.max(0, radius * hardness)
+  const tint =
+    currentStrokeMode.value === 'erase'
+      ? '255,64,64'
+      : currentStrokeMode.value === 'flat'
+        ? '64,200,255'
+        : '255,255,255'
   const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius)
-  gradient.addColorStop(0, '#ffffff')
-  gradient.addColorStop(1, 'rgba(255,255,255,0)')
+  gradient.addColorStop(0, `rgba(${tint},1)`)
+  gradient.addColorStop(1, `rgba(${tint},0)`)
   ctx.fillStyle = gradient
   ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = brushFlow.value
   ctx.beginPath()
   ctx.arc(x, y, radius, 0, Math.PI * 2)
   ctx.fill()
+  ctx.globalAlpha = 1
 }
 
 function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
@@ -454,7 +467,7 @@ function commitOverlay() {
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
   if (!overlayCtx || !values || !width || !height) return
-  const opacity = Math.min(1, Math.max(0.01, brushOpacity.value * brushFlow.value))
+  const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
   const overlayData = overlayCtx.getImageData(0, 0, width, height)
   const data = overlayData.data
   const mode = currentStrokeMode.value
@@ -535,6 +548,14 @@ function handleApply () {
   }, 'image/png')
 }
 
+function exportMask(options?: { includeAlpha?: boolean }): Promise<Blob | null> {
+  const target = options?.includeAlpha ? previewCanvasRef.value : canvasRef.value
+  if (!target) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    target.toBlob((blob) => resolve(blob ?? null), 'image/png')
+  })
+}
+
 function handleViewportWheel(event: WheelEvent) {
   if (!event.ctrlKey && !event.metaKey) return
   event.preventDefault()
@@ -581,6 +602,7 @@ defineExpose({
   setZoom,
   resetMask: handleReset,
   applyMask: handleApply,
+  exportMask,
   undo,
   redo
 })
@@ -703,6 +725,12 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 
 .layer-mask-editor__canvas-wrapper {
   position: relative;
+  margin: 0 auto;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 0.25rem;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.8);
 }
 
 .layer-mask-editor__canvas {

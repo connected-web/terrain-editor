@@ -86,8 +86,9 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] Create/delete layer flows (with confirmation)
 * [ ] Fill tool (paint bucket)
 * [ ] Mask view toggle: B/W vs colour-coded
-* [ ] Onion-skin neighbouring layers with fading alpha
+* [x] Onion-skin neighbouring layers with fading alpha
 * [x] Brush opacity slider
+* [x] Export mask directly from the Layer Editor (grayscale + alpha variants)
 * [ ] Brush type menu (basic, spray, Perlin noise)
 * [ ] Save/load custom brushes (name + icon)
 * [ ] Layer import via drag/drop or file upload
@@ -116,6 +117,8 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] High-level sculpting workflow (to pair with future topology editing)
 * [ ] Break up `App.vue` into targeted composables/models (`useLayerEditor`, `useLayerAssets`, viewer helpers) so cross-cutting logic lives outside the root component
 * [x] Brush spacing/flow controls + advanced panel menu for mask tooling
+* [ ] Grid snap + measurement settings for mask tools
+* [ ] Transform tool interactions (translate/scale/rotate selections)
 
 ### Viewer Backlog
 

@@ -25,7 +25,7 @@
             v-if="activeLayer"
             type="button"
             class="pill-button"
-            @click="$emit('export-layer')"
+            @click="handleExportClick()"
           >
             <Icon icon="file-export">Export</Icon>
           </button>
@@ -50,6 +50,21 @@
               <button type="button" @click="applyCanvas(); toggleOverflowMenu(false)">
                 <Icon icon="floppy-disk" /> Apply changes
               </button>
+              <button type="button" @click="setZoom(1); toggleOverflowMenu(false)">
+                <Icon icon="magnifying-glass" /> Zoom 100%
+              </button>
+              <button type="button" :disabled="!historyState.canUndo" @click="undoCanvas(); toggleOverflowMenu(false)">
+                <Icon icon="rotate-left" /> Undo
+              </button>
+              <button type="button" :disabled="!historyState.canRedo" @click="redoCanvas(); toggleOverflowMenu(false)">
+                <Icon icon="rotate-right" /> Redo
+              </button>
+              <button type="button" @click="handleExportClick(true); toggleOverflowMenu(false)">
+                <Icon icon="droplet" /> Export w/ alpha
+              </button>
+              <button type="button" class="layer-editor__overflow-menu--disabled" disabled title="Snap grid coming soon">
+                <Icon icon="border-all" /> Snap (soon)
+              </button>
             </div>
           </div>
           <button type="button" class="pill-button pill-button--ghost" aria-label="Close editor" @click="$emit('close')">
@@ -71,16 +86,12 @@
                 'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
               }"
               :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
-              :title="`${tool.label} (${tool.shortcut})`"
+              :title="tool.disabled ? 'Coming soon' : `${tool.label} (${tool.shortcut})`"
               @click="selectTool(tool.id)"
             >
-              <div class="layer-editor__tool-icon">
-                <Icon :icon="tool.icon" aria-hidden="true" />
-              </div>
-              <div class="layer-editor__tool-meta">
-                <span class="layer-editor__tool-label">{{ tool.label }}</span>
-                <small>{{ tool.shortcut }}</small>
-              </div>
+              <Icon :icon="tool.icon" aria-hidden="true" />
+              <span class="layer-editor__tool-label">{{ tool.label }}</span>
+              <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
             </button>
           </aside>
 
@@ -112,29 +123,11 @@
           <aside class="layer-editor__properties">
             <div class="layer-editor__properties-header">
               <div>
-                <h3>Tool: {{ currentTool.label }}</h3>
+                <h3>{{ currentTool.label }}</h3>
                 <p class="layer-editor__properties-hint">{{ currentTool.description }}</p>
               </div>
-              <div class="layer-editor__properties-mode">
-                <button
-                  type="button"
-                  class="pill-button pill-button--ghost"
-                  :class="{ 'pill-button--active': propertyMode === 'basic' }"
-                  @click="propertyMode = 'basic'"
-                >
-                  Basic
-                </button>
-                <button
-                  type="button"
-                  class="pill-button pill-button--ghost"
-                  :class="{ 'pill-button--active': propertyMode === 'advanced' }"
-                  @click="propertyMode = 'advanced'"
-                >
-                  Adv
-                </button>
-              </div>
             </div>
-            <div v-if="propertyMode === 'basic'" class="layer-editor__properties-body">
+            <div class="layer-editor__properties-body">
               <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
                 <label class="layer-editor__slider-field">
                   <span>Size (px)</span>
@@ -211,6 +204,22 @@
               <p v-else class="layer-editor__placeholder-text">
                 Tool options coming soon.
               </p>
+              <div class="layer-editor__control-stack layer-editor__control-stack--advanced">
+                <label class="layer-editor__slider-field">
+                  <span>Spacing (%)</span>
+                  <div class="layer-editor__slider-input">
+                    <input type="range" min="20" max="200" v-model.number="spacingPercent">
+                    <input type="number" min="20" max="200" v-model.number="spacingPercent">
+                  </div>
+                </label>
+                <label class="layer-editor__slider-field">
+                  <span>Flow (%)</span>
+                  <div class="layer-editor__slider-input">
+                    <input type="range" min="5" max="100" v-model.number="flowPercent">
+                    <input type="number" min="5" max="100" v-model.number="flowPercent">
+                  </div>
+                </label>
+              </div>
               <div class="layer-editor__section">
                 <h4>Layer settings</h4>
                 <label class="layer-editor__field">
@@ -231,24 +240,6 @@
                     aria-label="Layer colour"
                     @input="handleColourChange"
                   >
-                </label>
-              </div>
-            </div>
-            <div v-else class="layer-editor__properties-body">
-              <div class="layer-editor__control-stack">
-                <label class="layer-editor__slider-field">
-                  <span>Spacing (%)</span>
-                  <div class="layer-editor__slider-input">
-                    <input type="range" min="20" max="200" v-model.number="spacingPercent">
-                    <input type="number" min="20" max="200" v-model.number="spacingPercent">
-                  </div>
-                </label>
-                <label class="layer-editor__slider-field">
-                  <span>Flow (%)</span>
-                  <div class="layer-editor__slider-input">
-                    <input type="range" min="5" max="100" v-model.number="flowPercent">
-                    <input type="number" min="5" max="100" v-model.number="flowPercent">
-                  </div>
                 </label>
               </div>
               <div class="layer-editor__section">
@@ -284,16 +275,12 @@
             <button type="button" class="pill-button" @click="applyCanvas">
               <Icon icon="shuffle" /> Apply
             </button>
-            <button type="button" class="pill-button pill-button--ghost" :disabled="!historyState.canUndo" @click="undoCanvas">
-              <Icon icon="rotate-left" /> Undo
+            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canUndo" @click="undoCanvas">
+              <Icon icon="rotate-left" /> Undo ({{ historyState.undoSteps }})
             </button>
-            <button type="button" class="pill-button pill-button--ghost" :disabled="!historyState.canRedo" @click="redoCanvas">
-              <Icon icon="rotate-right" /> Redo
+            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canRedo" @click="redoCanvas">
+              <Icon icon="rotate-right" /> Redo ({{ historyState.redoSteps }})
             </button>
-            <label class="layer-editor__snap-toggle">
-              <input type="checkbox" v-model="snapEnabled">
-              <span>Snap</span>
-            </label>
           </div>
         </footer>
       </div>
@@ -353,11 +340,9 @@ watch(
 
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const layerPreviewMode = ref<'mask' | 'overlay'>('mask')
-const propertyMode = ref<'basic' | 'advanced'>('basic')
-const snapEnabled = ref(false)
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
-const historyState = ref({ canUndo: false, canRedo: false })
+const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSteps: 0 })
 const showOverflowMenu = ref(false)
 const overflowMenuRef = ref<HTMLElement | null>(null)
 const overflowButtonRef = ref<HTMLButtonElement | null>(null)
@@ -382,9 +367,10 @@ const opacityPercent = computed({
   }
 })
 const softnessPercent = computed({
-  get: () => Math.round(strokeSettings.value.softness * 100),
+  get: () => Math.round(Math.sqrt(strokeSettings.value.softness) * 100),
   set: (value: number) => {
-    strokeSettings.value.softness = clamp(value / 100, 0, 1)
+    const normalized = clamp(value / 100, 0, 1)
+    strokeSettings.value.softness = clamp(normalized * normalized, 0, 1)
   }
 })
 const spacingPercent = computed({
@@ -694,6 +680,30 @@ function applyCanvas() {
   maskEditorRef.value?.applyMask()
 }
 
+async function handleExportClick(includeAlpha = false) {
+  const editor = maskEditorRef.value
+  if (editor) {
+    const blob = await editor.exportMask({ includeAlpha })
+    if (blob) {
+      const filenameBase = props.activeLayer?.label?.toLowerCase().replace(/\s+/g, '_') || 'layer'
+      downloadBlob(blob, `${filenameBase}${includeAlpha ? '_alpha' : ''}.png`)
+      return
+    }
+  }
+  emit('export-layer')
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 function handleZoomChange(value: number) {
   currentZoom.value = value
 }
@@ -710,7 +720,7 @@ function redoCanvas() {
   maskEditorRef.value?.redo()
 }
 
-function handleHistoryChange(payload: { canUndo: boolean; canRedo: boolean }) {
+function handleHistoryChange(payload: { canUndo: boolean; canRedo: boolean; undoSteps: number; redoSteps: number }) {
   historyState.value = payload
 }
 
@@ -810,20 +820,22 @@ function clamp(value: number, min: number, max: number) {
 
 <style scoped>
 .layer-editor {
+  --layer-editor-left-gap: clamp(320px, 30vw, 520px);
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   pointer-events: none;
   padding: 1rem;
+  padding-left: var(--layer-editor-left-gap);
 }
 
 .layer-editor__panel {
   display: flex;
   flex-direction: column;
   margin: 0;
-  width: min(1280px, calc(100vw - 4rem));
+  width: min(1100px, calc(100vw - var(--layer-editor-left-gap) - 2rem));
   height: calc(100vh - 2rem);
   background: rgba(5, 8, 17, 0.96);
   border-radius: 20px;
@@ -904,8 +916,9 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  min-width: 180px;
+  min-width: 200px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  z-index: 20;
 }
 
 .layer-editor__overflow-menu button {
@@ -921,8 +934,13 @@ function clamp(value: number, min: number, max: number) {
   text-align: left;
 }
 
-.layer-editor__overflow-menu button:hover {
+.layer-editor__overflow-menu button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.layer-editor__overflow-menu--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .layer-editor__content {
@@ -944,48 +962,34 @@ function clamp(value: number, min: number, max: number) {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.35rem;
   overflow-y: auto;
 }
 
 .layer-editor__tool-button {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0.35rem 0.55rem;
+  padding: 0.4rem 0.6rem;
   text-transform: none;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
 }
 
-.layer-editor__tool-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.9rem;
-}
-
-.layer-editor__tool-meta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
 .layer-editor__tool-label {
   font-size: 0.85rem;
+  flex: 1;
+  text-align: left;
 }
 
-.layer-editor__tool-meta small {
-  opacity: 0.6;
-  font-size: 0.7rem;
+.layer-editor__tool-shortcut {
+  opacity: 0.65;
+  font-size: 0.72rem;
 }
 
 .layer-editor__tool-button--active {
@@ -1029,20 +1033,40 @@ function clamp(value: number, min: number, max: number) {
   opacity: 0.7;
 }
 
-.layer-editor__properties-mode {
-  display: flex;
-  gap: 0.4rem;
+.layer-editor__properties-tabs {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  padding: 0.15rem;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
 }
 
-.pill-button--active {
-  border-color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.15);
+.layer-editor__properties-tabs button {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.layer-editor__properties-tabs__button--active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 .layer-editor__control-stack {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.layer-editor__control-stack--advanced {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .layer-editor__slider-field {
@@ -1103,7 +1127,7 @@ function clamp(value: number, min: number, max: number) {
   border-radius: 8px;
   background: transparent;
   width: 100%;
-  height: 2.2rem;
+  height: 2.1rem;
   padding: 0.15rem;
 }
 
@@ -1130,11 +1154,9 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.5rem;
 }
 
-.layer-editor__snap-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.85rem;
+.layer-editor__status-button {
+  min-width: 110px;
+  justify-content: center;
 }
 
 .layer-editor__empty,
@@ -1145,16 +1167,13 @@ function clamp(value: number, min: number, max: number) {
 }
 
 @media (max-width: 1100px) {
+  .layer-editor {
+    --layer-editor-left-gap: 1rem;
+    padding-left: 1rem;
+  }
+
   .layer-editor__grid {
     grid-template-columns: 160px minmax(0, 1fr) 220px;
-  }
-
-  .layer-editor__panel {
-    width: calc(100vw - 2rem);
-  }
-
-  .layer-editor__tool-meta .layer-editor__tool-label {
-    font-size: 0.78rem;
   }
 }
 </style>
