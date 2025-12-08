@@ -13,7 +13,7 @@
         @toggle-fullscreen="toggleEditorFullscreen"
       />
       <PanelDock
-        :collapsed="isDockCollapsed"
+        :collapsed="isDockCollapsed || layersApi.layerEditorOpen.value"
         :mobile="isCompactViewport"
         @toggle="toggleDock"
       >
@@ -95,11 +95,19 @@
         :active-layer="layersApi.activeLayer.value"
         :show-grid="localSettings.showLayerTransparencyGrid"
         :onion-layers="onionLayersForEditor"
+        :layer-entries="layerEntriesWithOnion"
+        :color-to-css="rgb"
         @update:filter-text="setAssetDialogFilter"
         @export-layer="layersApi.exportActiveLayerImage"
         @replace="handleLayerAssetReplace"
         @update-colour="handleLayerColourUpdate"
         @update-layer-name="handleLayerNameUpdate"
+        @open-layer-editor="layersApi.openLayerEditor"
+        @toggle-layer="toggleLayer"
+        @set-all="setAllLayers"
+        @toggle-onion="toggleOnionLayer"
+        @add-layer="openLayerCreateDialog()"
+        @reorder-layer="handleLayerReorder"
         @close="layersApi.closeLayerEditor()"
       />
       <LocationPickerDialog

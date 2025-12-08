@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-editor">
+  <div class="layer-editor" :class="{ 'layer-editor--with-list': hasLayerList }">
     <section class="layer-editor__panel">
       <header class="layer-editor__header">
         <div class="layer-editor__header-left">
@@ -75,6 +75,79 @@
 
       <div v-if="activeLayer" class="layer-editor__content">
         <div class="layer-editor__grid">
+          <aside
+            v-if="hasLayerList"
+            class="layer-editor__layers"
+            @dragover.prevent="handleLayerListDragOver"
+            @drop.prevent="handleLayerListDrop"
+          >
+            <div class="layer-editor__layers-header">
+              <Icon icon="layer-group" aria-hidden="true" />
+              <span>Layers</span>
+              <button type="button" class="pill-button pill-button--ghost layer-editor__layers-add" @click="handleLayerAdd">
+                <Icon icon="plus" />
+              </button>
+            </div>
+            <div class="layer-editor__layers-list">
+              <button
+                v-for="entry in layerList"
+                :key="entry.id"
+                type="button"
+                class="layer-editor__layer-pill"
+                :class="{
+                  'layer-editor__layer-pill--inactive': !entry.visible,
+                  'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id
+                }"
+                :draggable="entry.kind !== 'heightmap'"
+                @click="openLayerFromList(entry.id)"
+                @dragstart="handleLayerDragStart(entry)"
+                @dragover.prevent="handleLayerDragOver(entry, $event)"
+                @drop.prevent="handleLayerDrop(entry)"
+                @dragend="handleLayerDragEnd"
+              >
+                <Icon :icon="entry?.icon ?? 'circle'" class="layer-editor__layer-pill-icon" :style="{ color: colorToCss(entry.color) }" />
+                <span class="layer-editor__layer-pill-label">{{ entry.label }}</span>
+                <span class="spacer"></span>
+                <button
+                  v-if="entry.kind !== 'heightmap'"
+                  type="button"
+                  class="layer-editor__layer-pill-action"
+                  title="Toggle visibility"
+                  @click.stop="toggleLayerVisibility(entry.id)"
+                >
+                  <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" />
+                </button>
+                <button
+                  type="button"
+                  class="layer-editor__layer-pill-action"
+                  title="Toggle onion skin"
+                  @click.stop="toggleLayerOnion(entry.id)"
+                >
+                  <Icon icon="film" :style="{ opacity: entry.onionEnabled ? '1' : '0.4' }" />
+                </button>
+              </button>
+              <div
+                v-if="draggingLayerId"
+                class="layer-editor__layers-dropzone"
+              >
+                Drop here to move layer to the bottom.
+              </div>
+            </div>
+            <div class="layer-editor__layers-actions">
+              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('biome', true)">
+                <Icon icon="eye" /> Show biomes
+              </button>
+              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('biome', false)">
+                <Icon icon="eye-slash" /> Hide biomes
+              </button>
+              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('overlay', true)">
+                <Icon icon="plane" /> Show overlays
+              </button>
+              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('overlay', false)">
+                <Icon icon="plane-slash" /> Hide overlays
+              </button>
+            </div>
+          </aside>
           <aside class="layer-editor__tools">
             <button
               v-for="tool in toolPalette"
@@ -238,7 +311,7 @@
                     type="color"
                     :value="layerColourHex"
                     aria-label="Layer colour"
-                    @input="handleColourChange"
+                    @change="handleColourChange"
                   >
                 </label>
               </div>
@@ -317,6 +390,8 @@ const props = defineProps<{
   activeLayer: LayerEntry | null
   showGrid?: boolean
   onionLayers?: Array<{ id: string; mask?: string | null; color: [number, number, number] }>
+  layerEntries?: LayerEntry[]
+  colorToCss?: (color: [number, number, number]) => string
 }>()
 
 const emit = defineEmits<{
@@ -327,6 +402,12 @@ const emit = defineEmits<{
   (ev: 'replace', asset: TerrainProjectFileEntry): void
   (ev: 'update-colour', payload: { id: string; color: [number, number, number] }): void
   (ev: 'update-layer-name', payload: { id: string; label: string }): void
+  (ev: 'open-layer-editor', id: string): void
+  (ev: 'toggle-layer', id: string): void
+  (ev: 'set-all', kind: 'biome' | 'overlay', visible: boolean): void
+  (ev: 'add-layer'): void
+  (ev: 'reorder-layer', payload: { sourceId: string; targetId: string | null }): void
+  (ev: 'toggle-onion', id: string): void
 }>()
 
 const layerName = ref('')
@@ -346,6 +427,15 @@ const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSte
 const showOverflowMenu = ref(false)
 const overflowMenuRef = ref<HTMLElement | null>(null)
 const overflowButtonRef = ref<HTMLButtonElement | null>(null)
+const hasLayerList = computed(() => (props.layerEntries?.length ?? 0) > 0)
+const layerList = computed(() => props.layerEntries ?? [])
+const colorToCss = computed(
+  () =>
+    props.colorToCss ??
+    ((color: [number, number, number]) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`)
+)
+const draggingLayerId = ref<string | null>(null)
+const draggingLayerKind = ref<'biome' | 'overlay' | null>(null)
 
 const activeTool = ref<typeof TOOL_PALETTE[number]['id']>('brush')
 const toolSettings = reactive({
@@ -704,6 +794,63 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function openLayerFromList(id: string) {
+  emit('open-layer-editor', id)
+}
+
+function toggleLayerVisibility(id: string) {
+  emit('toggle-layer', id)
+}
+
+function toggleLayerOnion(id: string) {
+  emit('toggle-onion', id)
+}
+
+function handleLayerSetAll(kind: 'biome' | 'overlay', visible: boolean) {
+  emit('set-all', kind, visible)
+}
+
+function handleLayerAdd() {
+  emit('add-layer')
+}
+
+function handleLayerDragStart(entry: LayerEntry) {
+  if (entry.kind === 'heightmap') return
+  draggingLayerId.value = entry.id
+  draggingLayerKind.value = entry.kind
+}
+
+function handleLayerDragOver(entry: LayerEntry, event: DragEvent) {
+  if (!draggingLayerId.value || !draggingLayerKind.value) return
+  if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
+  event.preventDefault()
+}
+
+function handleLayerDrop(entry: LayerEntry) {
+  if (!draggingLayerId.value || !draggingLayerKind.value) return
+  if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
+  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: entry.id })
+  draggingLayerId.value = null
+  draggingLayerKind.value = null
+}
+
+function handleLayerDragEnd() {
+  draggingLayerId.value = null
+  draggingLayerKind.value = null
+}
+
+function handleLayerListDragOver(event: DragEvent) {
+  if (!draggingLayerId.value) return
+  event.preventDefault()
+}
+
+function handleLayerListDrop() {
+  if (!draggingLayerId.value) return
+  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: null })
+  draggingLayerId.value = null
+  draggingLayerKind.value = null
+}
+
 function handleZoomChange(value: number) {
   currentZoom.value = value
 }
@@ -955,6 +1102,105 @@ function clamp(value: number, min: number, max: number) {
   grid-template-columns: 200px minmax(0, 1fr) 260px;
   flex: 1;
   min-height: 0;
+}
+
+.layer-editor--with-list .layer-editor__grid {
+  grid-template-columns: 240px 180px minmax(0, 1fr) 260px;
+}
+
+.layer-editor__layers {
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.layer-editor__layers-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.layer-editor__layers-header span {
+  flex: 1;
+}
+
+.layer-editor__layers-add {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.layer-editor__layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.layer-editor__layer-pill {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.layer-editor__layer-pill--active {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.layer-editor__layer-pill--inactive {
+  opacity: 0.55;
+}
+
+.layer-editor__layer-pill-icon {
+  margin-right: 0.4rem;
+}
+
+.layer-editor__layer-pill-label {
+  font-size: 0.85rem;
+}
+
+.layer-editor__layer-pill .spacer {
+  flex: 1;
+}
+
+.layer-editor__layer-pill-action {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.15rem;
+}
+
+.layer-editor__layers-dropzone {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 0.7rem;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.layer-editor__layers-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.layer-editor .spacer {
+  flex: 1;
 }
 
 .layer-editor__tools {
