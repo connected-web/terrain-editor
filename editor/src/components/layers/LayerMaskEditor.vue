@@ -77,6 +77,8 @@ const props = defineProps<{
   brushSize?: number
   brushOpacity?: number
   brushSoftness?: number
+  brushFlow?: number
+  brushSpacing?: number
   flatLevel?: number
 }>()
 
@@ -84,6 +86,7 @@ const emit = defineEmits<{
   (ev: 'update-mask', blob: Blob): void
   (ev: 'zoom-change', value: number): void
   (ev: 'cursor-move', coords: { x: number; y: number }): void
+  (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean }): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -93,6 +96,11 @@ const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const maskValues = ref<Float32Array | null>(null)
 const initialMaskValues = ref<Float32Array | null>(null)
+const undoStack: Float32Array[] = []
+const redoStack: Float32Array[] = []
+const HISTORY_LIMIT = 25
+const canUndo = ref(false)
+const canRedo = ref(false)
 
 const hasValidImage = computed(() => {
   return Boolean(props.src && maskValues.value && maskValues.value.length)
@@ -104,6 +112,8 @@ const lastY = ref(0)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
+const brushFlow = computed(() => Math.min(1, Math.max(0.05, props.brushFlow ?? 1)))
+const brushSpacing = computed(() => Math.min(2, Math.max(0.2, props.brushSpacing ?? 1)))
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const toolMode = computed(() => props.tool ?? 'brush')
 const panModeActive = computed(() => toolMode.value === 'hand' || toolMode.value === 'pan')
@@ -116,6 +126,66 @@ const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
   if (panModeActive.value) return 'pan'
   return currentStrokeMode.value === 'erase' ? 'erase' : 'paint'
 })
+
+function updateHistoryState() {
+  canUndo.value = undoStack.length > 1
+  canRedo.value = redoStack.length > 0
+  emit('history-change', { canUndo: canUndo.value, canRedo: canRedo.value })
+}
+
+function snapshotValues(values = maskValues.value) {
+  if (!values) return null
+  return new Float32Array(values)
+}
+
+function seedHistory() {
+  undoStack.length = 0
+  redoStack.length = 0
+  const snap = snapshotValues()
+  if (snap) {
+    undoStack.push(snap)
+  }
+  updateHistoryState()
+}
+
+function pushHistorySnapshot() {
+  const snap = snapshotValues()
+  if (!snap) return
+  undoStack.push(snap)
+  if (undoStack.length > HISTORY_LIMIT) {
+    undoStack.shift()
+  }
+  redoStack.length = 0
+  updateHistoryState()
+}
+
+function restoreFromSnapshot(snapshot: Float32Array | null) {
+  if (!snapshot) return
+  maskValues.value = new Float32Array(snapshot)
+  renderMaskCanvas()
+  renderPreviewCanvas()
+  clearOverlay()
+}
+
+function undo() {
+  if (undoStack.length <= 1) return
+  const current = undoStack.pop()
+  if (current) {
+    redoStack.push(current)
+  }
+  const previous = undoStack[undoStack.length - 1] ?? null
+  restoreFromSnapshot(previous)
+  updateHistoryState()
+}
+
+function redo() {
+  if (!redoStack.length) return
+  const snapshot = redoStack.pop() ?? null
+  if (!snapshot) return
+  undoStack.push(new Float32Array(snapshot))
+  restoreFromSnapshot(snapshot)
+  updateHistoryState()
+}
 
 const activeCursorIcon = computed(() => {
   switch (toolMode.value) {
@@ -228,6 +298,7 @@ function loadImage () {
     maskValues.value = new Float32Array(1)
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
+    seedHistory()
     return
   }
 
@@ -251,6 +322,7 @@ function loadImage () {
     image.value = img
     renderMaskCanvas()
     renderPreviewCanvas()
+    seedHistory()
   }
 
   img.onerror = () => {
@@ -337,9 +409,10 @@ function stampBrush(x: number, y: number) {
 }
 
 function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
+  const spacingStep = Math.max(1, (brushSize.value / 4) * brushSpacing.value)
   const steps = Math.max(
     1,
-    Math.ceil(Math.hypot(toX - fromX, toY - fromY) / Math.max(1, brushSize.value / 4))
+    Math.ceil(Math.hypot(toX - fromX, toY - fromY) / spacingStep)
   )
   for (let i = 0; i <= steps; i += 1) {
     const t = steps === 0 ? 0 : i / steps
@@ -381,7 +454,7 @@ function commitOverlay() {
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
   if (!overlayCtx || !values || !width || !height) return
-  const opacity = Math.min(1, Math.max(0.01, brushOpacity.value))
+  const opacity = Math.min(1, Math.max(0.01, brushOpacity.value * brushFlow.value))
   const overlayData = overlayCtx.getImageData(0, 0, width, height)
   const data = overlayData.data
   const mode = currentStrokeMode.value
@@ -402,6 +475,7 @@ function commitOverlay() {
   renderMaskCanvas()
   renderPreviewCanvas()
   clearOverlay()
+  pushHistorySnapshot()
 }
 const viewportRef = ref<HTMLDivElement | null>(null)
 const isPanning = ref(false)
@@ -448,9 +522,8 @@ function handleViewportPointerUp(event: PointerEvent) {
 function handleReset () {
   const values = initialMaskValues.value
   if (!values) return
-  maskValues.value = new Float32Array(values)
-  renderMaskCanvas()
-  renderPreviewCanvas()
+  restoreFromSnapshot(values)
+  pushHistorySnapshot()
 }
 
 function handleApply () {
@@ -479,11 +552,23 @@ function handleViewportWheel(event: WheelEvent) {
 
 function fitView() {
   const viewport = viewportRef.value
-  zoom.value = 1
-  if (viewport) {
-    viewport.scrollLeft = 0
-    viewport.scrollTop = 0
+  const { width, height } = canvasDimensions.value
+  if (!viewport || !width || !height) {
+    zoom.value = 1
+    emit('zoom-change', zoom.value)
+    return
   }
+  const padding = 16
+  const availableWidth = Math.max(1, viewport.clientWidth - padding)
+  const availableHeight = Math.max(1, viewport.clientHeight - padding)
+  const scaleX = availableWidth / width
+  const scaleY = availableHeight / height
+  const target = clampZoom(Math.min(scaleX, scaleY))
+  zoom.value = target
+  const displayWidth = width * target
+  const displayHeight = height * target
+  viewport.scrollLeft = Math.max(0, (displayWidth - viewport.clientWidth) / 2)
+  viewport.scrollTop = Math.max(0, (displayHeight - viewport.clientHeight) / 2)
   emit('zoom-change', zoom.value)
 }
 
@@ -495,7 +580,9 @@ defineExpose({
   fitView,
   setZoom,
   resetMask: handleReset,
-  applyMask: handleApply
+  applyMask: handleApply,
+  undo,
+  redo
 })
 
 watch(

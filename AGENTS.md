@@ -102,7 +102,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 
 ### Layer Editor Improvements
 
-* [ ] Undo/redo history for mask tooling
+* [x] Undo/redo history for mask tooling
 * [ ] Point-based heightmap editor (with JSON/PNG export)
 * [ ] River polyline authoring that respects slope + widening rules
 * [ ] Unified workspace covering heightmap, theme, locations, masks, thumbnails
@@ -115,6 +115,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] Advanced onion-skin controls
 * [ ] High-level sculpting workflow (to pair with future topology editing)
 * [ ] Break up `App.vue` into targeted composables/models (`useLayerEditor`, `useLayerAssets`, viewer helpers) so cross-cutting logic lives outside the root component
+* [x] Brush spacing/flow controls + advanced panel menu for mask tooling
 
 ### Viewer Backlog
 

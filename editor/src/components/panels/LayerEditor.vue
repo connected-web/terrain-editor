@@ -29,9 +29,29 @@
           >
             <Icon icon="file-export">Export</Icon>
           </button>
-          <button type="button" class="pill-button pill-button--ghost" aria-label="More actions" title="More actions">
-            <Icon icon="ellipsis-vertical" />
-          </button>
+          <div v-if="activeLayer" class="layer-editor__overflow">
+            <button
+              type="button"
+              ref="overflowButtonRef"
+              class="pill-button pill-button--ghost"
+              aria-label="More actions"
+              title="More actions"
+              @click="toggleOverflowMenu()"
+            >
+              <Icon icon="ellipsis-vertical" />
+            </button>
+            <div v-if="showOverflowMenu" ref="overflowMenuRef" class="layer-editor__overflow-menu">
+              <button type="button" @click="fitCanvasView(); toggleOverflowMenu(false)">
+                <Icon icon="expand" /> Fit to viewport
+              </button>
+              <button type="button" @click="resetCanvas(); toggleOverflowMenu(false)">
+                <Icon icon="arrow-rotate-left" /> Reset mask
+              </button>
+              <button type="button" @click="applyCanvas(); toggleOverflowMenu(false)">
+                <Icon icon="floppy-disk" /> Apply changes
+              </button>
+            </div>
+          </div>
           <button type="button" class="pill-button pill-button--ghost" aria-label="Close editor" @click="$emit('close')">
             <Icon icon="xmark" />
           </button>
@@ -51,11 +71,16 @@
                 'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
               }"
               :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
+              :title="`${tool.label} (${tool.shortcut})`"
               @click="selectTool(tool.id)"
             >
-              <Icon :icon="tool.icon" aria-hidden="true" />
-              <span>{{ tool.label }}</span>
-              <small>{{ tool.shortcut }}</small>
+              <div class="layer-editor__tool-icon">
+                <Icon :icon="tool.icon" aria-hidden="true" />
+              </div>
+              <div class="layer-editor__tool-meta">
+                <span class="layer-editor__tool-label">{{ tool.label }}</span>
+                <small>{{ tool.shortcut }}</small>
+              </div>
             </button>
           </aside>
 
@@ -70,11 +95,14 @@
               :brush-size="strokeSettings.size"
               :brush-opacity="strokeSettings.opacity"
               :brush-softness="strokeSettings.softness"
+              :brush-flow="strokeSettings.flow"
+              :brush-spacing="strokeSettings.spacing"
               :flat-level="toolSettings.flat.level"
               :onion-layers="onionLayerSources"
               @update-mask="handleUpdateMask"
               @zoom-change="handleZoomChange"
               @cursor-move="handleCursorMove"
+              @history-change="handleHistoryChange"
             />
             <p v-else class="layer-editor__placeholder">
               No mask image found for this layer.
@@ -192,12 +220,48 @@
                     <option value="overlay">Overlay</option>
                   </select>
                 </label>
+                <label
+                  v-if="supportsColourPicker && activeLayer"
+                  class="layer-editor__field layer-editor__color-field"
+                >
+                  <span>Layer colour</span>
+                  <input
+                    type="color"
+                    :value="layerColourHex"
+                    aria-label="Layer colour"
+                    @input="handleColourChange"
+                  >
+                </label>
               </div>
             </div>
             <div v-else class="layer-editor__properties-body">
-              <p class="layer-editor__placeholder-text">
-                Advanced controls are on the roadmap.
-              </p>
+              <div class="layer-editor__control-stack">
+                <label class="layer-editor__slider-field">
+                  <span>Spacing (%)</span>
+                  <div class="layer-editor__slider-input">
+                    <input type="range" min="20" max="200" v-model.number="spacingPercent">
+                    <input type="number" min="20" max="200" v-model.number="spacingPercent">
+                  </div>
+                </label>
+                <label class="layer-editor__slider-field">
+                  <span>Flow (%)</span>
+                  <div class="layer-editor__slider-input">
+                    <input type="range" min="5" max="100" v-model.number="flowPercent">
+                    <input type="number" min="5" max="100" v-model.number="flowPercent">
+                  </div>
+                </label>
+              </div>
+              <div class="layer-editor__section">
+                <h4>Layer utilities</h4>
+                <div class="layer-editor__properties-actions">
+                  <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
+                    <Icon icon="arrow-rotate-left" /> Reset mask
+                  </button>
+                  <button type="button" class="pill-button" @click="applyCanvas">
+                    <Icon icon="floppy-disk" /> Apply changes
+                  </button>
+                </div>
+              </div>
             </div>
           </aside>
         </div>
@@ -220,10 +284,10 @@
             <button type="button" class="pill-button" @click="applyCanvas">
               <Icon icon="shuffle" /> Apply
             </button>
-            <button type="button" class="pill-button pill-button--ghost" disabled>
+            <button type="button" class="pill-button pill-button--ghost" :disabled="!historyState.canUndo" @click="undoCanvas">
               <Icon icon="rotate-left" /> Undo
             </button>
-            <button type="button" class="pill-button pill-button--ghost" disabled>
+            <button type="button" class="pill-button pill-button--ghost" :disabled="!historyState.canRedo" @click="redoCanvas">
               <Icon icon="rotate-right" /> Redo
             </button>
             <label class="layer-editor__snap-toggle">
@@ -242,7 +306,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { TerrainDataset, TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 import type { LayerEntry } from '../../composables/useLayersModel'
 import Icon from '../Icon.vue'
@@ -293,12 +357,16 @@ const propertyMode = ref<'basic' | 'advanced'>('basic')
 const snapEnabled = ref(false)
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
+const historyState = ref({ canUndo: false, canRedo: false })
+const showOverflowMenu = ref(false)
+const overflowMenuRef = ref<HTMLElement | null>(null)
+const overflowButtonRef = ref<HTMLButtonElement | null>(null)
 
 const activeTool = ref<typeof TOOL_PALETTE[number]['id']>('brush')
 const toolSettings = reactive({
-  brush: { size: 48, opacity: 1, softness: 0.15 },
-  erase: { size: 48, opacity: 1, softness: 0.15 },
-  flat: { size: 64, opacity: 1, softness: 0.25, level: 0.5 }
+  brush: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
+  erase: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
+  flat: { size: 64, opacity: 1, softness: 0.25, spacing: 1, flow: 1, level: 0.5 }
 })
 
 const strokeToolTarget = computed<'brush' | 'erase' | 'flat'>(() => {
@@ -317,6 +385,18 @@ const softnessPercent = computed({
   get: () => Math.round(strokeSettings.value.softness * 100),
   set: (value: number) => {
     strokeSettings.value.softness = clamp(value / 100, 0, 1)
+  }
+})
+const spacingPercent = computed({
+  get: () => Math.round(strokeSettings.value.spacing * 100),
+  set: (value: number) => {
+    strokeSettings.value.spacing = clamp(value / 100, 0.2, 2)
+  }
+})
+const flowPercent = computed({
+  get: () => Math.round(strokeSettings.value.flow * 100),
+  set: (value: number) => {
+    strokeSettings.value.flow = clamp(value / 100, 0.05, 1)
   }
 })
 const flatPercent = computed({
@@ -354,12 +434,18 @@ const toolPalette = computed(() =>
     disabled: tool.disabled
   }))
 )
+const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
 
 const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === activeTool.value) ?? toolPalette.value[0])
 const layerKindLabel = computed(() => {
   if (!props.activeLayer) return ''
   if (props.activeLayer.kind === 'heightmap') return 'Heightmap'
   return 'Mask'
+})
+const layerColourHex = computed(() => {
+  const color = props.activeLayer?.color ?? [255, 255, 255]
+  const toHex = (value: number) => value.toString(16).padStart(2, '0')
+  return `#${toHex(color[0])}${toHex(color[1])}${toHex(color[2])}`
 })
 const supportsBrushProperties = computed(() =>
   ['brush', 'erase', 'flat'].includes(activeTool.value)
@@ -585,6 +671,10 @@ function resetLayerName() {
 }
 
 function selectTool(id: typeof TOOL_PALETTE[number]['id']) {
+  const tool = toolPalette.value.find((entry) => entry.id === id)
+  if (!tool || tool.disabled || (tool.onlyHeightmap && !isHeightmap.value)) {
+    return
+  }
   activeTool.value = id
 }
 
@@ -611,6 +701,72 @@ function handleZoomChange(value: number) {
 function handleCursorMove(coords: { x: number; y: number }) {
   cursorCoords.value = coords
 }
+
+function undoCanvas() {
+  maskEditorRef.value?.undo()
+}
+
+function redoCanvas() {
+  maskEditorRef.value?.redo()
+}
+
+function handleHistoryChange(payload: { canUndo: boolean; canRedo: boolean }) {
+  historyState.value = payload
+}
+
+function toggleOverflowMenu(force?: boolean) {
+  showOverflowMenu.value = typeof force === 'boolean' ? force : !showOverflowMenu.value
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!showOverflowMenu.value) return
+  const target = event.target as Node | null
+  if (
+    overflowMenuRef.value?.contains(target as Node) ||
+    overflowButtonRef.value?.contains(target as Node)
+  ) {
+    return
+  }
+  toggleOverflowMenu(false)
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+    return
+  }
+  const key = event.key.toLowerCase()
+  if ((event.metaKey || event.ctrlKey) && key === 'z') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      redoCanvas()
+    } else {
+      undoCanvas()
+    }
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && (key === 'y')) {
+    event.preventDefault()
+    redoCanvas()
+    return
+  }
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  const toolId = toolShortcutMap.get(key)
+  if (toolId) {
+    event.preventDefault()
+    selectTool(toolId)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 
 onBeforeUnmount(() => {
   if (maskUrlOwned.value && maskObjectUrl.value) {
@@ -641,6 +797,8 @@ watch(
     settings.size = clamp(settings.size, 1, 512)
     settings.opacity = clamp(settings.opacity, 0.05, 1)
     settings.softness = clamp(settings.softness, 0, 1)
+    settings.spacing = clamp(settings.spacing, 0.2, 2)
+    settings.flow = clamp(settings.flow, 0.05, 1)
   },
   { deep: true }
 )
@@ -656,17 +814,17 @@ function clamp(value: number, min: number, max: number) {
   inset: 0;
   z-index: 200;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   pointer-events: none;
-  padding: 0;
+  padding: 1rem;
 }
 
 .layer-editor__panel {
   display: flex;
   flex-direction: column;
-  margin: 1.5rem;
-  width: min(960px, 96vw);
-  height: calc(100vh - 3rem);
+  margin: 0;
+  width: min(1280px, calc(100vw - 4rem));
+  height: calc(100vh - 2rem);
   background: rgba(5, 8, 17, 0.96);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -731,6 +889,42 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.5rem;
 }
 
+.layer-editor__overflow {
+  position: relative;
+}
+
+.layer-editor__overflow-menu {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  background: rgba(8, 12, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.4rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 180px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.layer-editor__overflow-menu button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0.35rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.layer-editor__overflow-menu button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .layer-editor__content {
   display: flex;
   flex-direction: column;
@@ -757,20 +951,41 @@ function clamp(value: number, min: number, max: number) {
 .layer-editor__tool-button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.55rem;
   text-transform: none;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
 }
 
-.layer-editor__tool-button small {
-  opacity: 0.65;
+.layer-editor__tool-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.layer-editor__tool-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.layer-editor__tool-label {
+  font-size: 0.85rem;
+}
+
+.layer-editor__tool-meta small {
+  opacity: 0.6;
+  font-size: 0.7rem;
 }
 
 .layer-editor__tool-button--active {
@@ -883,6 +1098,21 @@ function clamp(value: number, min: number, max: number) {
   color: inherit;
 }
 
+.layer-editor__color-field input {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  width: 100%;
+  height: 2.2rem;
+  padding: 0.15rem;
+}
+
+.layer-editor__properties-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .layer-editor__status {
   display: flex;
   justify-content: space-between;
@@ -917,6 +1147,14 @@ function clamp(value: number, min: number, max: number) {
 @media (max-width: 1100px) {
   .layer-editor__grid {
     grid-template-columns: 160px minmax(0, 1fr) 220px;
+  }
+
+  .layer-editor__panel {
+    width: calc(100vw - 2rem);
+  }
+
+  .layer-editor__tool-meta .layer-editor__tool-label {
+    font-size: 0.78rem;
   }
 }
 </style>
