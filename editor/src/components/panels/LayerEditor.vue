@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-editor" :class="{ 'layer-editor--with-list': hasLayerList }">
+  <div class="layer-editor" :class="{ 'layer-editor--with-list': hasLayerList, 'layer-editor--inline': inlineMode }">
     <section class="layer-editor__panel">
       <header class="layer-editor__header">
         <div class="layer-editor__header-left">
@@ -78,73 +78,76 @@
           <aside
             v-if="hasLayerList"
             class="layer-editor__layers"
-            @dragover.prevent="handleLayerListDragOver"
-            @drop.prevent="handleLayerListDrop"
           >
             <div class="layer-editor__layers-header">
-              <Icon icon="layer-group" aria-hidden="true" />
-              <span>Layers</span>
+              <div class="layer-editor__layers-title">
+                <Icon icon="layer-group" aria-hidden="true" />
+                <span>Layers</span>
+              </div>
               <button type="button" class="pill-button pill-button--ghost layer-editor__layers-add" @click="handleLayerAdd">
                 <Icon icon="plus" />
               </button>
             </div>
-            <div class="layer-editor__layers-list">
-              <button
-                v-for="entry in layerList"
-                :key="entry.id"
-                type="button"
-                class="layer-editor__layer-pill"
-                :class="{
-                  'layer-editor__layer-pill--inactive': !entry.visible,
-                  'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id
-                }"
-                :draggable="entry.kind !== 'heightmap'"
-                @click="openLayerFromList(entry.id)"
-                @dragstart="handleLayerDragStart(entry)"
-                @dragover.prevent="handleLayerDragOver(entry, $event)"
-                @drop.prevent="handleLayerDrop(entry)"
-                @dragend="handleLayerDragEnd"
-              >
-                <Icon :icon="entry?.icon ?? 'circle'" class="layer-editor__layer-pill-icon" :style="{ color: colorToCss(entry.color) }" />
-                <span class="layer-editor__layer-pill-label">{{ entry.label }}</span>
-                <span class="spacer"></span>
-                <button
-                  v-if="entry.kind !== 'heightmap'"
-                  type="button"
-                  class="layer-editor__layer-pill-action"
-                  title="Toggle visibility"
-                  @click.stop="toggleLayerVisibility(entry.id)"
-                >
-                  <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" />
-                </button>
-                <button
-                  type="button"
-                  class="layer-editor__layer-pill-action"
-                  title="Toggle onion skin"
-                  @click.stop="toggleLayerOnion(entry.id)"
-                >
-                  <Icon icon="film" :style="{ opacity: entry.onionEnabled ? '1' : '0.4' }" />
-                </button>
-              </button>
-              <div
-                v-if="draggingLayerId"
-                class="layer-editor__layers-dropzone"
-              >
-                Drop here to move layer to the bottom.
-              </div>
+            <div
+              class="layer-editor__layers-scroll"
+              @dragover.prevent="handleLayerListDragOver"
+              @drop.prevent="handleLayerListDrop"
+            >
+              <template v-for="section in layerSections" :key="section.key">
+                <p class="layer-editor__layers-section-label">{{ section.label }}</p>
+                <div class="layer-editor__layers-section">
+                  <div
+                    v-for="entry in section.entries"
+                    :key="entry.id"
+                    class="layer-editor__layer-pill"
+                    :class="{
+                      'layer-editor__layer-pill--inactive': !entry.visible,
+                      'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id
+                    }"
+                    :draggable="entry.kind !== 'heightmap'"
+                    role="button"
+                    tabindex="0"
+                    :title="entry.label"
+                    @click="openLayerFromList(entry.id)"
+                    @keydown.enter.prevent="openLayerFromList(entry.id)"
+                    @keydown.space.prevent="openLayerFromList(entry.id)"
+                    @dragstart="handleLayerDragStart(entry)"
+                    @dragover.prevent="handleLayerDragOver(entry, $event)"
+                    @drop.prevent="handleLayerDrop(entry)"
+                    @dragend="handleLayerDragEnd"
+                  >
+                    <Icon :icon="entry?.icon ?? 'circle'" class="layer-editor__layer-pill-icon" :style="{ color: colorToCss(entry.color) }" />
+                    <span class="layer-editor__layer-pill-label">{{ entry.label }}</span>
+                    <span class="layer-editor__layer-pill-spacer"></span>
+                    <button
+                      v-if="entry.kind !== 'heightmap'"
+                      type="button"
+                      class="layer-editor__layer-pill-action"
+                      title="Toggle visibility"
+                      @click.stop="toggleLayerVisibility(entry.id)"
+                    >
+                      <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" />
+                    </button>
+                    <button
+                      type="button"
+                      class="layer-editor__layer-pill-action"
+                      title="Toggle onion skin"
+                      @click.stop="toggleLayerOnion(entry.id)"
+                    >
+                      <Icon icon="film" :style="{ opacity: entry.onionEnabled ? '1' : '0.4' }" />
+                    </button>
+                    </div>
+                </div>
+              </template>
             </div>
             <div class="layer-editor__layers-actions">
-              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('biome', true)">
-                <Icon icon="eye" /> Show biomes
+              <button type="button" class="pill-button pill-button--ghost" @click="toggleGroupVisibility('biome')">
+                <Icon icon="adjust" />
+                {{ biomesFullyVisible ? 'Hide biomes' : 'Show biomes' }}
               </button>
-              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('biome', false)">
-                <Icon icon="eye-slash" /> Hide biomes
-              </button>
-              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('overlay', true)">
-                <Icon icon="plane" /> Show overlays
-              </button>
-              <button type="button" class="pill-button pill-button--ghost" @click="handleLayerSetAll('overlay', false)">
-                <Icon icon="plane-slash" /> Hide overlays
+              <button type="button" class="pill-button pill-button--ghost" @click="toggleGroupVisibility('overlay')">
+                <Icon icon="layer-group" />
+                {{ overlaysFullyVisible ? 'Hide overlays' : 'Show overlays' }}
               </button>
             </div>
           </aside>
@@ -159,12 +162,12 @@
                 'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
               }"
               :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
-              :title="tool.disabled ? 'Coming soon' : `${tool.label} (${tool.shortcut})`"
+              :title="tool.label"
               @click="selectTool(tool.id)"
             >
               <Icon :icon="tool.icon" aria-hidden="true" />
-              <span class="layer-editor__tool-label">{{ tool.label }}</span>
               <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
+              <span class="sr-only">{{ tool.label }}</span>
             </button>
           </aside>
 
@@ -392,6 +395,7 @@ const props = defineProps<{
   onionLayers?: Array<{ id: string; mask?: string | null; color: [number, number, number] }>
   layerEntries?: LayerEntry[]
   colorToCss?: (color: [number, number, number]) => string
+  inline?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -411,6 +415,7 @@ const emit = defineEmits<{
 }>()
 
 const layerName = ref('')
+const inlineMode = computed(() => Boolean(props.inline))
 watch(
   () => props.activeLayer,
   (next) => {
@@ -434,9 +439,45 @@ const colorToCss = computed(
     props.colorToCss ??
     ((color: [number, number, number]) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`)
 )
-const draggingLayerId = ref<string | null>(null)
-const draggingLayerKind = ref<'biome' | 'overlay' | null>(null)
-
+type LayerSectionKey = 'heightmap' | 'biome' | 'overlay'
+type LayerSection = { key: LayerSectionKey; label: string; entries: LayerEntry[] }
+const layerSections = computed<LayerSection[]>(() => {
+  const sections: LayerSection[] = []
+  const buckets: Record<LayerSectionKey, LayerEntry[]> = {
+    heightmap: [],
+    biome: [],
+    overlay: []
+  }
+  for (const entry of layerList.value) {
+    if (entry.kind === 'heightmap') {
+      buckets.heightmap.push(entry)
+    } else if (entry.kind === 'overlay') {
+      buckets.overlay.push(entry)
+    } else {
+      buckets.biome.push(entry)
+    }
+  }
+  if (buckets.heightmap.length) {
+    sections.push({ key: 'heightmap', label: 'Height Map', entries: buckets.heightmap })
+  }
+  if (buckets.biome.length) {
+    sections.push({ key: 'biome', label: 'Biomes', entries: buckets.biome })
+  }
+  if (buckets.overlay.length) {
+    sections.push({ key: 'overlay', label: 'Overlays', entries: buckets.overlay })
+  }
+  return sections
+})
+const biomesFullyVisible = computed(() => {
+  const section = layerSections.value.find((sec) => sec.key === 'biome')
+  if (!section || !section.entries.length) return true
+  return section.entries.every((entry) => entry.visible)
+})
+const overlaysFullyVisible = computed(() => {
+  const section = layerSections.value.find((sec) => sec.key === 'overlay')
+  if (!section || !section.entries.length) return true
+  return section.entries.every((entry) => entry.visible)
+})
 const activeTool = ref<typeof TOOL_PALETTE[number]['id']>('brush')
 const toolSettings = reactive({
   brush: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
@@ -806,8 +847,11 @@ function toggleLayerOnion(id: string) {
   emit('toggle-onion', id)
 }
 
-function handleLayerSetAll(kind: 'biome' | 'overlay', visible: boolean) {
-  emit('set-all', kind, visible)
+function toggleGroupVisibility(kind: 'biome' | 'overlay') {
+  const section = layerSections.value.find((sec) => sec.key === kind)
+  if (!section || !section.entries.length) return
+  const shouldShow = section.entries.some((entry) => !entry.visible)
+  emit('set-all', kind, shouldShow)
 }
 
 function handleLayerAdd() {
@@ -850,6 +894,7 @@ function handleLayerListDrop() {
   draggingLayerId.value = null
   draggingLayerKind.value = null
 }
+
 
 function handleZoomChange(value: number) {
   currentZoom.value = value
@@ -967,7 +1012,7 @@ function clamp(value: number, min: number, max: number) {
 
 <style scoped>
 .layer-editor {
-  --layer-editor-left-gap: clamp(320px, 30vw, 520px);
+  --layer-editor-left-gap: 3.5rem;
   position: fixed;
   inset: 0;
   z-index: 200;
@@ -978,17 +1023,36 @@ function clamp(value: number, min: number, max: number) {
   padding-left: var(--layer-editor-left-gap);
 }
 
+.layer-editor--inline {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: flex;
+  justify-content: flex-start;
+  padding: 0;
+  pointer-events: auto;
+  width: 100%;
+  height: 100%;
+}
+
 .layer-editor__panel {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   margin: 0;
-  width: min(1100px, calc(100vw - var(--layer-editor-left-gap) - 2rem));
+  width: min(1400px, calc(100vw - var(--layer-editor-left-gap) - 2rem));
   height: calc(100vh - 2rem);
   background: rgba(5, 8, 17, 0.96);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: auto;
   overflow: hidden;
+}
+
+.layer-editor--inline .layer-editor__panel {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
 }
 
 .layer-editor__header {
@@ -1099,43 +1163,78 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__grid {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr) 260px;
+  grid-template-columns: 130px minmax(0, 1fr) 260px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .layer-editor--with-list .layer-editor__grid {
-  grid-template-columns: 240px 180px minmax(0, 1fr) 260px;
+  grid-template-columns: 280px 80px minmax(0, 1fr) 260px;
 }
 
 .layer-editor__layers {
   border-right: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0.75rem;
+  padding: 0.9rem 0.75rem 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  overflow-y: auto;
+  min-height: 0;
 }
 
 .layer-editor__layers-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+  justify-content: space-between;
+}
+
+.layer-editor__layers-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.layer-editor__layers-header span {
-  flex: 1;
-}
-
 .layer-editor__layers-add {
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0.55rem;
   font-size: 0.85rem;
 }
 
-.layer-editor__layers-list {
+.layer-editor__layers-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.layer-editor__layers-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.layer-editor__layers-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.layer-editor__layers-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+}
+
+.layer-editor__layers-section-label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.layer-editor__layers-section {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -1171,7 +1270,7 @@ function clamp(value: number, min: number, max: number) {
   font-size: 0.85rem;
 }
 
-.layer-editor__layer-pill .spacer {
+.layer-editor__layer-pill-spacer {
   flex: 1;
 }
 
@@ -1183,24 +1282,10 @@ function clamp(value: number, min: number, max: number) {
   padding: 0.15rem;
 }
 
-.layer-editor__layers-dropzone {
-  margin-top: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  font-size: 0.7rem;
-  text-align: center;
-  opacity: 0.8;
-}
-
 .layer-editor__layers-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 0.4rem;
-}
-
-.layer-editor .spacer {
-  flex: 1;
 }
 
 .layer-editor__tools {
@@ -1210,32 +1295,34 @@ function clamp(value: number, min: number, max: number) {
   flex-direction: column;
   gap: 0.35rem;
   overflow-y: auto;
+  align-items: center;
+  min-height: 0;
 }
 
 .layer-editor__tool-button {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0.25rem;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem 0.4rem;
   text-transform: none;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
+  min-height: 56px;
 }
 
-.layer-editor__tool-label {
-  font-size: 0.85rem;
-  flex: 1;
-  text-align: left;
+.layer-editor__tool-button svg {
+  font-size: 1rem;
 }
 
 .layer-editor__tool-shortcut {
-  opacity: 0.65;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .layer-editor__tool-button--active {
@@ -1252,9 +1339,16 @@ function clamp(value: number, min: number, max: number) {
   position: relative;
   padding: 0.75rem;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .layer-editor__canvas :deep(.layer-mask-editor) {
+  height: 100%;
+}
+
+.layer-editor__canvas :deep(.layer-mask-editor__viewport) {
   height: 100%;
 }
 
@@ -1265,6 +1359,7 @@ function clamp(value: number, min: number, max: number) {
   flex-direction: column;
   gap: 0.75rem;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .layer-editor__properties-header {

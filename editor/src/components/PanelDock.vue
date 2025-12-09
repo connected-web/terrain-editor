@@ -2,16 +2,13 @@
   <aside
     ref="rootRef"
     class="panel-dock"
-    :class="{
-      'panel-dock--collapsed': collapsed,
-      'panel-dock--mobile': mobile
-    }"
+    :class="panelDockClasses"
   >
     <button type="button" class="panel-dock__toggle" @click="$emit('toggle')">
       <Icon :icon="toggleIcon" :key="toggleIcon" />
     </button>
     <div class="panel-dock__inner">
-      <div class="panel-dock__nav">
+      <div class="panel-dock__nav" :class="{ 'panel-dock__nav--hidden': !hasNavContent }">
         <slot name="nav" />
       </div>
       <div class="panel-dock__content">
@@ -22,11 +19,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 
 const props = defineProps<{
   collapsed: boolean
   mobile: boolean
+  expanded?: boolean
+  hideNav?: boolean
 }>()
 
 defineEmits<{
@@ -42,6 +41,14 @@ const toggleIcon = computed(() => {
   return props.mobile ? 'angles-down' : 'angles-left'
 })
 
+const slots = useSlots()
+const panelDockClasses = computed(() => ({
+  'panel-dock--collapsed': props.collapsed,
+  'panel-dock--mobile': props.mobile,
+  'panel-dock--expanded': props.expanded
+}))
+const hasNavContent = computed(() => !props.hideNav && Boolean(slots.nav?.().length))
+
 defineExpose({
   element: rootRef
 })
@@ -52,14 +59,21 @@ defineExpose({
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(50%, 420px);
-  min-width: 260px;
+  width: min(45%, 420px);
+  min-width: 300px;
   max-width: 50%;
   transition: width 0.2s ease;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
-  height: 100%;
+  height: 100vh;
   margin-left: 5rem;
+  overflow: hidden;
+}
+
+.panel-dock--expanded {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
 }
 
 .panel-dock--mobile {
@@ -105,16 +119,58 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.panel-dock--expanded .panel-dock__inner {
+  flex-direction: row;
+}
+
+.panel-dock__nav {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-dock--expanded .panel-dock__nav {
+  width: 280px;
+  overflow-y: auto;
+  border-bottom: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-dock__nav--hidden {
+  display: none;
+}
+
+.panel-dock__nav-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.panel-dock__nav-divider {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0.35rem 0;
+}
+
+.panel-dock__nav-button--muted {
+  opacity: 0.8;
 }
 
 .panel-dock__content {
   box-sizing: border-box;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 1rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  max-height: 100vh;
+  max-height: 100%;
 }
 
 .panel-dock__content::-webkit-scrollbar {
@@ -131,11 +187,18 @@ defineExpose({
   border-radius: 999px;
 }
 
-.panel-dock--collapsed .panel-dock__content {
+.panel-dock--collapsed .panel-dock__content,
+.panel-dock--collapsed .panel-dock__nav {
   display: none;
 }
 
-.panel-dock--collapsed .panel-dock__nav {
-  display: none;
+.panel-dock--mobile .panel-dock__inner {
+  flex-direction: column;
+}
+
+.panel-dock--mobile .panel-dock__nav {
+  width: 100%;
+  border-right: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 </style>

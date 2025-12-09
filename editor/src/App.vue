@@ -13,10 +13,36 @@
         @toggle-fullscreen="toggleEditorFullscreen"
       />
       <PanelDock
-        :collapsed="isDockCollapsed || layersApi.layerEditorOpen.value"
+        :collapsed="isDockCollapsed"
         :mobile="isCompactViewport"
+        :expanded="dockExpanded"
+        :hide-nav="hideDockNav"
         @toggle="toggleDock"
       >
+        <template #nav>
+          <div class="panel-dock__nav-stack">
+            <button
+              v-for="item in dockNavItems"
+              :key="item.id"
+              type="button"
+              class="panel-dock__nav-button"
+              :class="{ 'panel-dock__nav-button--active': activeDockPanel === item.id }"
+              @click="setActivePanel(item.id)"
+            >
+              <Icon :icon="item.icon" aria-hidden="true" />
+              <span>{{ item.label }}</span>
+            </button>
+            <div class="panel-dock__nav-divider"></div>
+            <button type="button" class="panel-dock__nav-button" @click="exportArchive">
+              <Icon icon="file-export" aria-hidden="true" />
+              <span>Export WYN</span>
+            </button>
+            <button type="button" class="panel-dock__nav-button panel-dock__nav-button--muted" @click="startNewMap()">
+              <Icon icon="circle-xmark" aria-hidden="true" />
+              <span>Close map</span>
+            </button>
+          </div>
+        </template>
         <WorkspacePanel
           v-if="activeDockPanel === 'workspace'"
           :has-active-archive="hasActiveArchive"
@@ -26,17 +52,44 @@
           @export-archive="exportArchive"
         />
 
-        <LayersPanel
-          v-else-if="activeDockPanel === 'layers'"
-          :layer-entries="layerEntriesWithOnion"
-          :color-to-css="rgb"
-          @open-layer-editor="layersApi.openLayerEditor"
-          @toggle-layer="toggleLayer"
-          @set-all="setAllLayers"
-          @toggle-onion="toggleOnionLayer"
-          @add-layer="openLayerCreateDialog()"
-          @reorder-layer="handleLayerReorder"
-        />
+        <template v-else-if="activeDockPanel === 'layers'">
+          <LayerEditor
+            v-if="layersApi.layerEditorOpen.value"
+            inline
+            :assets="layerEditorAssets"
+            :get-preview="getIconPreview"
+            :dataset="datasetRef.value"
+            :filter-text="assetDialogFilter"
+            :active-layer="layersApi.activeLayer.value"
+            :show-grid="localSettings.showLayerTransparencyGrid"
+            :onion-layers="onionLayersForEditor"
+            :layer-entries="layerEntriesWithOnion"
+            :color-to-css="rgb"
+            @update:filter-text="setAssetDialogFilter"
+            @export-layer="layersApi.exportActiveLayerImage"
+            @replace="handleLayerAssetReplace"
+            @update-colour="handleLayerColourUpdate"
+            @update-layer-name="handleLayerNameUpdate"
+            @open-layer-editor="layersApi.openLayerEditor"
+            @toggle-layer="toggleLayer"
+            @set-all="setAllLayers"
+            @toggle-onion="toggleOnionLayer"
+            @add-layer="openLayerCreateDialog()"
+            @reorder-layer="handleLayerReorder"
+            @close="layersApi.closeLayerEditor()"
+          />
+          <LayersPanel
+            v-else
+            :layer-entries="layerEntriesWithOnion"
+            :color-to-css="rgb"
+            @open-layer-editor="layersApi.openLayerEditor"
+            @toggle-layer="toggleLayer"
+            @set-all="setAllLayers"
+            @toggle-onion="toggleOnionLayer"
+            @add-layer="openLayerCreateDialog()"
+            @reorder-layer="handleLayerReorder"
+          />
+        </template>
 
         <ThemePanel
           v-else-if="activeDockPanel === 'theme'"
@@ -85,30 +138,6 @@
         @upload="() => triggerLibraryUpload()"
         @remove="removeAsset"
         @close="closeIconPicker"
-      />
-      <LayerEditor
-        v-if="layersApi.layerEditorOpen.value"
-        :assets="layerEditorAssets"
-        :get-preview="getIconPreview"
-        :dataset="datasetRef.value"
-        :filter-text="assetDialogFilter"
-        :active-layer="layersApi.activeLayer.value"
-        :show-grid="localSettings.showLayerTransparencyGrid"
-        :onion-layers="onionLayersForEditor"
-        :layer-entries="layerEntriesWithOnion"
-        :color-to-css="rgb"
-        @update:filter-text="setAssetDialogFilter"
-        @export-layer="layersApi.exportActiveLayerImage"
-        @replace="handleLayerAssetReplace"
-        @update-colour="handleLayerColourUpdate"
-        @update-layer-name="handleLayerNameUpdate"
-        @open-layer-editor="layersApi.openLayerEditor"
-        @toggle-layer="toggleLayer"
-        @set-all="setAllLayers"
-        @toggle-onion="toggleOnionLayer"
-        @add-layer="openLayerCreateDialog()"
-        @reorder-layer="handleLayerReorder"
-        @close="layersApi.closeLayerEditor()"
       />
       <LocationPickerDialog
         v-if="locationsApi.locationPickerOpen.value"
@@ -184,6 +213,7 @@ import LayersPanel from './components/panels/LayersPanel.vue'
 import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
+import Icon from './components/Icon.vue'
 import { useUiActions } from './composables/useUiActions'
 import { useLayersModel } from './composables/useLayersModel'
 import { useViewer } from './composables/useViewer'
@@ -199,6 +229,13 @@ const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const isDockCollapsed = ref(false)
 const isCompactViewport = ref(window.innerWidth < 800)
 const activeDockPanel = ref<DockPanel>('workspace')
+const dockNavItems: Array<{ id: DockPanel; label: string; icon: string }> = [
+  { id: 'workspace', label: 'Workspace', icon: 'briefcase' },
+  { id: 'layers', label: 'Layers', icon: 'layer-group' },
+  { id: 'locations', label: 'Locations', icon: 'location-dot' },
+  { id: 'theme', label: 'Theme', icon: 'palette' },
+  { id: 'settings', label: 'Settings', icon: 'sliders' }
+]
 const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
 
 const projectStore = createProjectStore()
@@ -243,6 +280,10 @@ const {
 })
 
 const layersApi = useLayersModel({ layerState, handle })
+const dockExpanded = computed(
+  () => activeDockPanel.value === 'layers' && layersApi.layerEditorOpen.value
+)
+const hideDockNav = computed(() => !isDockCollapsed.value || dockExpanded.value)
 const onionLayerState = reactive<Record<string, boolean>>({})
 const layerEntriesWithOnion = computed(() =>
   Array.isArray(layersApi.layerEntries.value)
