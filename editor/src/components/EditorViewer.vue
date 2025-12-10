@@ -160,7 +160,8 @@ defineExpose({
   height: 100%;
 }
 
-.viewer-surface .ctw-viewer-overlay__buttons > .ctw-chip-button:first-child {
+.viewer-surface .ctw-viewer-overlay__buttons > .ctw-chip-button:first-child,
+.viewer-surface .ctw-viewer-overlay__buttons > .ctw-chip-button:nth-child(2) {
   display: none;
 }
 
