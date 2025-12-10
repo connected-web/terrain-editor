@@ -106,11 +106,13 @@ export type TerrainHandle = {
   updateLayers: (state: LayerToggleState) => Promise<void>
   setInteractiveMode: (enabled: boolean) => void
   updateLocations: (locations: TerrainLocation[], focusedId?: string) => void
+  setFocusedLocation: (locationId?: string | null) => void
   navigateTo: (payload: {
     pixel: { x: number; y: number }
     locationId?: string
     world?: { x: number; y: number; z: number }
     view?: LocationViewState
+    instant?: boolean
   }) => void
   setHoveredLocation: (id: string | null) => void
   setCameraOffset: (offset: number, focusId?: string) => void
@@ -781,6 +783,7 @@ export async function initTerrainViewer(
       updateLayers: async () => {},
       setInteractiveMode: noop,
       updateLocations: noop,
+      setFocusedLocation: noop,
       navigateTo: noop,
       setHoveredLocation: noop,
       setCameraOffset: noop,
@@ -1621,7 +1624,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     }
     navigateToLocation({
       pixel: fallbackPixel,
-      view: options.cameraView
+      view: options.cameraView,
+      instant: true
     })
   }
 
@@ -1636,8 +1640,9 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     locationId?: string
     world?: THREE.Vector3 | { x: number; y: number; z: number }
     view?: LocationViewState
+    instant?: boolean
   }) {
-    const { pixel, locationId, world: worldOverride, view } = payload
+    const { pixel, locationId, world: worldOverride, view, instant } = payload
     let world =
       normalizeWorld(worldOverride) ||
       (locationId && locationWorldCache.get(locationId)?.clone()) ||
@@ -1655,7 +1660,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     const endTarget = baseTarget.clone()
     const endPos = basePos.clone()
     cameraOffset.current = cameraOffset.target
-    const duration = payload.view ? 0 : 650
+    const duration = instant ? 0 : 650
     startCameraTween(endPos, endTarget, duration)
     if (locationId) currentFocusId = locationId
   }
@@ -1673,6 +1678,12 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     updateLocations: (locations: TerrainLocation[], focusedId?: string) => {
       setLocationMarkers(locations, focusedId)
     },
+    setFocusedLocation: (locationId?: string | null) => {
+      const nextId = locationId ?? undefined
+      if (currentFocusId === nextId) return
+      currentFocusId = nextId
+      updateMarkerVisuals()
+    },
     navigateTo: navigateToLocation,
     setHoveredLocation: (id: string | null) => {
       hoveredLocationId = id
@@ -1687,7 +1698,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
           navigateToLocation({
             pixel: loc.pixel,
             locationId: targetId,
-            view: loc.view
+            view: loc.view,
+            instant: true
           })
         }
       }

@@ -1029,7 +1029,9 @@ function clamp(value: number, min: number, max: number) {
   z-index: auto;
   display: flex;
   justify-content: flex-start;
-  padding: 0;
+  padding: 1rem;
+  padding-left: max(2.5rem, 3vw);
+  padding-right: max(1.5rem, 2vw);
   pointer-events: auto;
   width: 100%;
   height: 100%;
@@ -1050,9 +1052,10 @@ function clamp(value: number, min: number, max: number) {
 }
 
 .layer-editor--inline .layer-editor__panel {
-  width: 100%;
+  width: min(1400px, 100%);
   height: 100%;
   max-height: 100%;
+  margin: 0 auto;
 }
 
 .layer-editor__header {

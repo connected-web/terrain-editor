@@ -374,7 +374,8 @@ function tryApplyCameraOverride() {
   }
   viewerHandle.navigateTo({
     pixel: pending.targetPixel ?? fallbackPixel,
-    view: pending
+    view: pending,
+    instant: true
   })
   pendingCameraOverride.value = null
 }

@@ -120,7 +120,7 @@ export function useLocations() {
     if (!handle) return
     const target = locationsList.value.find((location) => ensureLocationId(location).id === id)
     if (!target) return
-    handle.updateLocations(workspace.getViewerLocations(), id)
+    handle.setFocusedLocation?.(id)
     const pixel =
       target.pixel ?? {
         x: Math.round(workspaceForm.width / 2),
@@ -240,10 +240,13 @@ export function useLocations() {
             const copy = ensureLocationId({ ...location })
             if (copy.showBorder === undefined) copy.showBorder = true
             return copy
-          })
+        })
         : []
       ensureActiveLocationSelection()
-      workspace.handle.value?.updateLocations(workspace.getViewerLocations(locationsList.value))
+      workspace.handle.value?.updateLocations(
+        workspace.getViewerLocations(locationsList.value),
+        selectedLocationId.value ?? undefined
+      )
     },
     { deep: true, immediate: true }
   )
@@ -259,7 +262,8 @@ export function useLocations() {
           workspace.ensureDockExpanded?.()
         }
       } else if (workspace.handle.value) {
-        workspace.handle.value.updateLocations(workspace.getViewerLocations())
+        workspace.handle.value.updateLocations(workspace.getViewerLocations(), undefined)
+        workspace.handle.value.setFocusedLocation?.(undefined)
       }
       if (!hasSyncedInitialLocationSelection) {
         hasSyncedInitialLocationSelection = true
