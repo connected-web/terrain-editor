@@ -56,6 +56,7 @@ defineExpose({
 
 <style scoped>
 .panel-dock {
+  --dock-left-gap: clamp(4.2rem, 5vw, 5.5rem);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -66,14 +67,14 @@ defineExpose({
   border-left: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
   height: 100vh;
-  margin-left: 5rem;
-  overflow: hidden;
+  margin-left: var(--dock-left-gap);
+  overflow: visible;
 }
 
 .panel-dock--expanded {
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
+  width: calc(100% - var(--dock-left-gap));
+  max-width: calc(100% - var(--dock-left-gap));
+  margin-left: var(--dock-left-gap);
 }
 
 .panel-dock--mobile {
@@ -97,21 +98,25 @@ defineExpose({
 
 .panel-dock__toggle {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: rgba(7, 11, 18, 0.9);
+  top: clamp(0.75rem, 1.5vw, 1.4rem);
+  left: calc(-2rem);
+  background: rgba(7, 11, 18, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
   color: inherit;
   cursor: pointer;
-  z-index: 2;
+  z-index: 700;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .panel-dock__toggle:hover {
   background: rgba(7, 11, 18, 1);
   border-color: rgba(196, 174, 53, 0.692);
+}
+
+.panel-dock--collapsed .panel-dock__toggle {
+  left: calc(-2rem);
 }
 
 .panel-dock__inner {
