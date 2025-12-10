@@ -61,7 +61,6 @@
             :dataset="datasetRef.value"
             :filter-text="assetDialogFilter"
             :active-layer="layersApi.activeLayer.value"
-            :show-grid="localSettings.showLayerTransparencyGrid"
             :onion-layers="onionLayersForEditor"
             :layer-entries="layerEntriesWithOnion"
             :color-to-css="rgb"

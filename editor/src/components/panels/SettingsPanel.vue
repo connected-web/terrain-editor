@@ -25,19 +25,6 @@
       <p class="panel-card__hint">
         Turn off to keep the current panel open when clicking markers in the viewer.
       </p>
-      <div class="panel-card__header-main">
-        <Icon icon="layer-group">Layer Editor</Icon>
-      </div>
-      <p class="panel-card__hint">
-        Settings for the layer mask editor.
-      </p>
-      <label class="locations-panel__toggle">
-        <input type="checkbox" v-model="localSettings.showLayerTransparencyGrid" />
-        <span>Show checker background</span>
-      </label>
-      <p class="panel-card__hint">
-        Toggle between a checkerboard transparency grid and a solid black background in the layer mask editor.
-      </p>
     </div>
   </section>
 </template>

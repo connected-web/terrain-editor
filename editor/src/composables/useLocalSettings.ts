@@ -4,13 +4,11 @@ import { persistLocalSettings, readLocalSettings } from '../utils/storage'
 export type LocalSettings = {
   cameraTracking: boolean
   openLocationsOnSelect: boolean
-  showLayerTransparencyGrid: boolean
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   cameraTracking: true,
-  openLocationsOnSelect: true,
-  showLayerTransparencyGrid: true
+  openLocationsOnSelect: true
 }
 
 export function useLocalSettings() {
@@ -23,8 +21,6 @@ export function useLocalSettings() {
       saved.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
     localSettings.openLocationsOnSelect =
       saved.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
-    localSettings.showLayerTransparencyGrid =
-      saved.showLayerTransparencyGrid ?? DEFAULT_LOCAL_SETTINGS.showLayerTransparencyGrid
   }
 
   function persistSettings() {
@@ -32,11 +28,7 @@ export function useLocalSettings() {
   }
 
   watch(
-    () => [
-      localSettings.cameraTracking,
-      localSettings.openLocationsOnSelect,
-      localSettings.showLayerTransparencyGrid
-    ],
+    () => [localSettings.cameraTracking, localSettings.openLocationsOnSelect],
     () => persistSettings()
   )
 

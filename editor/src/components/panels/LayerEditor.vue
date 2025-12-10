@@ -176,7 +176,7 @@
               v-if="maskUrl"
               ref="maskEditorRef"
               :src="maskUrl"
-              :show-grid="showGrid"
+              :show-grid="previewBackground === 'grid'"
               :tool="activeTool"
               :value-mode="isHeightmap ? 'heightmap' : 'mask'"
               :brush-size="strokeSettings.size"
@@ -299,10 +299,10 @@
               <div class="layer-editor__section">
                 <h4>Layer settings</h4>
                 <label class="layer-editor__field">
-                  <span>Preview</span>
-                  <select v-model="layerPreviewMode">
-                    <option value="mask">Mask</option>
-                    <option value="overlay">Overlay</option>
+                  <span>Background</span>
+                  <select v-model="previewBackground">
+                    <option value="grid">Checkerboard</option>
+                    <option value="solid">Solid black</option>
                   </select>
                 </label>
                 <label
@@ -391,7 +391,6 @@ const props = defineProps<{
   dataset?: TerrainDataset | null
   filterText?: string
   activeLayer: LayerEntry | null
-  showGrid?: boolean
   onionLayers?: Array<{ id: string; mask?: string | null; color: [number, number, number] }>
   layerEntries?: LayerEntry[]
   colorToCss?: (color: [number, number, number]) => string
@@ -425,7 +424,7 @@ watch(
 )
 
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
-const layerPreviewMode = ref<'mask' | 'overlay'>('mask')
+const previewBackground = ref<'grid' | 'solid'>('grid')
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
 const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSteps: 0 })
