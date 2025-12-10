@@ -7,9 +7,12 @@
       <span class="panel-card__hint">Local to this browser</span>
     </header>
     <div class="panel-card__list">
+      <div class="panel-card__header-main">
+        <Icon icon="camera">Camera</Icon>
+      </div>
       <label class="locations-panel__toggle">
         <input type="checkbox" v-model="localSettings.cameraTracking" />
-        <span>Camera tracking between locations</span>
+        <span>Use location camera when moving between locations</span>
       </label>
       <p class="panel-card__hint">
         When enabled, the viewer uses a location’s saved camera view (distance/polar/azimuth) while moving
