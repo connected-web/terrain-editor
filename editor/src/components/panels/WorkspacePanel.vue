@@ -159,6 +159,12 @@ defineEmits<{
   gap: 0.5rem;
 }
 
+.workspace-form__range {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
 .pill-button--primary {
   background: rgba(246, 231, 195, 0.15);
   border-color: rgba(246, 231, 195, 0.45);

@@ -16,7 +16,24 @@
         </Icon>
       </button>
     </div>
-    <div ref="viewerRef" class="editor-viewer__canvas"></div>
+    <div
+      ref="viewerRef"
+      class="editor-viewer__canvas"
+      @dragenter.prevent="handleDragEnter"
+      @dragover.prevent="handleDragOver"
+      @dragleave.prevent="handleDragLeave"
+      @drop.prevent="handleDrop"
+    ></div>
+    <div v-if="isDragActive" class="editor-viewer__drop-overlay">
+      Drop .wyn to load
+    </div>
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".wyn"
+      class="editor-viewer__file-input"
+      @change="handleFileInputChange"
+    />
   </div>
 </template>
 
@@ -45,6 +62,9 @@ const rootRef = ref<HTMLElement | null>(null)
 const viewerRef = ref<HTMLElement | null>(null)
 const overlayHandle = ref<ViewerOverlayHandle | null>(null)
 const showLabels = computed(() => props.showToolbarLabels ?? true)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const isDragActive = ref(false)
+const dragDepth = ref(0)
 
 const toolbarActions = computed(() =>
   (props.uiActions ?? []).filter((action) => (action.slot ?? 'toolbar') === 'toolbar')
@@ -56,17 +76,18 @@ const overlayActions = computed(() =>
 
 function buildOptions() {
   return {
+    status: {
+      initialText: props.status
+    },
     selectFile: {
-      enabled: true,
-      callback: (file: File) => emit('loadFile', file)
+      enabled: false
     },
     popout: {
       enabled: false
     },
     fullscreen: {
-      enabled: true,
-      displayInEmbed: true,
-      onToggle: () => emit('toggleFullscreen')
+      enabled: false,
+      displayInEmbed: false
     },
     customButtons: overlayActions.value.map((action) => ({
       location: action.slot === 'overlay-center' ? ('center' as const) : ((action.slot ??
@@ -124,6 +145,56 @@ function setOverlayLoading(state: ViewerOverlayLoadingState | null) {
   overlayHandle.value?.setLoadingProgress(state)
 }
 
+function triggerFileSelect() {
+  fileInputRef.value?.click()
+}
+
+function handleFileInputChange(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  const file = target?.files?.[0]
+  if (file) {
+    emit('loadFile', file)
+  }
+  if (target) {
+    target.value = ''
+  }
+}
+
+function hasFilePayload(event: DragEvent) {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+function handleDragEnter(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  dragDepth.value += 1
+  isDragActive.value = true
+}
+
+function handleDragOver(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+function handleDragLeave(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    isDragActive.value = false
+  }
+}
+
+function handleDrop(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  dragDepth.value = 0
+  isDragActive.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (file) {
+    emit('loadFile', file)
+  }
+}
+
 onMounted(() => {
   setupOverlay()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
@@ -137,7 +208,7 @@ onBeforeUnmount(() => {
 defineExpose({
   getViewerElement: () => viewerRef.value,
   setOverlayLoading,
-  triggerFileSelect: () => overlayHandle.value?.openFileDialog()
+  triggerFileSelect
 })
 </script>
 
@@ -158,11 +229,6 @@ defineExpose({
 .editor-viewer__canvas {
   width: 100%;
   height: 100%;
-}
-
-.viewer-surface .ctw-viewer-overlay__buttons > .ctw-chip-button:first-child,
-.viewer-surface .ctw-viewer-overlay__buttons > .ctw-chip-button:nth-child(2) {
-  display: none;
 }
 
 .editor-viewer__toolbar {
@@ -208,6 +274,33 @@ defineExpose({
 
 .editor-viewer__toolbar-label {
   font-size: 0.85rem;
+}
+
+.editor-viewer__drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 11, 20, 0.75);
+  color: #f6e7c3;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.editor-viewer__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* < 800px width */

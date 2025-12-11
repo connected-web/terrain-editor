@@ -57,7 +57,6 @@ defineExpose({
 <style scoped>
 .panel-dock {
   --dock-left-gap: clamp(4.2rem, 5vw, 5.5rem);
-  --dock-top-offset: clamp(1rem, 1.5vw, 1.6rem);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -69,7 +68,6 @@ defineExpose({
   backdrop-filter: blur(8px);
   height: 100vh;
   margin-left: var(--dock-left-gap);
-  margin-top: var(--dock-top-offset);
   overflow: visible;
 }
 
@@ -100,7 +98,7 @@ defineExpose({
 
 .panel-dock__toggle {
   position: absolute;
-  top: 0;
+  top: clamp(1rem, 1.5vw, 1.6rem);
   left: calc(-2rem);
   background: rgba(7, 11, 18, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
