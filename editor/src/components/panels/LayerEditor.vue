@@ -94,15 +94,20 @@
               @drop.prevent="handleLayerListDrop"
             >
               <template v-for="section in layerSections" :key="section.key">
-                <p class="layer-editor__layers-section-label">{{ section.label }}</p>
-                <div class="layer-editor__layers-section">
+                <div class="layer-editor__layers-section-heading">
+                  <p class="layer-editor__layers-section-label" :title="sectionHints[section.key] ?? ''">{{ section.label }}</p>
+                </div>
+                <div class="layer-editor__layers-section" :data-section-key="section.key">
                   <div
                     v-for="entry in section.entries"
                     :key="entry.id"
                     class="layer-editor__layer-pill"
                     :class="{
                       'layer-editor__layer-pill--inactive': !entry.visible,
-                      'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id
+                      'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id,
+                      'layer-editor__layer-pill--dragging': draggingLayerId === entry.id,
+                      'layer-editor__layer-pill--drop-above': isDropAbove(entry.id),
+                      'layer-editor__layer-pill--drop-below': isDropBelow(entry.id)
                     }"
                     :draggable="entry.kind !== 'heightmap'"
                     role="button"
@@ -111,11 +116,15 @@
                     @click="openLayerFromList(entry.id)"
                     @keydown.enter.prevent="openLayerFromList(entry.id)"
                     @keydown.space.prevent="openLayerFromList(entry.id)"
-                    @dragstart="handleLayerDragStart(entry)"
+                    @dragstart="handleLayerDragStart(entry, $event)"
                     @dragover.prevent="handleLayerDragOver(entry, $event)"
                     @drop.prevent="handleLayerDrop(entry)"
                     @dragend="handleLayerDragEnd"
+                    @dragleave="handleLayerDragLeave(entry, $event)"
                   >
+                    <span class="layer-editor__layer-pill-handle" aria-hidden="true">
+                      <Icon icon="grip-lines" />
+                    </span>
                     <Icon :icon="entry?.icon ?? 'circle'" class="layer-editor__layer-pill-icon" :style="{ color: colorToCss(entry.color) }" />
                     <span class="layer-editor__layer-pill-label">{{ entry.label }}</span>
                     <span class="layer-editor__layer-pill-spacer"></span>
@@ -138,6 +147,12 @@
                     </button>
                     </div>
                 </div>
+                <div
+                  class="layer-editor__drop-zone"
+                  :class="{ 'layer-editor__drop-zone--active': isTailDropActive(section.key) }"
+                  @dragover.prevent="handleSectionTailDragOver(section.key, $event)"
+                  @drop.prevent="handleSectionTailDrop(section.key)"
+                ></div>
               </template>
             </div>
             <div class="layer-editor__layers-actions">
@@ -346,16 +361,16 @@
           </div>
           <div class="layer-editor__status-right">
             <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
-              <Icon icon="arrow-rotate-left" /> Reset
-            </button>
-            <button type="button" class="pill-button" @click="applyCanvas">
-              <Icon icon="shuffle" /> Apply
+              <Icon icon="arrow-rotate-left">Reset</Icon>
             </button>
             <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canUndo" @click="undoCanvas">
-              <Icon icon="rotate-left" /> Undo ({{ historyState.undoSteps }})
+              <Icon icon="rotate-left">Undo ({{ historyState.undoSteps }})</Icon>
             </button>
             <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canRedo" @click="redoCanvas">
-              <Icon icon="rotate-right" /> Redo ({{ historyState.redoSteps }})
+              <Icon icon="rotate-right">Redo ({{ historyState.redoSteps }})</Icon>
+            </button>
+            <button type="button" class="pill-button" @click="applyCanvas">
+              <Icon icon="shuffle">Apply</Icon>
             </button>
           </div>
         </footer>
@@ -415,6 +430,10 @@ const emit = defineEmits<{
 
 const layerName = ref('')
 const inlineMode = computed(() => Boolean(props.inline))
+const draggingLayerId = ref<string | null>(null)
+const draggingLayerKind = ref<LayerSectionKey | null>(null)
+const dropHoverState = ref<{ id: string | null; kind: LayerSectionKey | null; position: 'above' | 'below' } | null>(null)
+const dragPreviewEl = ref<HTMLElement | null>(null)
 watch(
   () => props.activeLayer,
   (next) => {
@@ -440,6 +459,11 @@ const colorToCss = computed(
 )
 type LayerSectionKey = 'heightmap' | 'biome' | 'overlay'
 type LayerSection = { key: LayerSectionKey; label: string; entries: LayerEntry[] }
+const sectionHints: Record<LayerSectionKey, string> = {
+  heightmap: 'Base terrain height data',
+  biome: 'Entries lower in the list render on top',
+  overlay: 'Later overlays appear above earlier ones'
+}
 const layerSections = computed<LayerSection[]>(() => {
   const sections: LayerSection[] = []
   const buckets: Record<LayerSectionKey, LayerEntry[]> = {
@@ -857,29 +881,58 @@ function handleLayerAdd() {
   emit('add-layer')
 }
 
-function handleLayerDragStart(entry: LayerEntry) {
-  if (entry.kind === 'heightmap') return
+function handleLayerDragStart(entry: LayerEntry, event: DragEvent) {
+  if (entry.kind === 'heightmap') {
+    event.preventDefault()
+    return
+  }
   draggingLayerId.value = entry.id
-  draggingLayerKind.value = entry.kind
+  draggingLayerKind.value = entry.kind as LayerSectionKey
+  dropHoverState.value = { id: entry.id, kind: entry.kind as LayerSectionKey, position: 'above' }
+  const pill = event.currentTarget as HTMLElement | null
+  if (pill && event.dataTransfer) {
+    const clone = pill.cloneNode(true) as HTMLElement
+    clone.style.position = 'absolute'
+    clone.style.top = '-1000px'
+    clone.style.left = '-1000px'
+    clone.style.width = `${pill.offsetWidth}px`
+    clone.classList.add('layer-editor__layer-pill--ghost')
+    document.body.appendChild(clone)
+    event.dataTransfer.setDragImage(clone, pill.offsetWidth / 2, pill.offsetHeight / 2)
+    dragPreviewEl.value = clone
+  }
 }
 
 function handleLayerDragOver(entry: LayerEntry, event: DragEvent) {
   if (!draggingLayerId.value || !draggingLayerKind.value) return
   if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
+  const pill = event.currentTarget as HTMLElement | null
+  if (pill) {
+    const rect = pill.getBoundingClientRect()
+    const position = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
+    dropHoverState.value = { id: entry.id, kind: entry.kind as LayerSectionKey, position }
+  }
   event.preventDefault()
 }
 
 function handleLayerDrop(entry: LayerEntry) {
   if (!draggingLayerId.value || !draggingLayerKind.value) return
   if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
-  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: entry.id })
-  draggingLayerId.value = null
-  draggingLayerKind.value = null
+  const targetId = resolveDropTarget(entry.id, entry.kind as LayerSectionKey)
+  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId })
+  clearDragState()
+}
+
+function handleLayerDragLeave(entry: LayerEntry, event: DragEvent) {
+  const related = event.relatedTarget as HTMLElement | null
+  if (related && related.closest('.layer-editor__layer-pill') === event.currentTarget) return
+  if (dropHoverState.value?.id === entry.id) {
+    dropHoverState.value = null
+  }
 }
 
 function handleLayerDragEnd() {
-  draggingLayerId.value = null
-  draggingLayerKind.value = null
+  clearDragState()
 }
 
 function handleLayerListDragOver(event: DragEvent) {
@@ -888,10 +941,62 @@ function handleLayerListDragOver(event: DragEvent) {
 }
 
 function handleLayerListDrop() {
-  if (!draggingLayerId.value) return
+  if (!draggingLayerId.value || !draggingLayerKind.value) return
   emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: null })
+  clearDragState()
+}
+
+function resolveDropTarget(entryId: string, kind: LayerSectionKey) {
+  if (dropHoverState.value?.position === 'below') {
+    const nextId = findNextLayerId(entryId, kind)
+    return nextId ?? null
+  }
+  return entryId
+}
+
+function getEntriesForKind(kind: LayerSectionKey) {
+  return layerSections.value.find((section) => section.key === kind)?.entries ?? []
+}
+
+function findNextLayerId(entryId: string, kind: LayerSectionKey) {
+  const entries = getEntriesForKind(kind)
+  const index = entries.findIndex((entry) => entry.id === entryId)
+  if (index === -1) return null
+  return entries[index + 1]?.id ?? null
+}
+
+function clearDragState() {
   draggingLayerId.value = null
   draggingLayerKind.value = null
+  dropHoverState.value = null
+  if (dragPreviewEl.value) {
+    document.body.removeChild(dragPreviewEl.value)
+    dragPreviewEl.value = null
+  }
+}
+
+function isDropAbove(id: string) {
+  return dropHoverState.value?.id === id && dropHoverState.value?.position === 'above'
+}
+
+function isDropBelow(id: string) {
+  return dropHoverState.value?.id === id && dropHoverState.value?.position === 'below'
+}
+
+function isTailDropActive(kind: LayerSectionKey) {
+  return dropHoverState.value?.id === null && dropHoverState.value?.kind === kind
+}
+
+function handleSectionTailDragOver(kind: LayerSectionKey, event: DragEvent) {
+  if (!draggingLayerId.value || draggingLayerKind.value !== kind) return
+  dropHoverState.value = { id: null, kind, position: 'below' }
+  event.preventDefault()
+}
+
+function handleSectionTailDrop(kind: LayerSectionKey) {
+  if (!draggingLayerId.value || draggingLayerKind.value !== kind) return
+  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: null })
+  clearDragState()
 }
 
 
@@ -1236,6 +1341,19 @@ function clamp(value: number, min: number, max: number) {
   opacity: 0.7;
 }
 
+.layer-editor__layers-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.layer-editor__layers-section-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  opacity: 0.55;
+}
+
 .layer-editor__layers-section {
   display: flex;
   flex-direction: column;
@@ -1253,6 +1371,7 @@ function clamp(value: number, min: number, max: number) {
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   cursor: pointer;
+  position: relative;
 }
 
 .layer-editor__layer-pill--active {
@@ -1262,6 +1381,54 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__layer-pill--inactive {
   opacity: 0.55;
+}
+
+.layer-editor__layer-pill--dragging {
+  opacity: 0.3;
+}
+
+.layer-editor__layer-pill::before,
+.layer-editor__layer-pill::after {
+  content: '';
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  height: 2px;
+  background: #f7c948;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.layer-editor__layer-pill::before {
+  top: -3px;
+}
+
+.layer-editor__layer-pill::after {
+  bottom: -3px;
+}
+
+.layer-editor__layer-pill--drop-above::before,
+.layer-editor__layer-pill--drop-below::after {
+  opacity: 1;
+}
+
+.layer-editor__layer-pill-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  opacity: 0.6;
+  margin-right: 0.25rem;
+}
+
+.layer-editor__layer-pill--ghost {
+  pointer-events: none;
+  opacity: 0.85;
+  z-index: 9999;
+}
+
+.layer-editor__layer-pill--ghost :is(button, .layer-editor__layer-pill-action) {
+  display: none;
 }
 
 .layer-editor__layer-pill-icon {
@@ -1282,6 +1449,18 @@ function clamp(value: number, min: number, max: number) {
   color: inherit;
   cursor: pointer;
   padding: 0.15rem;
+}
+
+.layer-editor__drop-zone {
+  height: 0.5rem;
+  margin: 0.2rem 0 0.4rem;
+  border-radius: 4px;
+  border: 1px dashed transparent;
+}
+
+.layer-editor__drop-zone--active {
+  border-color: rgba(247, 201, 72, 0.8);
+  background: rgba(247, 201, 72, 0.12);
 }
 
 .layer-editor__layers-actions {

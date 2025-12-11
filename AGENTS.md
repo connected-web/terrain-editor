@@ -93,15 +93,17 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [x] Export mask directly from the Layer Editor (grayscale + alpha variants)
 * [ ] Brush type menu (basic, spray, Perlin noise)
 * [ ] Save/load custom brushes (name + icon)
+* [ ] Icon picker for brushes and locations based on FontAwesome Free icon set
+* [ ] FontAwesome icon support for the viewer location markers
 * [ ] Layer import via drag/drop or file upload
 
 ### Viewer & Interaction Improvements
 
 * [ ] Camera recentering responding to dock + toolbar layout changes
 * [ ] Zoom/pan calibration and cursor-to-world accuracy
-* [ ] Smooth scroll behavior (no jitter)
-* [ ] Layer editor wrapper must remain pointer-transparent
-* [ ] Cleanup of spacing/borders in layer toolbar + workspace UI
+* [x] Smooth scroll behavior (no jitter)
+* [x] Layer editor wrapper must remain pointer-transparent
+* [x] Cleanup of spacing/borders in layer toolbar + workspace UI
 
 ### Layer Editor Improvements
 
