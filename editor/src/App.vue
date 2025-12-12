@@ -75,6 +75,7 @@
             @toggle-onion="toggleOnionLayer"
             @add-layer="openLayerCreateDialog()"
             @reorder-layer="handleLayerReorder"
+            @delete-layer="handleLayerDelete"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -148,6 +149,9 @@
       <ConfirmDialog
         v-if="confirmState"
         :message="confirmState.message"
+        :confirm-label="confirmState.confirmLabel"
+        :cancel-label="confirmState.cancelLabel"
+        :confirm-variant="confirmState.confirmVariant"
         @confirm="handleConfirmDialog"
         @cancel="dismissConfirmDialog"
       />
@@ -444,6 +448,7 @@ const layerEditorHelpers = useLayerEditor({
   requestViewerRemount
 })
 const layerCreateDialogOpen = ref(false)
+let layerReorderTimeout: ReturnType<typeof setTimeout> | null = null
 
 function openLayerCreateDialog() {
   layerCreateDialogOpen.value = true
@@ -487,7 +492,15 @@ const {
 const loadSample = loadSampleArchive
 const loadArchiveFromFile = loadArchiveFromFileInternal
 
-const confirmState = ref<{ message: string; onConfirm: () => void } | null>(null)
+type GlobalConfirmState = {
+  message: string
+  onConfirm: () => void
+  confirmLabel?: string
+  cancelLabel?: string
+  confirmVariant?: 'primary' | 'danger'
+}
+
+const confirmState = ref<GlobalConfirmState | null>(null)
 const { uiActions } = useUiActions({
   hasActiveArchive,
   setActivePanel,
@@ -503,8 +516,12 @@ const { uiActions } = useUiActions({
   promptCloseArchive
 })
 
-function requestConfirm(message: string, onConfirm: () => void) {
-  confirmState.value = { message, onConfirm }
+function requestConfirm(
+  message: string,
+  onConfirm: () => void,
+  options: { confirmLabel?: string; cancelLabel?: string; confirmVariant?: 'primary' | 'danger' } = {}
+) {
+  confirmState.value = { message, onConfirm, ...options }
 }
 
 function handleConfirmDialog() {
@@ -852,8 +869,62 @@ function handleLayerReorder(payload: { sourceId: string; targetId: string | null
   if (datasetRef.value) {
     datasetRef.value.legend[groupKey] = { ...reordered }
   }
+  scheduleLayerReorderPersist()
+}
+
+function scheduleLayerReorderPersist() {
+  if (layerReorderTimeout) {
+    clearTimeout(layerReorderTimeout)
+  }
+  layerReorderTimeout = setTimeout(() => {
+    requestViewerRemount()
+    void persistCurrentProject()
+    layerReorderTimeout = null
+  }, 500)
+}
+
+function handleLayerDelete(layerId: string) {
+  if (!layerId || layerId === 'heightmap') return
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === layerId)
+  if (!entry || entry.kind === 'heightmap') return
+  requestConfirm(
+    `Delete the layer "${entry.label}"? This cannot be undone.`,
+    () => deleteLayerEntry(entry),
+    { confirmLabel: 'Delete layer', confirmVariant: 'danger' }
+  )
+}
+
+async function deleteLayerEntry(entry: (typeof layerEntriesWithOnion.value)[number]) {
+  const snapshot = projectStore.getSnapshot()
+  const legend = snapshot.legend
+  if (!legend) return
+  const [kind, key] = entry.id.split(':')
+  if (!key) return
+  const groupKey = kind === 'overlay' ? 'overlays' : 'biomes'
+  const group = { ...(legend[groupKey] ?? {}) }
+  if (!group[key]) return
+  delete group[key]
+  const nextLegend = {
+    ...legend,
+    [groupKey]: group
+  }
+  projectStore.setLegend(nextLegend)
+  layerBrowserStore.setLegend(nextLegend)
+  if (datasetRef.value) {
+    if (groupKey === 'overlays' && datasetRef.value.legend.overlays) {
+      delete datasetRef.value.legend.overlays[key]
+    } else if (groupKey === 'biomes' && datasetRef.value.legend.biomes) {
+      delete datasetRef.value.legend.biomes[key]
+    }
+  }
+  if (entry.mask) {
+    removeAssetFromStore(entry.mask)
+  }
+  if (layersApi.activeLayer.value?.id === entry.id) {
+    layersApi.closeLayerEditor()
+  }
+  await persistCurrentProject()
   requestViewerRemount()
-  void persistCurrentProject()
 }
 
 async function importLocationIcon(location: TerrainLocation, file: File) {

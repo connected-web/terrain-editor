@@ -87,6 +87,7 @@ const emit = defineEmits<{
   (ev: 'zoom-change', value: number): void
   (ev: 'cursor-move', coords: { x: number; y: number }): void
   (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean; undoSteps: number; redoSteps: number }): void
+  (ev: 'ready'): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -126,6 +127,12 @@ const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
   if (panModeActive.value) return 'pan'
   return currentStrokeMode.value === 'erase' ? 'erase' : 'paint'
 })
+
+type ViewState = {
+  zoom: number
+  scrollLeft: number
+  scrollTop: number
+}
 
 function updateHistoryState() {
   canUndo.value = undoStack.length > 1
@@ -304,6 +311,7 @@ function loadImage () {
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
     seedHistory()
+    emit('ready')
     return
   }
 
@@ -328,6 +336,7 @@ function loadImage () {
     renderMaskCanvas()
     renderPreviewCanvas()
     seedHistory()
+    emit('ready')
   }
 
   img.onerror = () => {
@@ -335,6 +344,7 @@ function loadImage () {
     maskValues.value = new Float32Array(1)
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
+    emit('ready')
   }
 }
 
@@ -597,6 +607,33 @@ function setZoom(value: number) {
   applyZoom(value)
 }
 
+function getViewState(): ViewState {
+  const viewport = viewportRef.value
+  return {
+    zoom: zoom.value,
+    scrollLeft: viewport?.scrollLeft ?? 0,
+    scrollTop: viewport?.scrollTop ?? 0
+  }
+}
+
+function restoreViewState(state?: Partial<ViewState> | null) {
+  if (!state) {
+    fitView()
+    return
+  }
+  if (typeof state.zoom === 'number') {
+    setZoom(state.zoom)
+  }
+  const viewport = viewportRef.value
+  if (!viewport) return
+  if (typeof state.scrollLeft === 'number') {
+    viewport.scrollLeft = state.scrollLeft
+  }
+  if (typeof state.scrollTop === 'number') {
+    viewport.scrollTop = state.scrollTop
+  }
+}
+
 defineExpose({
   fitView,
   setZoom,
@@ -604,7 +641,10 @@ defineExpose({
   applyMask: handleApply,
   exportMask,
   undo,
-  redo
+  redo,
+  getViewState,
+  restoreViewState,
+  seedHistory
 })
 
 watch(

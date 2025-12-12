@@ -1,5 +1,16 @@
 <template>
   <div class="layer-editor" :class="{ 'layer-editor--with-list': hasLayerList, 'layer-editor--inline': inlineMode }">
+    <ConfirmDialog
+      v-if="layerSwitchPrompt"
+      :message="unsavedSwitchMessage"
+      cancel-label="Stay here"
+      secondary-label="Switch anyway"
+      confirm-label="Apply & switch"
+      confirm-variant="primary"
+      @cancel="cancelLayerSwitchPrompt"
+      @secondary="discardAndSwitch"
+      @confirm="applyAndSwitch"
+    />
     <section class="layer-editor__panel">
       <header class="layer-editor__header">
         <div class="layer-editor__header-left">
@@ -62,6 +73,14 @@
               <button type="button" @click="handleExportClick(true); toggleOverflowMenu(false)">
                 <Icon icon="droplet" /> Export w/ alpha
               </button>
+              <button
+                v-if="!isHeightmap"
+                type="button"
+                class="layer-editor__overflow-menu--danger"
+                @click="requestActiveLayerDelete()"
+              >
+                <Icon icon="trash" /> Delete layer
+              </button>
               <button type="button" class="layer-editor__overflow-menu--disabled" disabled title="Snap grid coming soon">
                 <Icon icon="border-all" /> Snap (soon)
               </button>
@@ -88,73 +107,16 @@
                 <Icon icon="plus" />
               </button>
             </div>
-            <div
-              class="layer-editor__layers-scroll"
-              @dragover.prevent="handleLayerListDragOver"
-              @drop.prevent="handleLayerListDrop"
-            >
-              <template v-for="section in layerSections" :key="section.key">
-                <div class="layer-editor__layers-section-heading">
-                  <p class="layer-editor__layers-section-label" :title="sectionHints[section.key] ?? ''">{{ section.label }}</p>
-                </div>
-                <div class="layer-editor__layers-section" :data-section-key="section.key">
-                  <div
-                    v-for="entry in section.entries"
-                    :key="entry.id"
-                    class="layer-editor__layer-pill"
-                    :class="{
-                      'layer-editor__layer-pill--inactive': !entry.visible,
-                      'layer-editor__layer-pill--active': props.activeLayer?.id === entry.id,
-                      'layer-editor__layer-pill--dragging': draggingLayerId === entry.id,
-                      'layer-editor__layer-pill--drop-above': isDropAbove(entry.id),
-                      'layer-editor__layer-pill--drop-below': isDropBelow(entry.id)
-                    }"
-                    :draggable="entry.kind !== 'heightmap'"
-                    role="button"
-                    tabindex="0"
-                    :title="entry.label"
-                    @click="openLayerFromList(entry.id)"
-                    @keydown.enter.prevent="openLayerFromList(entry.id)"
-                    @keydown.space.prevent="openLayerFromList(entry.id)"
-                    @dragstart="handleLayerDragStart(entry, $event)"
-                    @dragover.prevent="handleLayerDragOver(entry, $event)"
-                    @drop.prevent="handleLayerDrop(entry)"
-                    @dragend="handleLayerDragEnd"
-                    @dragleave="handleLayerDragLeave(entry, $event)"
-                  >
-                    <span class="layer-editor__layer-pill-handle" aria-hidden="true">
-                      <Icon icon="grip-lines" />
-                    </span>
-                    <Icon :icon="entry?.icon ?? 'circle'" class="layer-editor__layer-pill-icon" :style="{ color: colorToCss(entry.color) }" />
-                    <span class="layer-editor__layer-pill-label">{{ entry.label }}</span>
-                    <span class="layer-editor__layer-pill-spacer"></span>
-                    <button
-                      v-if="entry.kind !== 'heightmap'"
-                      type="button"
-                      class="layer-editor__layer-pill-action"
-                      title="Toggle visibility"
-                      @click.stop="toggleLayerVisibility(entry.id)"
-                    >
-                      <Icon :icon="entry.visible ? 'toggle-on' : 'toggle-off'" />
-                    </button>
-                    <button
-                      type="button"
-                      class="layer-editor__layer-pill-action"
-                      title="Toggle onion skin"
-                      @click.stop="toggleLayerOnion(entry.id)"
-                    >
-                      <Icon icon="film" :style="{ opacity: entry.onionEnabled ? '1' : '0.4' }" />
-                    </button>
-                    </div>
-                </div>
-                <div
-                  class="layer-editor__drop-zone"
-                  :class="{ 'layer-editor__drop-zone--active': isTailDropActive(section.key) }"
-                  @dragover.prevent="handleSectionTailDragOver(section.key, $event)"
-                  @drop.prevent="handleSectionTailDrop(section.key)"
-                ></div>
-              </template>
-            </div>
+            <LayerList
+              :sections="layerSections"
+              :color-to-css="colorToCss"
+              :active-id="props.activeLayer?.id ?? null"
+              :section-hints="sectionHints"
+              @open-layer="attemptLayerSelection"
+              @toggle-layer="toggleLayerVisibility"
+              @toggle-onion="toggleLayerOnion"
+              @reorder-layer="emit('reorder-layer', $event)"
+            />
             <div class="layer-editor__layers-actions">
               <button type="button" class="pill-button pill-button--ghost" @click="toggleGroupVisibility('biome')">
                 <Icon icon="adjust" />
@@ -205,6 +167,7 @@
               @zoom-change="handleZoomChange"
               @cursor-move="handleCursorMove"
               @history-change="handleHistoryChange"
+              @ready="handleMaskReady"
             />
             <p v-else class="layer-editor__placeholder">
               No mask image found for this layer.
@@ -384,11 +347,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { TerrainDataset, TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 import type { LayerEntry } from '../../composables/useLayersModel'
 import Icon from '../Icon.vue'
+import ConfirmDialog from '../ConfirmDialog.vue'
 import LayerMaskEditor from '../layers/LayerMaskEditor.vue'
+import LayerList from '../layers/LayerList.vue'
+import { buildLayerSections, type LayerSection, type LayerSectionKey } from '../../utils/layerSections'
 
 const TOOL_PALETTE = [
   { id: 'brush', label: 'Brush', icon: 'paintbrush', shortcut: 'B', description: 'Paint layer values.' },
@@ -426,14 +392,11 @@ const emit = defineEmits<{
   (ev: 'add-layer'): void
   (ev: 'reorder-layer', payload: { sourceId: string; targetId: string | null }): void
   (ev: 'toggle-onion', id: string): void
+  (ev: 'delete-layer', id: string): void
 }>()
 
 const layerName = ref('')
 const inlineMode = computed(() => Boolean(props.inline))
-const draggingLayerId = ref<string | null>(null)
-const draggingLayerKind = ref<LayerSectionKey | null>(null)
-const dropHoverState = ref<{ id: string | null; kind: LayerSectionKey | null; position: 'above' | 'below' } | null>(null)
-const dragPreviewEl = ref<HTMLElement | null>(null)
 watch(
   () => props.activeLayer,
   (next) => {
@@ -447,6 +410,7 @@ const previewBackground = ref<'grid' | 'solid'>('grid')
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
 const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSteps: 0 })
+const maskDirty = computed(() => Boolean(props.activeLayer && historyState.value.undoSteps > 0))
 const showOverflowMenu = ref(false)
 const overflowMenuRef = ref<HTMLElement | null>(null)
 const overflowButtonRef = ref<HTMLButtonElement | null>(null)
@@ -457,40 +421,12 @@ const colorToCss = computed(
     props.colorToCss ??
     ((color: [number, number, number]) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`)
 )
-type LayerSectionKey = 'heightmap' | 'biome' | 'overlay'
-type LayerSection = { key: LayerSectionKey; label: string; entries: LayerEntry[] }
 const sectionHints: Record<LayerSectionKey, string> = {
   heightmap: 'Base terrain height data',
   biome: 'Entries lower in the list render on top',
   overlay: 'Later overlays appear above earlier ones'
 }
-const layerSections = computed<LayerSection[]>(() => {
-  const sections: LayerSection[] = []
-  const buckets: Record<LayerSectionKey, LayerEntry[]> = {
-    heightmap: [],
-    biome: [],
-    overlay: []
-  }
-  for (const entry of layerList.value) {
-    if (entry.kind === 'heightmap') {
-      buckets.heightmap.push(entry)
-    } else if (entry.kind === 'overlay') {
-      buckets.overlay.push(entry)
-    } else {
-      buckets.biome.push(entry)
-    }
-  }
-  if (buckets.heightmap.length) {
-    sections.push({ key: 'heightmap', label: 'Height Map', entries: buckets.heightmap })
-  }
-  if (buckets.biome.length) {
-    sections.push({ key: 'biome', label: 'Biomes', entries: buckets.biome })
-  }
-  if (buckets.overlay.length) {
-    sections.push({ key: 'overlay', label: 'Overlays', entries: buckets.overlay })
-  }
-  return sections
-})
+const layerSections = computed(() => buildLayerSections(layerList.value))
 const biomesFullyVisible = computed(() => {
   const section = layerSections.value.find((sec) => sec.key === 'biome')
   if (!section || !section.entries.length) return true
@@ -575,6 +511,17 @@ const toolPalette = computed(() =>
   }))
 )
 const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
+type LayerViewState = { zoom: number; scrollLeft: number; scrollTop: number }
+const viewStateCache = new Map<string, LayerViewState>()
+const pendingViewRestore = ref<string | null>(null)
+const layerSwitchPrompt = ref<{ targetId: string } | null>(null)
+const pendingApplySwitchId = ref<string | null>(null)
+const unsavedSwitchMessage = computed(() => {
+  if (!layerSwitchPrompt.value) return ''
+  const target = layerList.value.find((entry) => entry.id === layerSwitchPrompt.value?.targetId)
+  const label = target?.label ?? 'the selected layer'
+  return `Apply your changes before switching to ${label}?`
+})
 
 const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === activeTool.value) ?? toolPalette.value[0])
 const layerKindLabel = computed(() => {
@@ -791,6 +738,12 @@ async function handleUpdateMask(blob: Blob) {
     data,
     lastModified: Date.now()
   })
+  maskEditorRef.value?.seedHistory()
+  if (pendingApplySwitchId.value) {
+    const targetId = pendingApplySwitchId.value
+    pendingApplySwitchId.value = null
+    emit('open-layer-editor', targetId)
+  }
 }
 
 function submitLayerName() {
@@ -834,6 +787,18 @@ function applyCanvas() {
   maskEditorRef.value?.applyMask()
 }
 
+function handleMaskReady() {
+  const currentId = props.activeLayer?.id ?? null
+  if (!maskEditorRef.value) return
+  const cachedState = currentId ? viewStateCache.get(currentId) ?? null : null
+  if (cachedState) {
+    maskEditorRef.value.restoreViewState(cachedState)
+  } else {
+    fitCanvasView()
+  }
+  pendingViewRestore.value = null
+}
+
 async function handleExportClick(includeAlpha = false) {
   const editor = maskEditorRef.value
   if (editor) {
@@ -858,7 +823,12 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function openLayerFromList(id: string) {
+function attemptLayerSelection(id: string) {
+  if (!props.activeLayer || props.activeLayer.id === id) return
+  if (maskDirty.value) {
+    layerSwitchPrompt.value = { targetId: id }
+    return
+  }
   emit('open-layer-editor', id)
 }
 
@@ -877,126 +847,32 @@ function toggleGroupVisibility(kind: 'biome' | 'overlay') {
   emit('set-all', kind, shouldShow)
 }
 
+function cancelLayerSwitchPrompt() {
+  layerSwitchPrompt.value = null
+}
+
+function discardAndSwitch() {
+  if (!layerSwitchPrompt.value) return
+  const { targetId } = layerSwitchPrompt.value
+  layerSwitchPrompt.value = null
+  emit('open-layer-editor', targetId)
+}
+
+function applyAndSwitch() {
+  if (!layerSwitchPrompt.value) return
+  pendingApplySwitchId.value = layerSwitchPrompt.value.targetId
+  layerSwitchPrompt.value = null
+  applyCanvas()
+}
+
+function requestActiveLayerDelete() {
+  if (!props.activeLayer || isHeightmap.value) return
+  emit('delete-layer', props.activeLayer.id)
+  toggleOverflowMenu(false)
+}
+
 function handleLayerAdd() {
   emit('add-layer')
-}
-
-function handleLayerDragStart(entry: LayerEntry, event: DragEvent) {
-  if (entry.kind === 'heightmap') {
-    event.preventDefault()
-    return
-  }
-  draggingLayerId.value = entry.id
-  draggingLayerKind.value = entry.kind as LayerSectionKey
-  dropHoverState.value = { id: entry.id, kind: entry.kind as LayerSectionKey, position: 'above' }
-  const pill = event.currentTarget as HTMLElement | null
-  if (pill && event.dataTransfer) {
-    const clone = pill.cloneNode(true) as HTMLElement
-    clone.style.position = 'absolute'
-    clone.style.top = '-1000px'
-    clone.style.left = '-1000px'
-    clone.style.width = `${pill.offsetWidth}px`
-    clone.classList.add('layer-editor__layer-pill--ghost')
-    document.body.appendChild(clone)
-    event.dataTransfer.setDragImage(clone, pill.offsetWidth / 2, pill.offsetHeight / 2)
-    dragPreviewEl.value = clone
-  }
-}
-
-function handleLayerDragOver(entry: LayerEntry, event: DragEvent) {
-  if (!draggingLayerId.value || !draggingLayerKind.value) return
-  if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
-  const pill = event.currentTarget as HTMLElement | null
-  if (pill) {
-    const rect = pill.getBoundingClientRect()
-    const position = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below'
-    dropHoverState.value = { id: entry.id, kind: entry.kind as LayerSectionKey, position }
-  }
-  event.preventDefault()
-}
-
-function handleLayerDrop(entry: LayerEntry) {
-  if (!draggingLayerId.value || !draggingLayerKind.value) return
-  if (entry.kind !== draggingLayerKind.value || entry.id === draggingLayerId.value) return
-  const targetId = resolveDropTarget(entry.id, entry.kind as LayerSectionKey)
-  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId })
-  clearDragState()
-}
-
-function handleLayerDragLeave(entry: LayerEntry, event: DragEvent) {
-  const related = event.relatedTarget as HTMLElement | null
-  if (related && related.closest('.layer-editor__layer-pill') === event.currentTarget) return
-  if (dropHoverState.value?.id === entry.id) {
-    dropHoverState.value = null
-  }
-}
-
-function handleLayerDragEnd() {
-  clearDragState()
-}
-
-function handleLayerListDragOver(event: DragEvent) {
-  if (!draggingLayerId.value) return
-  event.preventDefault()
-}
-
-function handleLayerListDrop() {
-  if (!draggingLayerId.value || !draggingLayerKind.value) return
-  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: null })
-  clearDragState()
-}
-
-function resolveDropTarget(entryId: string, kind: LayerSectionKey) {
-  if (dropHoverState.value?.position === 'below') {
-    const nextId = findNextLayerId(entryId, kind)
-    return nextId ?? null
-  }
-  return entryId
-}
-
-function getEntriesForKind(kind: LayerSectionKey) {
-  return layerSections.value.find((section) => section.key === kind)?.entries ?? []
-}
-
-function findNextLayerId(entryId: string, kind: LayerSectionKey) {
-  const entries = getEntriesForKind(kind)
-  const index = entries.findIndex((entry) => entry.id === entryId)
-  if (index === -1) return null
-  return entries[index + 1]?.id ?? null
-}
-
-function clearDragState() {
-  draggingLayerId.value = null
-  draggingLayerKind.value = null
-  dropHoverState.value = null
-  if (dragPreviewEl.value) {
-    document.body.removeChild(dragPreviewEl.value)
-    dragPreviewEl.value = null
-  }
-}
-
-function isDropAbove(id: string) {
-  return dropHoverState.value?.id === id && dropHoverState.value?.position === 'above'
-}
-
-function isDropBelow(id: string) {
-  return dropHoverState.value?.id === id && dropHoverState.value?.position === 'below'
-}
-
-function isTailDropActive(kind: LayerSectionKey) {
-  return dropHoverState.value?.id === null && dropHoverState.value?.kind === kind
-}
-
-function handleSectionTailDragOver(kind: LayerSectionKey, event: DragEvent) {
-  if (!draggingLayerId.value || draggingLayerKind.value !== kind) return
-  dropHoverState.value = { id: null, kind, position: 'below' }
-  event.preventDefault()
-}
-
-function handleSectionTailDrop(kind: LayerSectionKey) {
-  if (!draggingLayerId.value || draggingLayerKind.value !== kind) return
-  emit('reorder-layer', { sourceId: draggingLayerId.value, targetId: null })
-  clearDragState()
 }
 
 
@@ -1089,10 +965,14 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => props.activeLayer?.mask,
-  () => {
-    fitCanvasView()
-  }
+  () => props.activeLayer?.id,
+  (next, prev) => {
+    if (prev && maskEditorRef.value) {
+      viewStateCache.set(prev, maskEditorRef.value.getViewState())
+    }
+    pendingViewRestore.value = next ?? null
+  },
+  { flush: 'sync' }
 )
 
 const supportsColourPicker = computed(() => props.activeLayer?.kind !== 'heightmap')
@@ -1252,6 +1132,10 @@ function clamp(value: number, min: number, max: number) {
   text-align: left;
 }
 
+.layer-editor__overflow-menu--danger {
+  color: #ff7b7b;
+}
+
 .layer-editor__overflow-menu button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
 }
@@ -1309,158 +1193,6 @@ function clamp(value: number, min: number, max: number) {
 .layer-editor__layers-add {
   padding: 0.25rem 0.55rem;
   font-size: 0.85rem;
-}
-
-.layer-editor__layers-scroll {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.layer-editor__layers-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.layer-editor__layers-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 999px;
-}
-
-.layer-editor__layers-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
-}
-
-.layer-editor__layers-section-label {
-  margin: 0;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.7;
-}
-
-.layer-editor__layers-section-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-
-.layer-editor__layers-section-hint {
-  margin: 0;
-  font-size: 0.7rem;
-  opacity: 0.55;
-}
-
-.layer-editor__layers-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.layer-editor__layer-pill {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 0.4rem 0.5rem;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
-  cursor: pointer;
-  position: relative;
-}
-
-.layer-editor__layer-pill--active {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.layer-editor__layer-pill--inactive {
-  opacity: 0.55;
-}
-
-.layer-editor__layer-pill--dragging {
-  opacity: 0.3;
-}
-
-.layer-editor__layer-pill::before,
-.layer-editor__layer-pill::after {
-  content: '';
-  position: absolute;
-  left: 0.6rem;
-  right: 0.6rem;
-  height: 2px;
-  background: #f7c948;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.layer-editor__layer-pill::before {
-  top: -3px;
-}
-
-.layer-editor__layer-pill::after {
-  bottom: -3px;
-}
-
-.layer-editor__layer-pill--drop-above::before,
-.layer-editor__layer-pill--drop-below::after {
-  opacity: 1;
-}
-
-.layer-editor__layer-pill-handle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  opacity: 0.6;
-  margin-right: 0.25rem;
-}
-
-.layer-editor__layer-pill--ghost {
-  pointer-events: none;
-  opacity: 0.85;
-  z-index: 9999;
-}
-
-.layer-editor__layer-pill--ghost :is(button, .layer-editor__layer-pill-action) {
-  display: none;
-}
-
-.layer-editor__layer-pill-icon {
-  margin-right: 0.4rem;
-}
-
-.layer-editor__layer-pill-label {
-  font-size: 0.85rem;
-}
-
-.layer-editor__layer-pill-spacer {
-  flex: 1;
-}
-
-.layer-editor__layer-pill-action {
-  background: transparent;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  padding: 0.15rem;
-}
-
-.layer-editor__drop-zone {
-  height: 0.5rem;
-  margin: 0.2rem 0 0.4rem;
-  border-radius: 4px;
-  border: 1px dashed transparent;
-}
-
-.layer-editor__drop-zone--active {
-  border-color: rgba(247, 201, 72, 0.8);
-  background: rgba(247, 201, 72, 0.12);
 }
 
 .layer-editor__layers-actions {

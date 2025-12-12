@@ -4,16 +4,50 @@
     <section class="confirm-dialog__panel">
       <p>{{ message }}</p>
       <div class="confirm-dialog__actions">
-        <button type="button" class="pill-button pill-button--ghost" @click="$emit('cancel')">Cancel</button>
-        <button type="button" class="pill-button pill-button--danger" @click="$emit('confirm')">Confirm</button>
+        <button type="button" class="pill-button pill-button--ghost" @click="$emit('cancel')">{{ cancelLabel }}</button>
+        <button
+          v-if="secondaryLabel"
+          type="button"
+          class="pill-button pill-button--ghost"
+          @click="$emit('secondary')"
+        >
+          {{ secondaryLabel }}
+        </button>
+        <button type="button" :class="confirmButtonClass" @click="$emit('confirm')">
+          {{ confirmLabel }}
+        </button>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{ message: string }>()
-defineEmits<{ confirm: []; cancel: [] }>()
+import { computed } from 'vue'
+const props = withDefaults(defineProps<{
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+  secondaryLabel?: string
+  confirmVariant?: 'primary' | 'danger'
+}>(), {
+  confirmLabel: 'Confirm',
+  cancelLabel: 'Cancel',
+  secondaryLabel: undefined,
+  confirmVariant: 'danger'
+})
+
+defineEmits<{ confirm: []; cancel: []; secondary: [] }>()
+
+const confirmButtonClass = computed(() => {
+  return props.confirmVariant === 'danger'
+    ? 'pill-button pill-button--danger'
+    : 'pill-button'
+})
+
+const cancelLabel = props.cancelLabel
+const secondaryLabel = props.secondaryLabel
+const confirmLabel = props.confirmLabel
+const message = props.message
 </script>
 
 <style scoped>
