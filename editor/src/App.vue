@@ -908,6 +908,8 @@ async function deleteLayerEntry(entry: (typeof layerEntriesWithOnion.value)[numb
     ...legend,
     [groupKey]: group
   }
+  const wasActiveLayer = layersApi.layerEditorSelectedLayerId.value === entry.id
+
   projectStore.setLegend(nextLegend)
   layerBrowserStore.setLegend(nextLegend)
   if (datasetRef.value) {
@@ -920,8 +922,8 @@ async function deleteLayerEntry(entry: (typeof layerEntriesWithOnion.value)[numb
   if (entry.mask) {
     removeAssetFromStore(entry.mask)
   }
-  if (layersApi.activeLayer.value?.id === entry.id) {
-    layersApi.closeLayerEditor()
+  if (wasActiveLayer) {
+    layersApi.resetLayerEditor()
   }
   await persistCurrentProject()
   requestViewerRemount()
