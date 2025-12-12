@@ -10,6 +10,7 @@
       @pointerleave="handleViewportPointerLeave"
       @pointerenter="handleViewportPointerEnter"
       @wheel="handleViewportWheel"
+      @scroll.passive="handleViewportScroll"
     >
       <div
         v-show="hasValidImage"
@@ -90,6 +91,7 @@ const emit = defineEmits<{
   (ev: 'cursor-move', coords: { x: number; y: number }): void
   (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean; undoSteps: number; redoSteps: number }): void
   (ev: 'ready'): void
+  (ev: 'view-change', payload: ViewState): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -132,10 +134,8 @@ const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
 
 type ViewState = {
   zoom: number
-  scrollLeft: number
-  scrollTop: number
-  paddingX: number
-  paddingY: number
+  centerX: number
+  centerY: number
 }
 
 function updateHistoryState() {
@@ -220,11 +220,19 @@ const zoom = ref(1)
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
 const canvasDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+const pendingRestoreState = ref<{ state: ViewState; emit: boolean } | null>(null)
+let suppressViewStateEmits = true
+let pendingPostRestoreHandle: number | null = null
+let viewInitialized = false
+let viewTrackingEnabled = false
+let pendingResumeHandle: number | null = null
+let userViewportActivated = false
 const displaySize = computed(() => ({
   width: Math.max(0, canvasDimensions.value.width * zoom.value),
   height: Math.max(0, canvasDimensions.value.height * zoom.value)
 }))
 const viewportSize = ref({ width: 0, height: 0 })
+const currentViewState = ref<ViewState>({ zoom: 1, centerX: 0.5, centerY: 0.5 })
 const viewportPadding = computed(() => ({
   x: viewportSize.value.width / 2,
   y: viewportSize.value.height / 2
@@ -246,6 +254,10 @@ const overlayCanvasStyle = computed(() => ({
   opacity: Math.min(1, Math.max(0.01, brushOpacity.value))
 }))
 
+function clamp01(value: number) {
+  return Math.min(1, Math.max(0, value))
+}
+
 function clampZoom(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
 }
@@ -255,6 +267,26 @@ function getPaddingOffsets() {
     x: viewportPadding.value.x,
     y: viewportPadding.value.y
   }
+}
+
+function isViewportReady(target = viewportRef.value) {
+  if (!target) return false
+  return Boolean(
+    canvasDimensions.value.width &&
+    canvasDimensions.value.height &&
+    target.clientWidth > 0 &&
+    target.clientHeight > 0
+  )
+}
+
+function emitViewStateChange(options?: { force?: boolean }) {
+  const hasCanvas = canvasDimensions.value.width && canvasDimensions.value.height
+  const state = getViewState()
+  currentViewState.value = state
+  if (!hasCanvas) return
+  if (!options?.force && !isViewportReady()) return
+  if (!options?.force && (suppressViewStateEmits || !viewInitialized || !viewTrackingEnabled || !userViewportActivated)) return
+  emit('view-change', state)
 }
 
 function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
@@ -290,6 +322,7 @@ function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
   viewport.scrollLeft = Math.max(0, nextScrollLeft)
   viewport.scrollTop = Math.max(0, nextScrollTop)
   emit('zoom-change', clamped)
+  emitViewStateChange()
 }
 
 function adjustZoom(delta: number) {
@@ -315,6 +348,10 @@ function loadImage () {
   if (!canvas) return
   const overlay = overlayCanvasRef.value
   const preview = previewCanvasRef.value
+  viewInitialized = false
+  suppressViewStateEmits = true
+  suspendViewTracking()
+  userViewportActivated = false
 
   function resetCanvases(width: number, height: number) {
     if (canvas != null) {
@@ -477,6 +514,7 @@ function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
 
 function handlePointerDown(event: MouseEvent) {
   if (panModeActive.value || event.button !== 0) return
+  markUserViewportInteraction()
   const { x, y } = canvasCoordsFromEvent(event)
   isDrawing.value = true
   lastX.value = x
@@ -562,6 +600,16 @@ watch(
   { immediate: true }
 )
 
+watch(
+  viewportSize,
+  () => {
+    if (!canvasDimensions.value.width || !canvasDimensions.value.height) return
+    if (pendingRestoreState.value) return
+    if (!viewInitialized) return
+    restoreViewState(currentViewState.value, { emit: false })
+  }
+)
+
 onBeforeUnmount(() => {
   if (viewportObserver) {
     viewportObserver.disconnect()
@@ -572,6 +620,7 @@ onBeforeUnmount(() => {
 function handleViewportPointerDown(event: PointerEvent) {
   const viewport = viewportRef.value
   if (!viewport) return
+  markUserViewportInteraction()
   if (!panModeActive.value) {
     updateCursorPosition(event)
     return
@@ -597,6 +646,7 @@ function handleViewportPointerMove(event: PointerEvent) {
   const dy = event.clientY - panState.value.y
   viewport.scrollLeft = panState.value.scrollLeft - dx
   viewport.scrollTop = panState.value.scrollTop - dy
+  emitViewStateChange()
 }
 
 function handleViewportPointerUp(event: PointerEvent) {
@@ -605,6 +655,10 @@ function handleViewportPointerUp(event: PointerEvent) {
   if (!viewport) return
   isPanning.value = false
   viewport.releasePointerCapture(event.pointerId)
+}
+
+function handleViewportScroll() {
+  emitViewStateChange()
 }
 
 function handleReset () {
@@ -633,6 +687,7 @@ function exportMask(options?: { includeAlpha?: boolean }): Promise<Blob | null> 
 
 function handleViewportWheel(event: WheelEvent) {
   if (!event.ctrlKey && !event.metaKey) return
+  markUserViewportInteraction()
   event.preventDefault()
   const viewport = viewportRef.value
   if (!viewport) return
@@ -668,6 +723,9 @@ function fitView() {
   viewport.scrollLeft = Math.max(0, centerLeft)
   viewport.scrollTop = Math.max(0, centerTop)
   emit('zoom-change', zoom.value)
+  viewInitialized = true
+  suppressViewStateEmits = false
+  emitViewStateChange({ force: true })
 }
 
 function setZoom(value: number) {
@@ -676,17 +734,69 @@ function setZoom(value: number) {
 
 function getViewState(): ViewState {
   const viewport = viewportRef.value
-  const padding = getPaddingOffsets()
+  const { width, height } = canvasDimensions.value
+  if (!viewport || !width || !height) {
+    return {
+      zoom: zoom.value,
+      centerX: currentViewState.value.centerX,
+      centerY: currentViewState.value.centerY
+    }
+  }
+  const { x: paddingX, y: paddingY } = getPaddingOffsets()
+  const displayWidth = width * zoom.value
+  const displayHeight = height * zoom.value
+  const centerLeft = viewport.scrollLeft + viewport.clientWidth / 2 - paddingX
+  const centerTop = viewport.scrollTop + viewport.clientHeight / 2 - paddingY
   return {
     zoom: zoom.value,
-    scrollLeft: viewport?.scrollLeft ?? 0,
-    scrollTop: viewport?.scrollTop ?? 0,
-    paddingX: padding.x,
-    paddingY: padding.y
+    centerX: displayWidth ? clamp01(centerLeft / displayWidth) : 0.5,
+    centerY: displayHeight ? clamp01(centerTop / displayHeight) : 0.5
   }
 }
 
-function restoreViewState(state?: Partial<ViewState> | null) {
+function normalizeViewState(state: Partial<ViewState>): ViewState {
+  return {
+    zoom: typeof state.zoom === 'number' ? state.zoom : zoom.value,
+    centerX: typeof state.centerX === 'number' ? clamp01(state.centerX) : currentViewState.value.centerX,
+    centerY: typeof state.centerY === 'number' ? clamp01(state.centerY) : currentViewState.value.centerY
+  }
+}
+
+function applyNormalizedViewState(target: ViewState, emitChange: boolean) {
+  const viewport = viewportRef.value
+  const { width, height } = canvasDimensions.value
+  if (!viewport || !width || !height || viewport.clientWidth === 0 || viewport.clientHeight === 0) {
+    pendingRestoreState.value = { state: target, emit: emitChange }
+    return
+  }
+  suppressViewStateEmits = true
+  const { x: paddingX, y: paddingY } = getPaddingOffsets()
+  const displayWidth = width * zoom.value
+  const displayHeight = height * zoom.value
+  const targetLeft = paddingX + target.centerX * displayWidth - viewport.clientWidth / 2
+  const targetTop = paddingY + target.centerY * displayHeight - viewport.clientHeight / 2
+  viewport.scrollLeft = Math.max(0, targetLeft)
+  viewport.scrollTop = Math.max(0, targetTop)
+  if (!emitChange) {
+    currentViewState.value = target
+  }
+  if (pendingPostRestoreHandle !== null) {
+    cancelAnimationFrame(pendingPostRestoreHandle)
+  }
+  pendingPostRestoreHandle = requestAnimationFrame(() => {
+    pendingPostRestoreHandle = null
+    suppressViewStateEmits = false
+    viewTrackingEnabled = emitChange ? viewTrackingEnabled : viewTrackingEnabled
+    viewInitialized = true
+    if (emitChange) {
+      emitViewStateChange({ force: true })
+    } else {
+      currentViewState.value = target
+    }
+  })
+}
+
+function restoreViewState(state?: Partial<ViewState> | null, options: { emit?: boolean } = {}) {
   if (!state) {
     fitView()
     return
@@ -694,17 +804,58 @@ function restoreViewState(state?: Partial<ViewState> | null) {
   if (typeof state.zoom === 'number') {
     setZoom(state.zoom)
   }
+  const normalized = normalizeViewState(state)
+  applyNormalizedViewState(normalized, options.emit !== false)
+}
+
+watch(
+  () => [canvasDimensions.value.width, canvasDimensions.value.height] as const,
+  () => {
+    tryApplyPendingViewState()
+  }
+)
+
+watch(
+  viewportRef,
+  () => {
+    tryApplyPendingViewState()
+  }
+)
+
+function tryApplyPendingViewState() {
+  const payload = pendingRestoreState.value
+  if (!payload) return
   const viewport = viewportRef.value
-  if (!viewport) return
-  const padding = getPaddingOffsets()
-  if (typeof state.scrollLeft === 'number') {
-    const storedPadding = state.paddingX ?? padding.x
-    viewport.scrollLeft = Math.max(0, state.scrollLeft - storedPadding + padding.x)
+  const { width, height } = canvasDimensions.value
+  if (!viewport || !width || !height || viewport.clientWidth === 0 || viewport.clientHeight === 0) return
+  pendingRestoreState.value = null
+  applyNormalizedViewState(payload.state, payload.emit)
+}
+
+function suspendViewTracking() {
+  if (pendingResumeHandle !== null) {
+    cancelAnimationFrame(pendingResumeHandle)
+    pendingResumeHandle = null
   }
-  if (typeof state.scrollTop === 'number') {
-    const storedPadding = state.paddingY ?? padding.y
-    viewport.scrollTop = Math.max(0, state.scrollTop - storedPadding + padding.y)
+  viewTrackingEnabled = false
+  userViewportActivated = false
+}
+
+function resumeViewTracking() {
+  if (viewTrackingEnabled) return
+  if (pendingResumeHandle !== null) {
+    cancelAnimationFrame(pendingResumeHandle)
   }
+  pendingResumeHandle = requestAnimationFrame(() => {
+    pendingResumeHandle = null
+    viewTrackingEnabled = true
+  })
+}
+
+function markUserViewportInteraction() {
+  if (userViewportActivated) return
+  if (!viewTrackingEnabled || !viewInitialized) return
+  userViewportActivated = true
 }
 
 defineExpose({
@@ -717,7 +868,9 @@ defineExpose({
   redo,
   getViewState,
   restoreViewState,
-  seedHistory
+  seedHistory,
+  suspendViewTracking,
+  resumeViewTracking
 })
 
 watch(

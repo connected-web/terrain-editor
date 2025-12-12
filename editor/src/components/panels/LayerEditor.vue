@@ -168,6 +168,7 @@
               @cursor-move="handleCursorMove"
               @history-change="handleHistoryChange"
               @ready="handleMaskReady"
+              @view-change="handleMaskViewChange"
             />
             <p v-else class="layer-editor__placeholder">
               No mask image found for this layer.
@@ -376,6 +377,7 @@ const props = defineProps<{
   layerEntries?: LayerEntry[]
   colorToCss?: (color: [number, number, number]) => string
   inline?: boolean
+  pendingViewState?: LayerViewState | null
 }>()
 
 const emit = defineEmits<{
@@ -393,6 +395,8 @@ const emit = defineEmits<{
   (ev: 'reorder-layer', payload: { sourceId: string; targetId: string | null }): void
   (ev: 'toggle-onion', id: string): void
   (ev: 'delete-layer', id: string): void
+  (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
+  (ev: 'consume-pending-view-state'): void
 }>()
 
 const layerName = ref('')
@@ -513,13 +517,10 @@ const toolPalette = computed(() =>
 const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
 type LayerViewState = {
   zoom: number
-  scrollLeft: number
-  scrollTop: number
-  paddingX?: number
-  paddingY?: number
+  centerX: number
+  centerY: number
 }
 const viewStateCache = new Map<string, LayerViewState>()
-const pendingViewRestore = ref<string | null>(null)
 const layerSwitchPrompt = ref<{ targetId: string } | null>(null)
 const pendingApplySwitchId = ref<string | null>(null)
 const unsavedSwitchMessage = computed(() => {
@@ -532,7 +533,9 @@ const unsavedSwitchMessage = computed(() => {
 function cacheActiveLayerViewState(targetId?: string | null) {
   const id = targetId ?? props.activeLayer?.id ?? null
   if (!id || !maskEditorRef.value) return
-  viewStateCache.set(id, maskEditorRef.value.getViewState())
+  const state = maskEditorRef.value.getViewState()
+  viewStateCache.set(id, state)
+  emit('view-state-change', { id, state })
 }
 
 const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === activeTool.value) ?? toolPalette.value[0])
@@ -800,15 +803,27 @@ function applyCanvas() {
 }
 
 function handleMaskReady() {
-  const currentId = props.activeLayer?.id ?? null
   if (!maskEditorRef.value) return
-  const cachedState = currentId ? viewStateCache.get(currentId) ?? null : null
-  if (cachedState) {
-    maskEditorRef.value.restoreViewState(cachedState)
+  const currentId = props.activeLayer?.id ?? null
+  const pendingState = props.pendingViewState ?? null
+  maskEditorRef.value.suspendViewTracking()
+  if (pendingState) {
+    maskEditorRef.value.restoreViewState(pendingState, { emit: false })
+    if (currentId) {
+      viewStateCache.set(currentId, pendingState)
+      emit('view-state-change', { id: currentId, state: pendingState })
+    }
+    emit('consume-pending-view-state')
   } else {
-    fitCanvasView()
+    const cachedState = currentId ? viewStateCache.get(currentId) ?? null : null
+    if (cachedState) {
+      maskEditorRef.value.restoreViewState(cachedState, { emit: false })
+      emit('view-state-change', { id: currentId, state: cachedState })
+    } else {
+      fitCanvasView()
+    }
   }
-  pendingViewRestore.value = null
+  maskEditorRef.value.resumeViewTracking()
 }
 
 async function handleExportClick(includeAlpha = false) {
@@ -833,6 +848,13 @@ function downloadBlob(blob: Blob, filename: string) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+function handleMaskViewChange(state: LayerViewState) {
+  const id = props.activeLayer?.id
+  if (!id) return
+  viewStateCache.set(id, state)
+  emit('view-state-change', { id, state })
 }
 
 function attemptLayerSelection(id: string) {
@@ -993,12 +1015,27 @@ watch(
     if (prev) {
       cacheActiveLayerViewState(prev)
     }
-    pendingViewRestore.value = next ?? null
   },
   { flush: 'sync' }
 )
 
 const supportsColourPicker = computed(() => props.activeLayer?.kind !== 'heightmap')
+
+watch(
+  () => props.pendingViewState,
+  (next) => {
+    if (!next || !maskEditorRef.value) return
+    const currentId = props.activeLayer?.id ?? null
+    maskEditorRef.value.suspendViewTracking()
+    maskEditorRef.value.restoreViewState(next, { emit: false })
+    if (currentId) {
+      viewStateCache.set(currentId, next)
+      emit('view-state-change', { id: currentId, state: next })
+    }
+    emit('consume-pending-view-state')
+    maskEditorRef.value.resumeViewTracking()
+  }
+)
 
 watch(
   strokeSettings,

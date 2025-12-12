@@ -10,6 +10,12 @@ type CameraState = {
   targetPixel?: { x: number; y: number }
 }
 
+type LayerViewState = {
+  zoom: number
+  centerX: number
+  centerY: number
+}
+
 type Options = {
   activePanel: Ref<DockPanel>
   setActivePanel: (panel: DockPanel) => void
@@ -21,6 +27,8 @@ type Options = {
   layerBrowserStore: LayerBrowserStore
   cameraViewState: Ref<CameraState>
   setCameraViewState: (state: CameraState) => void
+  layerViewState: Ref<LayerViewState | null>
+  setPendingLayerViewState: (payload: { id: string | null; state: LayerViewState | null }) => void
 }
 
 type InitialRouteState = {
@@ -29,13 +37,14 @@ type InitialRouteState = {
   layerId: string | null
   layerVisSignature: string | null
   cameraState: CameraState | null
+  layerViewState: LayerViewState | null
 }
 
 const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations']
 
 function parseInitialState(): InitialRouteState {
   if (typeof window === 'undefined') {
-    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null }
+    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null, layerViewState: null }
   }
   const params = new URLSearchParams(window.location.search)
   const panelParam = params.get('panel')
@@ -66,12 +75,25 @@ function parseInitialState(): InitialRouteState {
       }
     }
   }
+  const layerViewParam = params.get('leo')
+  let layerViewState: LayerViewState | null = null
+  if (layerViewParam) {
+    const parts = layerViewParam.split(',').map((value) => Number(value))
+    if (parts.length >= 3) {
+      const [zoomRaw, centerXRaw, centerYRaw] = parts
+      const zoom = Number.isFinite(zoomRaw) ? zoomRaw : 1
+      const centerX = Number.isFinite(centerXRaw) ? centerXRaw : 0.5
+      const centerY = Number.isFinite(centerYRaw) ? centerYRaw : 0.5
+      layerViewState = { zoom, centerX, centerY }
+    }
+  }
   return {
     panel,
     dockCollapsed,
     layerId,
     layerVisSignature,
-    cameraState
+    cameraState,
+    layerViewState
   }
 }
 
@@ -151,6 +173,10 @@ export function useUrlState(options: Options) {
   if (initial.cameraState) {
     options.setCameraViewState(initial.cameraState)
   }
+  options.setPendingLayerViewState({
+    id: initial.layerId,
+    state: initial.layerViewState
+  })
   const pendingLayerId = ref<string | null>(initial.layerId)
   const pendingLayerVisibility = ref<string | null>(initial.layerVisSignature)
   const layerVisibilitySignature = computed(() =>
@@ -171,6 +197,17 @@ export function useUrlState(options: Options) {
       )
     }
     return parts.join(',')
+  })
+  const layerViewStateSignature = computed(() => {
+    if (!options.layerEditorOpen.value) return ''
+    const layerId = options.layerEditorSelectedLayerId.value
+    const state = options.layerViewState.value
+    if (!layerId || !state) return ''
+    return [
+      Number.isFinite(state.zoom) ? state.zoom.toFixed(3) : '1',
+      Number.isFinite(state.centerX) ? state.centerX.toFixed(4) : '0.5000',
+      Number.isFinite(state.centerY) ? state.centerY.toFixed(4) : '0.5000'
+    ].join(',')
   })
 
   watch(
@@ -235,6 +272,7 @@ export function useUrlState(options: Options) {
     const visibilityString = encodeLayerVisibility(options.layerEntries.value)
     updateQueryParam('layers', visibilityString || null, params)
     updateQueryParam('camera', cameraSignature.value || null, params)
+    updateQueryParam('leo', layerViewStateSignature.value || null, params)
     const query = params.toString()
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
     window.history.replaceState({}, '', nextUrl)
@@ -247,7 +285,8 @@ export function useUrlState(options: Options) {
       () => options.layerEditorOpen.value,
       () => options.layerEditorSelectedLayerId.value,
       layerVisibilitySignature,
-      cameraSignature
+      cameraSignature,
+      layerViewStateSignature
     ],
     () => scheduleSync(),
     { deep: false }

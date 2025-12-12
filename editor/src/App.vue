@@ -64,6 +64,7 @@
             :onion-layers="onionLayersForEditor"
             :layer-entries="layerEntriesWithOnion"
             :color-to-css="rgb"
+            :pending-view-state="pendingViewStateForEditor"
             @update:filter-text="setAssetDialogFilter"
             @export-layer="layersApi.exportActiveLayerImage"
             @replace="handleLayerAssetReplace"
@@ -76,6 +77,8 @@
             @add-layer="openLayerCreateDialog()"
             @reorder-layer="handleLayerReorder"
             @delete-layer="handleLayerDelete"
+            @view-state-change="handleLayerViewStateChange"
+            @consume-pending-view-state="consumePendingLayerViewState"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -227,6 +230,12 @@ import { useUrlState } from './composables/useUrlState'
 import { buildScratchDataset } from './utils/scratchDataset'
 import { createSolidImageData } from './utils/imageFactory'
 
+type LayerViewState = {
+  zoom: number
+  centerX: number
+  centerY: number
+}
+
 const editorRoot = ref<HTMLElement | null>(null)
 const viewerShell = ref<InstanceType<typeof EditorViewer> | null>(null)
 const isDockCollapsed = ref(false)
@@ -287,6 +296,58 @@ const dockExpanded = computed(
   () => activeDockPanel.value === 'layers' && layersApi.layerEditorOpen.value
 )
 const hideDockNav = computed(() => !isDockCollapsed.value || dockExpanded.value)
+const activeLayerViewState = ref<LayerViewState | null>(null)
+const pendingLayerViewStateRoute = ref<{ id: string | null; state: LayerViewState | null }>({
+  id: null,
+  state: null
+})
+const pendingLayerSwitchViewState = ref<{ id: string; state: LayerViewState } | null>(null)
+const pendingViewStateForEditor = computed(() => {
+  const activeId = layersApi.activeLayer.value?.id ?? null
+  if (!activeId) return null
+  if (pendingLayerViewStateRoute.value.id === activeId) {
+    return pendingLayerViewStateRoute.value.state
+  }
+  if (pendingLayerSwitchViewState.value?.id === activeId) {
+    return pendingLayerSwitchViewState.value.state
+  }
+  return null
+})
+watch(
+  () => layersApi.activeLayer.value?.id,
+  (next) => {
+    if (next && activeLayerViewState.value) {
+      pendingLayerSwitchViewState.value = {
+        id: next,
+        state: activeLayerViewState.value
+      }
+    } else {
+      pendingLayerSwitchViewState.value = null
+    }
+  }
+)
+watch(
+  () => layersApi.layerEditorOpen.value,
+  (open) => {
+    if (!open) {
+      pendingLayerSwitchViewState.value = null
+    } else {
+      const nextId = layersApi.activeLayer.value?.id ?? null
+      if (nextId && activeLayerViewState.value) {
+        pendingLayerSwitchViewState.value = {
+          id: nextId,
+          state: activeLayerViewState.value
+        }
+      }
+    }
+  }
+)
+const resolvedLayerViewStateForUrl = computed(() => {
+  if (pendingLayerViewStateRoute.value.id && pendingLayerViewStateRoute.value.state) {
+    return pendingLayerViewStateRoute.value.state
+  }
+  return layersApi.layerEditorOpen.value ? activeLayerViewState.value : null
+})
 const onionLayerState = reactive<Record<string, boolean>>({})
 const layerEntriesWithOnion = computed(() =>
   Array.isArray(layersApi.layerEntries.value)
@@ -321,6 +382,26 @@ watch(
   },
   { immediate: true }
 )
+
+function handleLayerViewStateChange(payload: { id: string; state: LayerViewState }) {
+  if (layersApi.activeLayer.value?.id === payload.id) {
+    activeLayerViewState.value = payload.state
+  }
+}
+
+function consumePendingLayerViewState() {
+  const activeId = layersApi.activeLayer.value?.id ?? null
+  if (activeId && pendingLayerViewStateRoute.value.id === activeId) {
+    pendingLayerViewStateRoute.value = { id: null, state: null }
+  }
+  if (activeId && pendingLayerSwitchViewState.value?.id === activeId) {
+    pendingLayerSwitchViewState.value = null
+  }
+}
+
+function setPendingLayerViewState(payload: { id: string | null; state: LayerViewState | null }) {
+  pendingLayerViewStateRoute.value = payload
+}
 const layerEditorAssets = computed(
   () =>
     ((projectSnapshot.value.files ?? []) as TerrainProjectFileEntry[]).map((entry) => ({
@@ -393,7 +474,9 @@ useUrlState({
   layerEntries: layersApi.layerEntries,
   layerBrowserStore,
   cameraViewState: locationsApi.cameraViewState,
-  setCameraViewState: applyCameraOverride
+  setCameraViewState: applyCameraOverride,
+  layerViewState: resolvedLayerViewStateForUrl,
+  setPendingLayerViewState
 })
 
 watch(
