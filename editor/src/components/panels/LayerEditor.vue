@@ -86,7 +86,7 @@
               </button>
             </div>
           </div>
-          <button type="button" class="pill-button pill-button--ghost" aria-label="Close editor" @click="$emit('close')">
+          <button type="button" class="pill-button pill-button--ghost" aria-label="Close editor" @click="handleCloseEditor">
             <Icon icon="xmark" />
           </button>
         </div>
@@ -511,7 +511,13 @@ const toolPalette = computed(() =>
   }))
 )
 const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
-type LayerViewState = { zoom: number; scrollLeft: number; scrollTop: number }
+type LayerViewState = {
+  zoom: number
+  scrollLeft: number
+  scrollTop: number
+  paddingX?: number
+  paddingY?: number
+}
 const viewStateCache = new Map<string, LayerViewState>()
 const pendingViewRestore = ref<string | null>(null)
 const layerSwitchPrompt = ref<{ targetId: string } | null>(null)
@@ -522,6 +528,12 @@ const unsavedSwitchMessage = computed(() => {
   const label = target?.label ?? 'the selected layer'
   return `Apply your changes before switching to ${label}?`
 })
+
+function cacheActiveLayerViewState(targetId?: string | null) {
+  const id = targetId ?? props.activeLayer?.id ?? null
+  if (!id || !maskEditorRef.value) return
+  viewStateCache.set(id, maskEditorRef.value.getViewState())
+}
 
 const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === activeTool.value) ?? toolPalette.value[0])
 const layerKindLabel = computed(() => {
@@ -825,6 +837,7 @@ function downloadBlob(blob: Blob, filename: string) {
 
 function attemptLayerSelection(id: string) {
   if (!props.activeLayer || props.activeLayer.id === id) return
+  cacheActiveLayerViewState()
   if (maskDirty.value) {
     layerSwitchPrompt.value = { targetId: id }
     return
@@ -867,12 +880,18 @@ function applyAndSwitch() {
 
 function requestActiveLayerDelete() {
   if (!props.activeLayer || isHeightmap.value) return
+  cacheActiveLayerViewState()
   emit('delete-layer', props.activeLayer.id)
   toggleOverflowMenu(false)
 }
 
 function handleLayerAdd() {
   emit('add-layer')
+}
+
+function handleCloseEditor() {
+  cacheActiveLayerViewState()
+  emit('close')
 }
 
 
@@ -946,6 +965,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  cacheActiveLayerViewState()
+})
+
+onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
@@ -967,8 +990,8 @@ onBeforeUnmount(() => {
 watch(
   () => props.activeLayer?.id,
   (next, prev) => {
-    if (prev && maskEditorRef.value) {
-      viewStateCache.set(prev, maskEditorRef.value.getViewState())
+    if (prev) {
+      cacheActiveLayerViewState(prev)
     }
     pendingViewRestore.value = next ?? null
   },

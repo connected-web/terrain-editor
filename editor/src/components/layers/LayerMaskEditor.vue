@@ -16,34 +16,36 @@
         class="layer-mask-editor__canvas-wrapper"
         :style="canvasWrapperStyle"
       >
-        <canvas
-          ref="canvasRef"
-          class="layer-mask-editor__canvas layer-mask-editor__canvas--base"
-          draggable="false"
-          @dragstart.prevent
-          @mousedown="handlePointerDown"
-          @mousemove="handlePointerMove"
-          @mouseup="handlePointerUp"
-          @mouseleave="handlePointerUp"
-        />
-        <canvas
-          ref="previewCanvasRef"
-          class="layer-mask-editor__canvas layer-mask-editor__canvas--preview"
-          draggable="false"
-        />
-        <div
-          v-for="layer in onionLayerEntries"
-          :key="`onion-${layer.id}`"
-          class="layer-mask-editor__onion"
-          :style="getOnionStyle(layer)"
-        />
-        <canvas
-          ref="overlayCanvasRef"
-          class="layer-mask-editor__canvas layer-mask-editor__canvas--overlay"
-          :style="overlayCanvasStyle"
-          draggable="false"
-          @dragstart.prevent
-        />
+        <div class="layer-mask-editor__canvas-surface" :style="canvasSurfaceStyle">
+          <canvas
+            ref="canvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--base"
+            draggable="false"
+            @dragstart.prevent
+            @mousedown="handlePointerDown"
+            @mousemove="handlePointerMove"
+            @mouseup="handlePointerUp"
+            @mouseleave="handlePointerUp"
+          />
+          <canvas
+            ref="previewCanvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--preview"
+            draggable="false"
+          />
+          <div
+            v-for="layer in onionLayerEntries"
+            :key="`onion-${layer.id}`"
+            class="layer-mask-editor__onion"
+            :style="getOnionStyle(layer)"
+          />
+          <canvas
+            ref="overlayCanvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--overlay"
+            :style="overlayCanvasStyle"
+            draggable="false"
+            @dragstart.prevent
+          />
+        </div>
       </div>
       <div v-if="!hasValidImage" class="layer-mask-editor__placeholder">
         <p>{{ props.src ? 'Loading mask image...' : 'No mask image available' }}</p>
@@ -132,6 +134,8 @@ type ViewState = {
   zoom: number
   scrollLeft: number
   scrollTop: number
+  paddingX: number
+  paddingY: number
 }
 
 function updateHistoryState() {
@@ -216,9 +220,27 @@ const zoom = ref(1)
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
 const canvasDimensions = ref<{ width: number; height: number }>({ width: 0, height: 0 })
+const displaySize = computed(() => ({
+  width: Math.max(0, canvasDimensions.value.width * zoom.value),
+  height: Math.max(0, canvasDimensions.value.height * zoom.value)
+}))
+const viewportSize = ref({ width: 0, height: 0 })
+const viewportPadding = computed(() => ({
+  x: viewportSize.value.width / 2,
+  y: viewportSize.value.height / 2
+}))
+const totalCanvasSize = computed(() => ({
+  width: displaySize.value.width + viewportPadding.value.x * 2,
+  height: displaySize.value.height + viewportPadding.value.y * 2
+}))
 const canvasWrapperStyle = computed(() => ({
-  width: `${Math.max(1, canvasDimensions.value.width * zoom.value)}px`,
-  height: `${Math.max(1, canvasDimensions.value.height * zoom.value)}px`
+  width: `${Math.max(1, totalCanvasSize.value.width)}px`,
+  height: `${Math.max(1, totalCanvasSize.value.height)}px`
+}))
+const canvasSurfaceStyle = computed(() => ({
+  width: `${Math.max(1, displaySize.value.width)}px`,
+  height: `${Math.max(1, displaySize.value.height)}px`,
+  margin: `${viewportPadding.value.y}px ${viewportPadding.value.x}px`
 }))
 const overlayCanvasStyle = computed(() => ({
   opacity: Math.min(1, Math.max(0.01, brushOpacity.value))
@@ -226,6 +248,13 @@ const overlayCanvasStyle = computed(() => ({
 
 function clampZoom(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+}
+
+function getPaddingOffsets() {
+  return {
+    x: viewportPadding.value.x,
+    y: viewportPadding.value.y
+  }
 }
 
 function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
@@ -250,13 +279,14 @@ function applyZoom(nextZoom: number, pivot?: { x: number; y: number }) {
   const pivotY = pivot?.y ?? clientHeight / 2
   const prevScrollLeft = viewport.scrollLeft
   const prevScrollTop = viewport.scrollTop
-  const prevOffsetX = prevScrollLeft + pivotX
-  const prevOffsetY = prevScrollTop + pivotY
-  const ratioX = prevDisplayWidth ? prevOffsetX / prevDisplayWidth : 0
-  const ratioY = prevDisplayHeight ? prevOffsetY / prevDisplayHeight : 0
+  const { x: paddingX, y: paddingY } = getPaddingOffsets()
+  const prevOffsetX = prevScrollLeft + pivotX - paddingX
+  const prevOffsetY = prevScrollTop + pivotY - paddingY
+  const ratioX = prevDisplayWidth ? Math.min(1, Math.max(0, prevOffsetX / prevDisplayWidth)) : 0
+  const ratioY = prevDisplayHeight ? Math.min(1, Math.max(0, prevOffsetY / prevDisplayHeight)) : 0
   zoom.value = clamped
-  const nextScrollLeft = ratioX * nextDisplayWidth - pivotX
-  const nextScrollTop = ratioY * nextDisplayHeight - pivotY
+  const nextScrollLeft = paddingX + ratioX * nextDisplayWidth - pivotX
+  const nextScrollTop = paddingY + ratioY * nextDisplayHeight - pivotY
   viewport.scrollLeft = Math.max(0, nextScrollLeft)
   viewport.scrollTop = Math.max(0, nextScrollTop)
   emit('zoom-change', clamped)
@@ -503,6 +533,41 @@ function commitOverlay() {
 const viewportRef = ref<HTMLDivElement | null>(null)
 const isPanning = ref(false)
 const panState = ref({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
+let viewportObserver: ResizeObserver | null = null
+
+watch(
+  () => viewportRef.value,
+  (next, prev) => {
+    if (prev && viewportObserver) {
+      viewportObserver.unobserve(prev)
+    }
+    if (next) {
+      if (!viewportObserver && typeof ResizeObserver !== 'undefined') {
+        viewportObserver = new ResizeObserver((entries) => {
+          const rect = entries[0]?.contentRect
+          if (!rect) return
+          viewportSize.value = {
+            width: rect.width,
+            height: rect.height
+          }
+        })
+      }
+      viewportObserver?.observe(next)
+      viewportSize.value = {
+        width: next.clientWidth,
+        height: next.clientHeight
+      }
+    }
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  if (viewportObserver) {
+    viewportObserver.disconnect()
+    viewportObserver = null
+  }
+})
 
 function handleViewportPointerDown(event: PointerEvent) {
   const viewport = viewportRef.value
@@ -589,17 +654,19 @@ function fitView() {
     emit('zoom-change', zoom.value)
     return
   }
-  const padding = 16
-  const availableWidth = Math.max(1, viewport.clientWidth - padding)
-  const availableHeight = Math.max(1, viewport.clientHeight - padding)
+  const availableWidth = Math.max(1, viewport.clientWidth)
+  const availableHeight = Math.max(1, viewport.clientHeight)
   const scaleX = availableWidth / width
   const scaleY = availableHeight / height
   const target = clampZoom(Math.min(scaleX, scaleY))
   zoom.value = target
   const displayWidth = width * target
   const displayHeight = height * target
-  viewport.scrollLeft = Math.max(0, (displayWidth - viewport.clientWidth) / 2)
-  viewport.scrollTop = Math.max(0, (displayHeight - viewport.clientHeight) / 2)
+  const { x: paddingX, y: paddingY } = getPaddingOffsets()
+  const centerLeft = paddingX + displayWidth / 2 - viewport.clientWidth / 2
+  const centerTop = paddingY + displayHeight / 2 - viewport.clientHeight / 2
+  viewport.scrollLeft = Math.max(0, centerLeft)
+  viewport.scrollTop = Math.max(0, centerTop)
   emit('zoom-change', zoom.value)
 }
 
@@ -609,10 +676,13 @@ function setZoom(value: number) {
 
 function getViewState(): ViewState {
   const viewport = viewportRef.value
+  const padding = getPaddingOffsets()
   return {
     zoom: zoom.value,
     scrollLeft: viewport?.scrollLeft ?? 0,
-    scrollTop: viewport?.scrollTop ?? 0
+    scrollTop: viewport?.scrollTop ?? 0,
+    paddingX: padding.x,
+    paddingY: padding.y
   }
 }
 
@@ -626,11 +696,14 @@ function restoreViewState(state?: Partial<ViewState> | null) {
   }
   const viewport = viewportRef.value
   if (!viewport) return
+  const padding = getPaddingOffsets()
   if (typeof state.scrollLeft === 'number') {
-    viewport.scrollLeft = state.scrollLeft
+    const storedPadding = state.paddingX ?? padding.x
+    viewport.scrollLeft = Math.max(0, state.scrollLeft - storedPadding + padding.x)
   }
   if (typeof state.scrollTop === 'number') {
-    viewport.scrollTop = state.scrollTop
+    const storedPadding = state.paddingY ?? padding.y
+    viewport.scrollTop = Math.max(0, state.scrollTop - storedPadding + padding.y)
   }
 }
 
@@ -766,11 +839,17 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 .layer-mask-editor__canvas-wrapper {
   position: relative;
   margin: 0 auto;
+}
+
+.layer-mask-editor__canvas-surface {
+  position: relative;
   border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 14px;
   padding: 0.25rem;
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.35);
   background: rgba(0, 0, 0, 0.8);
+  min-width: 1px;
+  min-height: 1px;
 }
 
 .layer-mask-editor__canvas {
