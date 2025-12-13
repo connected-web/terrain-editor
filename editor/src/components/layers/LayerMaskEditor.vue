@@ -33,6 +33,13 @@
             class="layer-mask-editor__canvas layer-mask-editor__canvas--preview"
             draggable="false"
           />
+          <canvas
+            ref="colorCanvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--color"
+            :style="colorCanvasStyle"
+            draggable="false"
+            aria-hidden="true"
+          />
           <div
             v-for="layer in onionLayerEntries"
             :key="`onion-${layer.id}`"
@@ -83,6 +90,8 @@ const props = defineProps<{
   brushFlow?: number
   brushSpacing?: number
   flatLevel?: number
+  viewMode?: 'grayscale' | 'color'
+  maskColor?: [number, number, number] | null
 }>()
 
 const emit = defineEmits<{
@@ -98,6 +107,7 @@ const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
 const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
+const colorCanvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const maskValues = ref<Float32Array | null>(null)
 const initialMaskValues = ref<Float32Array | null>(null)
@@ -131,6 +141,14 @@ const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
   if (panModeActive.value) return 'pan'
   return currentStrokeMode.value === 'erase' ? 'erase' : 'paint'
 })
+const viewMode = computed(() => props.viewMode ?? 'grayscale')
+const maskColor = computed<[number, number, number]>(() => props.maskColor ?? [255, 255, 255])
+const showColorOverlay = computed(() =>
+  viewMode.value === 'color' && props.valueMode !== 'heightmap' && Boolean(props.maskColor)
+)
+const colorCanvasStyle = computed(() => ({
+  opacity: showColorOverlay.value ? '1' : '0'
+}))
 
 type ViewState = {
   zoom: number
@@ -430,6 +448,7 @@ function renderMaskCanvas() {
     imageData.data[offset + 3] = 255
   }
   ctx.putImageData(imageData, 0, 0)
+  renderColorPreviewCanvas()
 }
 
 function renderPreviewCanvas() {
@@ -445,6 +464,38 @@ function renderPreviewCanvas() {
     imageData.data[offset + 1] = 255
     imageData.data[offset + 2] = 255
     imageData.data[offset + 3] = v
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
+function renderColorPreviewCanvas() {
+  const canvas = colorCanvasRef.value
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const ready = Boolean(values && width && height)
+  if (canvas.width !== width) {
+    canvas.width = width || 0
+  }
+  if (canvas.height !== height) {
+    canvas.height = height || 0
+  }
+  if (!ready || !showColorOverlay.value || !props.maskColor) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    return
+  }
+  if (!values || !width || !height) return
+  const imageData = ctx.createImageData(width, height)
+  const [r, g, b] = maskColor.value
+  for (let i = 0; i < values.length; i++) {
+    const v = Math.max(0, Math.min(1, values[i]))
+    const offset = i * 4
+    imageData.data[offset] = r
+    imageData.data[offset + 1] = g
+    imageData.data[offset + 2] = b
+    imageData.data[offset + 3] = Math.round(v * 255)
   }
   ctx.putImageData(imageData, 0, 0)
 }
@@ -812,6 +863,7 @@ watch(
   () => [canvasDimensions.value.width, canvasDimensions.value.height] as const,
   () => {
     tryApplyPendingViewState()
+    renderColorPreviewCanvas()
   }
 )
 
@@ -819,6 +871,27 @@ watch(
   viewportRef,
   () => {
     tryApplyPendingViewState()
+  }
+)
+
+watch(
+  () => props.viewMode,
+  () => {
+    renderColorPreviewCanvas()
+  }
+)
+
+watch(
+  () => (props.maskColor ? props.maskColor.join(',') : ''),
+  () => {
+    renderColorPreviewCanvas()
+  }
+)
+
+watch(
+  () => props.valueMode,
+  () => {
+    renderColorPreviewCanvas()
   }
 )
 
@@ -1033,6 +1106,14 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   pointer-events: none;
   z-index: 1;
   mix-blend-mode: normal;
+}
+
+.layer-mask-editor__canvas--color {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.2s ease;
 }
 
 .layer-mask-editor__onion {

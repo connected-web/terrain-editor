@@ -156,6 +156,8 @@
               :show-grid="previewBackground === 'grid'"
               :tool="activeTool"
               :value-mode="isHeightmap ? 'heightmap' : 'mask'"
+              :view-mode="maskViewMode"
+              :mask-color="props.activeLayer?.color ?? null"
               :brush-size="strokeSettings.size"
               :brush-opacity="strokeSettings.opacity"
               :brush-softness="strokeSettings.softness"
@@ -284,6 +286,28 @@
                     <option value="solid">Solid black</option>
                   </select>
                 </label>
+                <label class="layer-editor__field">
+                  <span>Mask view</span>
+                  <div class="layer-editor__segment">
+                    <button
+                      type="button"
+                      class="layer-editor__segment-button"
+                      :class="{ 'layer-editor__segment-button--active': maskViewMode === 'grayscale' }"
+                      @click="maskViewMode = 'grayscale'"
+                    >
+                      B/W
+                    </button>
+                    <button
+                      type="button"
+                      class="layer-editor__segment-button"
+                      :class="{ 'layer-editor__segment-button--active': maskViewMode === 'color' }"
+                      :disabled="isHeightmap"
+                      @click="maskViewMode = 'color'"
+                    >
+                      Colour
+                    </button>
+                  </div>
+                </label>
                 <label
                   v-if="supportsColourPicker && activeLayer"
                   class="layer-editor__field layer-editor__color-field"
@@ -411,6 +435,7 @@ watch(
 
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
+const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
 const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSteps: 0 })
@@ -505,6 +530,9 @@ const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
 watch(isHeightmap, (isH) => {
   if (!isH && activeTool.value === 'flat') {
     activeTool.value = 'brush'
+  }
+  if (isH && maskViewMode.value === 'color') {
+    maskViewMode.value = 'grayscale'
   }
 })
 
@@ -1441,6 +1469,32 @@ function clamp(value: number, min: number, max: number) {
   border-radius: 8px;
   padding: 0.35rem 0.5rem;
   color: inherit;
+}
+
+.layer-editor__segment {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.layer-editor__segment-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.layer-editor__segment-button--active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.layer-editor__segment-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .layer-editor__color-field input {

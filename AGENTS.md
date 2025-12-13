@@ -87,7 +87,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [ ] Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
 * [ ] Create/delete layer flows (with confirmation)
 * [ ] Fill tool (paint bucket)
-* [ ] Mask view toggle: B/W vs colour-coded
+* [x] Mask view toggle: B/W vs colour-coded
 * [x] Onion-skin neighbouring layers with fading alpha
 * [x] Brush opacity slider
 * [x] Export mask directly from the Layer Editor (grayscale + alpha variants)
