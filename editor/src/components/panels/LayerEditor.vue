@@ -382,13 +382,13 @@ import LayerList from '../layers/LayerList.vue'
 import { buildLayerSections, type LayerSection, type LayerSectionKey } from '../../utils/layerSections'
 
 const TOOL_PALETTE = [
-  { id: 'brush', label: 'Brush', icon: 'paintbrush', shortcut: 'B', description: 'Paint layer values.' },
-  { id: 'erase', label: 'Erase', icon: 'eraser', shortcut: 'E', description: 'Remove layer values.' },
-  { id: 'flat', label: 'Flatten', icon: 'equals', shortcut: 'F', description: 'Set the heightmap to a flat value.', onlyHeightmap: true },
-  { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', disabled: true },
-  { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', disabled: true },
-  { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.' },
-  { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', disabled: true }
+  { id: 'brush', label: 'Brush', icon: 'paintbrush', shortcut: 'B', description: 'Paint layer values.', onlyHeightmap: false, disabled: false },
+  { id: 'erase', label: 'Erase', icon: 'eraser', shortcut: 'E', description: 'Remove layer values.', onlyHeightmap: false, disabled: false },
+  { id: 'flat', label: 'Flatten', icon: 'equals', shortcut: 'F', description: 'Set the heightmap to a flat value.', onlyHeightmap: true, disabled: false },
+  { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: true },
+  { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: true },
+  { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.', onlyHeightmap: false, disabled: false },
+  { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true }
 ] as const
 
 const props = defineProps<{
@@ -844,7 +844,7 @@ function handleMaskReady() {
     emit('consume-pending-view-state')
   } else {
     const cachedState = currentId ? viewStateCache.get(currentId) ?? null : null
-    if (cachedState) {
+    if (cachedState && currentId) {
       maskEditorRef.value.restoreViewState(cachedState, { emit: false })
       emit('view-state-change', { id: currentId, state: cachedState })
     } else {
