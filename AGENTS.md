@@ -91,6 +91,7 @@ A web-based 3D terrain editing environment built on the shared `@connected-web/t
 * [x] Onion-skin neighbouring layers with fading alpha
 * [x] Brush opacity slider
 * [x] Export mask directly from the Layer Editor (grayscale + alpha variants)
+* [x] Layer editor viewport state persists via URL reloads & layer switches
 * [ ] Brush type menu (basic, spray, Perlin noise)
 * [ ] Save/load custom brushes (name + icon)
 * [ ] Icon picker for brushes and locations based on FontAwesome Free icon set
