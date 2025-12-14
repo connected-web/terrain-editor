@@ -1,7 +1,7 @@
 import fs from 'fs'
 import { test, expect, Page } from '@playwright/test'
 import { captureScreenshot } from './utils'
-import { saveVideoAsGif } from './video-utils'
+import { registerVideoRecordingHooks } from './video-utils'
 
 async function loadSampleArchive(page: Page) {
   const loadSampleButton = page
@@ -10,10 +10,18 @@ async function loadSampleArchive(page: Page) {
 
   await loadSampleButton.click()
 
+  // Data loaded
   await expect(
     page.getByText('sample archive loaded.', { exact: true })
   ).toBeVisible({ timeout: 30_000 })
+
+  // Visual readiness (pick something stable)
+  await page.waitForSelector('canvas', { state: 'visible', timeout: 30_000 })
+
+  // Optional: give WebGL a frame or two
+  await page.waitForTimeout(300)
 }
+
 
 async function openPanel(page: Page, label: string, testInfo?: any) {
   // Use the toolbar button with aria-label (always visible)
@@ -39,7 +47,7 @@ async function openPanel(page: Page, label: string, testInfo?: any) {
 
 test.describe('Terrain Editor : Panels & routing', () => {
   test.use({ 
-    viewport: { width: 1024, height: 768 }
+    viewport: { width: 1920, height: 1080 }
   })
 
   test('editor loads and imports sample archive', async ({ page }, testInfo) => {
@@ -56,7 +64,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await expect(exportButton).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor')
-    await saveVideoAsGif(page, testInfo, '01-editor-loads')
   })
 
   test('workspace panel shows metadata form', async ({ page }, testInfo) => {
@@ -75,8 +82,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await expect(labelInput).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor-workspace-panel')
-    
-    await saveVideoAsGif(page, testInfo, '02-workspace-panel')
   })
 
   test('theme panel exposes colour controls', async ({ page }, testInfo) => {
@@ -93,8 +98,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
     ).toBeVisible()
 
     await captureScreenshot(page, testInfo, 'editor-theme-panel')
-    
-    await saveVideoAsGif(page, testInfo, '03-theme-panel')
   })
 
   test('locations panel enables add location flow', async ({ page }, testInfo) => {
@@ -111,8 +114,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
     ).toBeEnabled()
 
     await captureScreenshot(page, testInfo, 'editor-locations-panel')
-    
-    await saveVideoAsGif(page, testInfo, '04-locations-panel')
   })
 
   test('settings panel shows local options', async ({ page }, testInfo) => {
@@ -129,8 +130,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
     ).toBeVisible()
 
     await captureScreenshot(page, testInfo, 'editor-settings-panel')
-    
-    await saveVideoAsGif(page, testInfo, '05-settings-panel')
   })
 
   test('mask view toggle switches modes', async ({ page }, testInfo) => {
@@ -150,8 +149,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
     )
 
     await captureScreenshot(page, testInfo, 'editor-mask-view-colour')
-    
-    await saveVideoAsGif(page, testInfo, '06-mask-view-toggle')
   })
 
   test('restores panel + layer from URL params', async ({ page }, testInfo) => {
@@ -181,7 +178,7 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await expect(activeLayerLabel).toHaveText(/forest/i)
     await captureScreenshot(page, testInfo, 'editor-layer-url-restore')
-    
-    await saveVideoAsGif(page, testInfo, '07-url-restore')
   })
 })
+
+registerVideoRecordingHooks(test)

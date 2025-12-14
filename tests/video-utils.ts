@@ -4,6 +4,13 @@ import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
+export function videoNameFromTest(testInfo: any) {
+  return testInfo.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
 export async function saveVideoAsGif(page: Page, testInfo: TestInfo, outputName: string) {
   if (!process.env.RECORD_VIDEO) {
     console.log('Video recording is disabled; skipping saveVideoAsGif. Set RECORD_VIDEO=1 to enable.')
@@ -60,4 +67,30 @@ export async function saveVideoAsGif(page: Page, testInfo: TestInfo, outputName:
   }
 
   console.log(`✓ Converted to GIF: ${gifOutput}`)
+}
+
+export function registerVideoRecordingHooks(test: { afterEach: (fn: (args: { page: Page }, testInfo: TestInfo) => Promise<void>) => void }) {
+  test.afterEach(async ({ page }, testInfo) => {
+    if (!process.env.RECORD_VIDEO) return
+
+    // Don't try to record if the test already blew up before page existed
+    if (!page) {
+      console.log('🎥 Skipped saving video; no page available for test:', testInfo.title)
+      return
+    }
+
+    // Only save video for failed tests 
+    if (testInfo.status !== testInfo.expectedStatus) {
+      console.log('🎥 Skipped saving video for failed test:', testInfo.title, '(' + testInfo.status + ')')
+      return
+    }
+
+    const outputName = videoNameFromTest(testInfo)
+
+    try {
+      await saveVideoAsGif(page, testInfo, outputName)
+    } catch (err) {
+      console.warn('⚠️ Failed to save video for', testInfo.title)
+    }
+  })
 }
