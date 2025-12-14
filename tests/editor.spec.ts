@@ -38,47 +38,34 @@ async function openPanel(page: Page, label: string, testInfo?: any) {
 }
 
 test.describe('Terrain Editor : Panels & routing', () => {
-  test.describe.configure({ mode: 'serial' })
+  test.use({ 
+    viewport: { width: 1024, height: 768 }
+  })
 
-  let page: Page
-
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext({
-      viewport: { width: 1024, height: 768 },
-      recordVideo: process.env.RECORD_VIDEO ? {
-        dir: './test-results/videos',
-        size: { width: 1024, height: 768 }
-      } : undefined
-    })
-    page = await context.newPage()
-
+  test('editor loads and imports sample archive', async ({ page }, testInfo) => {
     await page.goto('/editor/')
     await expect(
       page.getByRole('heading', { name: 'Terrain Editor' })
     ).toBeVisible()
 
-    // 🔥 Load the heavy 3D map ONCE
     await loadSampleArchive(page)
-  })
 
-  test.afterAll(async () => {
-    await page.context().close()
-  })
-
-  test('editor loads and imports sample archive', async ({}, testInfo) => {
     const exportButton = page
       .getByRole('button', { name: /^Export WYN$/ })
       .first()
 
     await expect(exportButton).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor')
-    
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '01-editor-loads')
-    }
+    await saveVideoAsGif(page, testInfo, '01-editor-loads')
   })
 
-  test('workspace panel shows metadata form', async ({}, testInfo) => {
+  test('workspace panel shows metadata form', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await openPanel(page, 'Workspace', testInfo)
 
     const labelInput = page
@@ -89,12 +76,16 @@ test.describe('Terrain Editor : Panels & routing', () => {
     await expect(labelInput).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor-workspace-panel')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '02-workspace-panel')
-    }
+    await saveVideoAsGif(page, testInfo, '02-workspace-panel')
   })
 
-  test('theme panel exposes colour controls', async ({}, testInfo) => {
+  test('theme panel exposes colour controls', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await openPanel(page, 'Theme', testInfo)
 
     await expect(
@@ -103,12 +94,16 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await captureScreenshot(page, testInfo, 'editor-theme-panel')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '03-theme-panel')
-    }
+    await saveVideoAsGif(page, testInfo, '03-theme-panel')
   })
 
-  test('locations panel enables add location flow', async ({}, testInfo) => {
+  test('locations panel enables add location flow', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await openPanel(page, 'Locations', testInfo)
 
     await expect(
@@ -117,12 +112,16 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await captureScreenshot(page, testInfo, 'editor-locations-panel')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '04-locations-panel')
-    }
+    await saveVideoAsGif(page, testInfo, '04-locations-panel')
   })
 
-  test('settings panel shows local options', async ({}, testInfo) => {
+  test('settings panel shows local options', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await openPanel(page, 'Settings', testInfo)
 
     await expect(
@@ -131,12 +130,16 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await captureScreenshot(page, testInfo, 'editor-settings-panel')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '05-settings-panel')
-    }
+    await saveVideoAsGif(page, testInfo, '05-settings-panel')
   })
 
-  test('mask view toggle switches modes', async ({}, testInfo) => {
+  test('mask view toggle switches modes', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await page.goto('/editor/?panel=layers&layer=biome:forest')
 
     const colourButton = page.getByRole('button', { name: /^Colour$/ })
@@ -148,17 +151,20 @@ test.describe('Terrain Editor : Panels & routing', () => {
 
     await captureScreenshot(page, testInfo, 'editor-mask-view-colour')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '06-mask-view-toggle')
-    }
+    await saveVideoAsGif(page, testInfo, '06-mask-view-toggle')
   })
 
-  test('restores panel + layer from URL params', async ({}, testInfo) => {
+  test('restores panel + layer from URL params', async ({ page }, testInfo) => {
+    await page.goto('/editor/')
+    await expect(
+      page.getByRole('heading', { name: 'Terrain Editor' })
+    ).toBeVisible()
+
+    await loadSampleArchive(page)
     await page.goto(
       '/editor/?panel=layers&layer=biome:forest&leo=1.4,0.55,0.62'
     )
 
-    // No reload needed — map already loaded
     await expect(page).toHaveURL(/panel=layers/)
 
     const dockButton = page
@@ -176,8 +182,6 @@ test.describe('Terrain Editor : Panels & routing', () => {
     await expect(activeLayerLabel).toHaveText(/forest/i)
     await captureScreenshot(page, testInfo, 'editor-layer-url-restore')
     
-    if (process.env.RECORD_VIDEO) {
-      await saveVideoAsGif(testInfo, '07-url-restore')
-    }
+    await saveVideoAsGif(page, testInfo, '07-url-restore')
   })
 })

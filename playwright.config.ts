@@ -4,7 +4,8 @@ const previewPort = Number(process.env.PLAYWRIGHT_PREVIEW_PORT || 4178)
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  workers: 1,
+  fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   timeout: 90_000,
   expect: {

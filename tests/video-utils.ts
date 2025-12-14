@@ -1,38 +1,63 @@
-import { TestInfo } from '@playwright/test';
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+// video-utils.ts
+import { TestInfo, Page } from '@playwright/test'
+import { execSync } from 'child_process'
+import fs from 'fs'
+import path from 'path'
 
-export async function saveVideoAsGif(testInfo: TestInfo, outputName: string) {
-  // Wait a moment for video to finalize
-  await new Promise(resolve => setTimeout(resolve, 1000));
+export async function saveVideoAsGif(page: Page, testInfo: TestInfo, outputName: string) {
+  if (!process.env.RECORD_VIDEO) {
+    console.log('Video recording is disabled; skipping saveVideoAsGif. Set RECORD_VIDEO=1 to enable.')
+    return
+  }
   
-  const videoAttachment = testInfo.attachments.find(att => att.name === 'video');
-  const videoPath = videoAttachment?.path;
-  if (!videoPath) {
-    console.warn('No video recorded for', outputName);
-    return;
+  const video = page.video()
+  if (!video) {
+    console.warn('Video is not enabled for this test:', outputName)
+    return
   }
 
-  const outputDir = path.join(process.cwd(), 'documentation', 'animations');
-  fs.mkdirSync(outputDir, { recursive: true });
+  const context = page.context()
+  await context.close()
 
-  const mp4Output = path.join(outputDir, `${outputName}.mp4`);
-  const gifOutput = path.join(outputDir, `${outputName}.gif`);
+  const videoPath = await video.path() // waits until video is written
+  if (!videoPath) {
+    console.warn('No video path available for', outputName)
+    return
+  }
 
-  // Copy the video file
-  fs.copyFileSync(videoPath, mp4Output);
-  console.log(`✓ Saved video: ${mp4Output}`);
+  const outputDir = path.join(process.cwd(), 'documentation', 'animations')
+  fs.mkdirSync(outputDir, { recursive: true })
 
-  // Convert to GIF using ffmpeg (lower resolution, 10fps)
+  const webmOutput = path.join(outputDir, `${outputName}.webm`)
+  const mp4Output = path.join(outputDir, `${outputName}.mp4`)
+  const gifOutput = path.join(outputDir, `${outputName}.gif`)
+
+  // Keep original container
+  fs.copyFileSync(videoPath, webmOutput)
+  console.log(`✓ Saved video: ${webmOutput}`)
+
+  // Convert to mp4 (real conversion, not rename)
   try {
     execSync(
-      `ffmpeg -i "${mp4Output}" -vf "fps=10,scale=512:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "${gifOutput}" -y`,
+      `ffmpeg -y -i "${webmOutput}" -movflags +faststart "${mp4Output}"`,
       { stdio: 'inherit' }
-    );
-    console.log(`✓ Converted to GIF: ${gifOutput}`);
-  } catch (error) {
-    console.warn('Failed to convert to GIF. Make sure ffmpeg is installed.');
-    console.warn('Install with: brew install ffmpeg (macOS) or apt-get install ffmpeg (Linux)');
+    )
+    console.log(`✓ Converted to MP4: ${mp4Output}`)
+  } catch (err) {
+    console.warn('⚠️ Video conversion failed for', outputName)
+    return
   }
+
+  // Convert to GIF (palette workflow)
+  try {
+    execSync(
+      `ffmpeg -y -i "${mp4Output}" -vf "fps=10,scale=512:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "${gifOutput}"`,
+      { stdio: 'inherit' }
+    )
+  } catch (err) {
+    console.warn('⚠️ GIF conversion failed for', outputName)
+    return
+  }
+
+  console.log(`✓ Converted to GIF: ${gifOutput}`)
 }
