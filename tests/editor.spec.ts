@@ -1,3 +1,4 @@
+import fs from 'fs'
 import { test, expect, Page } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
@@ -13,15 +14,26 @@ async function loadSampleArchive(page: Page) {
   ).toBeVisible({ timeout: 30_000 })
 }
 
-async function openPanel(page: Page, label: string) {
-  const navButton = page
-    .locator('.panel-dock__nav-button', { hasText: label })
-    .first()
-
-  await expect(navButton).toBeVisible({ timeout: 30_000 })
-  await navButton.click()
-
-  return navButton
+async function openPanel(page: Page, label: string, testInfo?: any) {
+  // Use the toolbar button with aria-label (always visible)
+  const toolbarButton = page.getByRole('button', { name: label });
+  
+  try {
+    await toolbarButton.waitFor({ state: 'visible', timeout: 5000 });
+    await toolbarButton.click();
+    
+    // Wait for the panel content to be visible
+    await page.waitForSelector('.panel-card', { state: 'visible', timeout: 5000 });
+    
+    return toolbarButton;
+  } catch (e) {
+    if (testInfo) {
+      await page.screenshot({ path: testInfo.outputPath(`openPanel-failure.png`) });
+      const html = await page.content();
+      fs.writeFileSync(testInfo.outputPath(`openPanel-failure.html`), html);
+    }
+    throw e;
+  }
 }
 
 test.describe('editor panels & routing', () => {
@@ -55,6 +67,61 @@ test.describe('editor panels & routing', () => {
     await captureScreenshot(page, testInfo, 'editor')
   })
 
+  test('workspace panel shows metadata form', async ({}, testInfo) => {
+    await openPanel(page, 'Workspace', testInfo)
+
+    const labelInput = page
+      .locator('.workspace-form__field', { hasText: 'Project title' })
+      .locator('input')
+      .first()
+
+    await expect(labelInput).toBeVisible()
+    await captureScreenshot(page, testInfo, 'editor-workspace-panel')
+  })
+
+  test('theme panel exposes colour controls', async ({}, testInfo) => {
+    await openPanel(page, 'Theme', testInfo)
+
+    await expect(
+      page.getByRole('heading', { name: 'Labels' })
+    ).toBeVisible()
+
+    await captureScreenshot(page, testInfo, 'editor-theme-panel')
+  })
+
+  test('locations panel enables add location flow', async ({}, testInfo) => {
+    await openPanel(page, 'Locations', testInfo)
+
+    await expect(
+      page.getByRole('button', { name: 'Add location' })
+    ).toBeEnabled()
+
+    await captureScreenshot(page, testInfo, 'editor-locations-panel')
+  })
+
+  test('settings panel shows local options', async ({}, testInfo) => {
+    await openPanel(page, 'Settings', testInfo)
+
+    await expect(
+      page.getByText('Local to this browser')
+    ).toBeVisible()
+
+    await captureScreenshot(page, testInfo, 'editor-settings-panel')
+  })
+
+  test('mask view toggle switches modes', async ({}, testInfo) => {
+    await page.goto('/editor/?panel=layers&layer=biome:forest')
+
+    const colourButton = page.getByRole('button', { name: /^Colour$/ })
+    await colourButton.click()
+
+    await expect(colourButton).toHaveClass(
+      /segment-button--active/
+    )
+
+    await captureScreenshot(page, testInfo, 'editor-mask-view-colour')
+  })
+
   test('restores panel + layer from URL params', async ({}, testInfo) => {
     await page.goto(
       '/editor/?panel=layers&layer=biome:forest&leo=1.4,0.55,0.62'
@@ -77,60 +144,5 @@ test.describe('editor panels & routing', () => {
 
     await expect(activeLayerLabel).toHaveText(/forest/i)
     await captureScreenshot(page, testInfo, 'editor-layer-url-restore')
-  })
-
-  test('mask view toggle switches modes', async ({}, testInfo) => {
-    await page.goto('/editor/?panel=layers&layer=biome:forest')
-
-    const colourButton = page.getByRole('button', { name: /^Colour$/ })
-    await colourButton.click()
-
-    await expect(colourButton).toHaveClass(
-      /segment-button--active/
-    )
-
-    await captureScreenshot(page, testInfo, 'editor-mask-view-colour')
-  })
-
-  test('workspace panel shows metadata form', async ({}, testInfo) => {
-    await openPanel(page, 'Workspace')
-
-    const labelInput = page
-      .locator('.workspace-form__field', { hasText: 'Project title' })
-      .locator('input')
-      .first()
-
-    await expect(labelInput).toBeVisible()
-    await captureScreenshot(page, testInfo, 'editor-workspace-panel')
-  })
-
-  test('theme panel exposes colour controls', async ({}, testInfo) => {
-    await openPanel(page, 'Theme')
-
-    await expect(
-      page.getByRole('heading', { name: 'Labels' })
-    ).toBeVisible()
-
-    await captureScreenshot(page, testInfo, 'editor-theme-panel')
-  })
-
-  test('locations panel enables add location flow', async ({}, testInfo) => {
-    await openPanel(page, 'Locations')
-
-    await expect(
-      page.getByRole('button', { name: 'Add location' })
-    ).toBeEnabled()
-
-    await captureScreenshot(page, testInfo, 'editor-locations-panel')
-  })
-
-  test('settings panel shows local options', async ({}, testInfo) => {
-    await openPanel(page, 'Settings')
-
-    await expect(
-      page.getByText('Local to this browser')
-    ).toBeVisible()
-
-    await captureScreenshot(page, testInfo, 'editor-settings-panel')
   })
 })
