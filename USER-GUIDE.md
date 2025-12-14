@@ -46,6 +46,26 @@ Placeholder for local/editor preferences (expand as needed).
 
 - Layer settings now include a “Mask view” segmented control (B/W vs Colour). Colour mode overlays the mask using the layer’s tint to help inspect overlapping biomes. Heightmaps automatically fall back to B/W since colour tint doesn’t apply.
 
+## URL Parameters for Deep Linking
+
+The editor supports several URL parameters to allow direct navigation to specific states for testing, documentation, or sharing:
+
+- `panel`: Open a specific panel (e.g., `?panel=layers`)
+- `layer`: Select a specific layer by ID (e.g., `?layer=biome:forest`)
+- `camera`: Set the viewer camera (e.g., `?camera=1.8,0.9,1.8,530,746`)
+- `leo`: Set the layer editor view state (zoom/center)
+- `location`: Select a specific location by ID (e.g., `?location=capital`)
+
+**Example:**
+
+```
+/editor/?panel=locations&location=capital&camera=1.8,0.9,1.8,530,746
+```
+
+This will open the editor with the Locations panel active, select the location with ID `capital`, and set the camera to the specified state.
+
+These parameters are useful for Playwright tests, documentation screenshots, and sharing reproducible scenes.
+
 ---
 
 Future updates: integrate layer asset uploads, more brush types/noise, custom brush presets, and GIF/Video captures for documentation via Playwright traces + ffmpeg.
