@@ -18,6 +18,9 @@
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke && npm run test:e2e",
     "test:e2e": "playwright test",
+    "test:e2e:headed": "HEADLESS=false playwright test",
+    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor.spec.ts",
+    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor.spec.ts",
     "test:smoke": "node ./scripts/smoke-tests.mjs"
   },
   "repository": {
@@ -39,10 +42,12 @@
   },
   "homepage": "https://github.com/connected-web/terrain-editor#readme",
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
+    "@playwright/test": "^1.57.0",
     "basic-ftp": "^5.0.5",
+    "gifski": "^1.7.1",
     "http-server": "^14.1.1",
     "playwright": "^1.56.1",
+    "playwright-video": "^2.4.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }

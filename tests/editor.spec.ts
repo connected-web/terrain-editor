@@ -1,6 +1,7 @@
 import fs from 'fs'
 import { test, expect, Page } from '@playwright/test'
 import { captureScreenshot } from './utils'
+import { saveVideoAsGif } from './video-utils'
 
 async function loadSampleArchive(page: Page) {
   const loadSampleButton = page
@@ -36,13 +37,19 @@ async function openPanel(page: Page, label: string, testInfo?: any) {
   }
 }
 
-test.describe('editor panels & routing', () => {
+test.describe('Terrain Editor : Panels & routing', () => {
   test.describe.configure({ mode: 'serial' })
 
   let page: Page
 
   test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext()
+    const context = await browser.newContext({
+      viewport: { width: 1024, height: 768 },
+      recordVideo: process.env.RECORD_VIDEO ? {
+        dir: './test-results/videos',
+        size: { width: 1024, height: 768 }
+      } : undefined
+    })
     page = await context.newPage()
 
     await page.goto('/editor/')
@@ -65,6 +72,10 @@ test.describe('editor panels & routing', () => {
 
     await expect(exportButton).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '01-editor-loads')
+    }
   })
 
   test('workspace panel shows metadata form', async ({}, testInfo) => {
@@ -77,6 +88,10 @@ test.describe('editor panels & routing', () => {
 
     await expect(labelInput).toBeVisible()
     await captureScreenshot(page, testInfo, 'editor-workspace-panel')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '02-workspace-panel')
+    }
   })
 
   test('theme panel exposes colour controls', async ({}, testInfo) => {
@@ -87,6 +102,10 @@ test.describe('editor panels & routing', () => {
     ).toBeVisible()
 
     await captureScreenshot(page, testInfo, 'editor-theme-panel')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '03-theme-panel')
+    }
   })
 
   test('locations panel enables add location flow', async ({}, testInfo) => {
@@ -97,6 +116,10 @@ test.describe('editor panels & routing', () => {
     ).toBeEnabled()
 
     await captureScreenshot(page, testInfo, 'editor-locations-panel')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '04-locations-panel')
+    }
   })
 
   test('settings panel shows local options', async ({}, testInfo) => {
@@ -107,6 +130,10 @@ test.describe('editor panels & routing', () => {
     ).toBeVisible()
 
     await captureScreenshot(page, testInfo, 'editor-settings-panel')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '05-settings-panel')
+    }
   })
 
   test('mask view toggle switches modes', async ({}, testInfo) => {
@@ -120,6 +147,10 @@ test.describe('editor panels & routing', () => {
     )
 
     await captureScreenshot(page, testInfo, 'editor-mask-view-colour')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '06-mask-view-toggle')
+    }
   })
 
   test('restores panel + layer from URL params', async ({}, testInfo) => {
@@ -144,5 +175,9 @@ test.describe('editor panels & routing', () => {
 
     await expect(activeLayerLabel).toHaveText(/forest/i)
     await captureScreenshot(page, testInfo, 'editor-layer-url-restore')
+    
+    if (process.env.RECORD_VIDEO) {
+      await saveVideoAsGif(testInfo, '07-url-restore')
+    }
   })
 })

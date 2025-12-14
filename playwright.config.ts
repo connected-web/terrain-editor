@@ -12,7 +12,8 @@ export default defineConfig({
   },
   use: {
     baseURL: `http://127.0.0.1:${previewPort}`,
-    headless: true
+    headless: process.env.HEADLESS !== 'false',
+    video: process.env.RECORD_VIDEO ? 'on' : 'off',
   },
   webServer: {
     command: `PREVIEW_PORT=${previewPort} npm run preview:dist`,

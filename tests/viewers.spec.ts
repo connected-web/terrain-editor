@@ -6,9 +6,11 @@ async function waitForStatus(page: Page, text: string | RegExp | readonly (strin
   await expect(overlayStatus).toContainText(text, { timeout: 30_000 })
 }
 
-test('vanilla viewer loads sample terrain', async ({ page }, testInfo) => {
-  await page.goto('/viewer-js/')
-  await expect(page.getByRole('heading', { name: 'Terrain Viewer Demo' })).toBeVisible()
-  await waitForStatus(page, 'Terrain loaded')
-  await captureScreenshot(page, testInfo, 'viewer-ts')
+test.describe('Terrain Viewer : Basic interactions', () => {
+  test('viewer loads sample terrain', async ({ page }, testInfo) => {
+    await page.goto('/viewer-js/')
+    await expect(page.getByRole('heading', { name: 'Terrain Viewer Demo' })).toBeVisible()
+    await waitForStatus(page, 'Terrain loaded')
+    await captureScreenshot(page, testInfo, 'viewer-ts')
+  })
 })
