@@ -62,9 +62,11 @@ test.describe('Terrain Editor : User Guide Features', () => {
     await expect(riverButton).toBeVisible()
     await riverButton.click()
 
-    // Wait for picker to close and camera to navigate
+    // Wait for picker to close
     await expect(pickerDialog).not.toBeVisible()
-    await page.waitForTimeout(3000) // Allow camera animation to complete
+
+    // Wait for camera animation to complete (5 seconds)
+    await page.waitForTimeout(5000)
 
     // Verify River Delta is now selected
     await expect(locationSelectorButton).toContainText('River Delta')
