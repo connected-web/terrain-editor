@@ -6,8 +6,10 @@ import {
   type TerrainHandle,
   type TerrainLocation,
   type TerrainThemeOverrides,
-  type LocationViewState
+  type LocationViewState,
+  type ViewerLifecycleState
 } from '@connected-web/terrain-editor'
+import { playwrightLog } from '../utils/playwrightDebug'
 
 type MountContext = {
   dataset: TerrainDataset
@@ -27,6 +29,7 @@ export function useViewer(options: {
   const handle = ref<TerrainHandle | null>(null)
   const status = ref('Load a Wyn archive to begin.')
   const statusFaded = ref(false)
+  const viewerLifecycleState = ref<ViewerLifecycleState>('initializing')
   let statusFadeHandle: number | null = null
   let statusFadeToken = 0
   let remountHandle: number | null = null
@@ -50,12 +53,31 @@ export function useViewer(options: {
     }
   }
 
+  function handleLifecycleChange(state: ViewerLifecycleState) {
+    viewerLifecycleState.value = state
+    playwrightLog('[useViewer] Lifecycle state changed to:', state)
+
+    const stateMessages: Record<ViewerLifecycleState, string> = {
+      'initializing': 'Initializing terrain viewer…',
+      'loading-textures': 'Loading textures…',
+      'building-geometry': 'Building terrain geometry…',
+      'first-render': 'Rendering terrain…',
+      'stabilizing': 'Stabilizing render…',
+      'ready': 'Map ready.'
+    }
+
+    const message = stateMessages[state]
+    const fadeDelay = state === 'ready' ? 3000 : 0
+    updateStatus(message, fadeDelay)
+  }
+
   async function mountViewer(context?: MountContext | null) {
     const nextContext = context ?? options.getMountContext()
     if (!nextContext) return
     const viewerElement = options.getViewerElement()
     if (!viewerElement) return
     disposeViewer()
+    viewerLifecycleState.value = 'initializing'
     handle.value = await initTerrainViewer(viewerElement, nextContext.dataset, {
       layers: nextContext.layerState,
       locations: nextContext.locations,
@@ -63,7 +85,8 @@ export function useViewer(options: {
       theme: nextContext.theme,
       cameraView: nextContext.initialCameraView,
       onLocationPick: nextContext.onLocationPick,
-      onLocationClick: nextContext.onLocationClick
+      onLocationClick: nextContext.onLocationClick,
+      onLifecycleChange: handleLifecycleChange
     })
   }
 
@@ -98,6 +121,7 @@ export function useViewer(options: {
     handle,
     status,
     statusFaded,
+    viewerLifecycleState,
     updateStatus,
     mountViewer,
     requestViewerRemount,

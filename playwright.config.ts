@@ -15,6 +15,17 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${previewPort}`,
     headless: process.env.HEADLESS !== 'false',
     video: process.env.RECORD_VIDEO ? 'on' : 'off',
+    // Use a fresh context for each test to avoid localStorage pollution
+    storageState: undefined,
+    // Enable GPU acceleration for WebGL in headless mode
+    launchOptions: {
+      args: [
+        '--use-gl=angle',
+        '--use-angle=swiftshader',
+        '--enable-webgl',
+        '--enable-accelerated-2d-canvas'
+      ]
+    }
   },
   webServer: {
     command: `PREVIEW_PORT=${previewPort} npm run preview:dist`,

@@ -72,7 +72,8 @@ export function useArchiveLoader(options: ArchiveStoreOptions) {
         }
       })
       await options.mountViewer()
-      options.updateStatus(`${archiveLabel} loaded.`)
+      // Note: Status is now managed by viewer lifecycle events (onLifecycleChange)
+      // The viewer will show "Map ready." when fully loaded and stabilized
       if (loadOptions.persist ?? true) {
         const base64 = loadOptions.base64 ?? arrayBufferToBase64(buffer)
         await options.persistCurrentProject({ label: archiveLabel, base64 })

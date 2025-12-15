@@ -7,12 +7,16 @@ import {
   snapLocationValue
 } from '../utils/locations'
 import { useWorkspaceContext, useWorkspaceModel } from '../models/workspace'
+import { playwrightLog } from '../utils/playwrightDebug'
 
 export function useLocations() {
+  playwrightLog('[useLocations] ========= COMPOSABLE INITIALIZED =========')
   const { workspaceForm, projectSnapshot } = useWorkspaceModel()
   const workspace = useWorkspaceContext()
   const locationsList = ref<TerrainLocation[]>([])
   const selectedLocationId = ref<string | null>(null)
+  const pendingLocationSearch = ref<string | null>(null)
+  playwrightLog('[useLocations] pendingLocationSearch initialized to:', pendingLocationSearch.value)
   const locationPickerOpen = ref(false)
   const pendingLocationId = ref<string | null>(null)
   const pendingLocationDraft = ref<TerrainLocation | null>(null)
@@ -64,9 +68,76 @@ export function useLocations() {
     selectedLocationId.value = id
   }
 
+  function findLocationByNameOrId(search: string): TerrainLocation | null {
+    if (!search) return null
+    const normalized = search.toLowerCase().trim()
+
+    playwrightLog('[useLocations][findLocationByNameOrId] search:', search, 'normalized:', normalized)
+    console.log('[useLocations][findLocationByNameOrId] search:', search, 'normalized:', normalized)
+
+    // First try exact ID match (case-insensitive)
+    const byId = locationsList.value.find(loc => ensureLocationId(loc).id?.toLowerCase() === normalized)
+    if (byId) {
+      playwrightLog('[useLocations][findLocationByNameOrId] Matched by ID:', byId)
+      console.log('[useLocations][findLocationByNameOrId] Matched by ID:', byId)
+      return byId
+    }
+
+    // Then try exact name match (case-insensitive)
+    const byExactName = locationsList.value.find(loc =>
+      loc.name?.toLowerCase() === normalized
+    )
+    if (byExactName) {
+      playwrightLog('[useLocations][findLocationByNameOrId] Matched by exact name:', byExactName)
+      console.log('[useLocations][findLocationByNameOrId] Matched by exact name:', byExactName)
+      return byExactName
+    }
+
+    // Finally try partial name match (case-insensitive)
+    const byPartialName = locationsList.value.find(loc =>
+      loc.name?.toLowerCase().includes(normalized)
+    )
+    if (byPartialName) {
+      playwrightLog('[useLocations][findLocationByNameOrId] Matched by partial name:', byPartialName)
+      console.log('[useLocations][findLocationByNameOrId] Matched by partial name:', byPartialName)
+      return byPartialName
+    }
+    playwrightLog('[useLocations][findLocationByNameOrId] No match found for:', search)
+    console.log('[useLocations][findLocationByNameOrId] No match found for:', search)
+    return null
+  }
+
+  function setActiveLocationByNameOrId(search: string | null) {
+    if (!search) {
+      setActiveLocation(null)
+      pendingLocationSearch.value = null
+      return
+    }
+
+    playwrightLog('[useLocations] setActiveLocationByNameOrId called with:', search)
+    playwrightLog('[useLocations] Current locations list length:', locationsList.value.length)
+
+    // Try to find the location immediately
+    const location = findLocationByNameOrId(search)
+    if (location) {
+      const id = ensureLocationId(location).id!
+      playwrightLog('[useLocations] Found location:', location.name, 'with ID:', id)
+      setActiveLocation(id)
+      pendingLocationSearch.value = null
+    } else {
+      // If not found, store the search term to retry when locations are loaded
+      playwrightLog('[useLocations] Location not found, storing as pending search:', search)
+      pendingLocationSearch.value = search
+    }
+  }
+
   function ensureActiveLocationSelection() {
     if (!locationsList.value.length) {
       selectedLocationId.value = null
+      return
+    }
+    // Don't auto-select if we have a pending location search
+    if (pendingLocationSearch.value) {
       return
     }
     const ensured = locationsList.value.map((location) => ensureLocationId(location))
@@ -235,6 +306,10 @@ export function useLocations() {
   watch(
     () => projectSnapshot.value.locations,
     (snapshotLocations) => {
+      playwrightLog('[useLocations WATCHER FIRED] snapshotLocations:', snapshotLocations ? `${snapshotLocations.length} items` : 'null/undefined')
+      playwrightLog('[useLocations WATCHER FIRED] pendingLocationSearch at start:', pendingLocationSearch.value)
+      playwrightLog('[useLocations WATCHER FIRED] selectedLocationId at start:', selectedLocationId.value)
+
       locationsList.value = snapshotLocations
         ? snapshotLocations.map((location) => {
             const copy = ensureLocationId({ ...location })
@@ -242,7 +317,35 @@ export function useLocations() {
             return copy
         })
         : []
-      ensureActiveLocationSelection()
+
+      playwrightLog('[useLocations] Locations list updated, length:', locationsList.value.length)
+      playwrightLog('[useLocations] Pending location search:', pendingLocationSearch.value)
+      playwrightLog('[useLocations] Location names:', locationsList.value.map(l => l.name).join(', '))
+
+      // Always try to resolve pending location search if present
+      if (pendingLocationSearch.value && locationsList.value.length > 0) {
+        playwrightLog('[useLocations] Attempting to resolve pending search:', pendingLocationSearch.value)
+        console.log('[useLocations] Attempting to resolve pending search:', pendingLocationSearch.value)
+        const location = findLocationByNameOrId(pendingLocationSearch.value)
+        if (location) {
+          const id = ensureLocationId(location).id!
+          playwrightLog('[useLocations] Resolved pending search to location:', location.name, 'ID:', id)
+          console.log('[useLocations] Resolved pending search to location:', location.name, 'ID:', id)
+          pendingLocationSearch.value = null // Clear before setActiveLocation
+          setActiveLocation(id)
+        } else {
+          playwrightLog('[useLocations] Could not resolve pending search:', pendingLocationSearch.value, 'Available:', locationsList.value.map(l => l.name))
+          console.log('[useLocations] Could not resolve pending search:', pendingLocationSearch.value, 'Available:', locationsList.value.map(l => l.name))
+        }
+      } else {
+        playwrightLog('[useLocations] Running ensureActiveLocationSelection (no pending search)')
+        playwrightLog('[useLocations] Reason: pendingLocationSearch=', pendingLocationSearch.value, 'locationsList.length=', locationsList.value.length)
+        console.log('[useLocations] Running ensureActiveLocationSelection (no pending search)')
+        console.log('[useLocations] Reason: pendingLocationSearch=', pendingLocationSearch.value, 'locationsList.length=', locationsList.value.length)
+        // Only run auto-selection if there's no pending search
+        ensureActiveLocationSelection()
+      }
+
       workspace.handle.value?.updateLocations(
         workspace.getViewerLocations(locationsList.value),
         selectedLocationId.value ?? undefined
@@ -252,11 +355,26 @@ export function useLocations() {
   )
 
   let hasSyncedInitialLocationSelection = false
+  let pendingCameraFocus: string | null = null
+
   watch(
     () => selectedLocationId.value,
     (id) => {
       if (id) {
-        focusLocationInViewer(id)
+        // Check if viewer is ready before focusing camera
+        const viewerReady = workspace.viewerLifecycleState?.value === 'ready'
+        playwrightLog('[useLocations] Location selected:', id, 'Viewer ready:', viewerReady)
+
+        if (viewerReady) {
+          // Viewer is ready, focus immediately
+          focusLocationInViewer(id)
+          pendingCameraFocus = null
+        } else {
+          // Viewer not ready, defer camera focus
+          playwrightLog('[useLocations] Deferring camera focus until viewer is ready')
+          pendingCameraFocus = id
+        }
+
         if (hasSyncedInitialLocationSelection && workspace.localSettings?.openLocationsOnSelect) {
           workspace.setActivePanel?.('locations')
           workspace.ensureDockExpanded?.()
@@ -264,9 +382,23 @@ export function useLocations() {
       } else if (workspace.handle.value) {
         workspace.handle.value.updateLocations(workspace.getViewerLocations(), undefined)
         workspace.handle.value.setFocusedLocation?.(undefined)
+        pendingCameraFocus = null
       }
       if (!hasSyncedInitialLocationSelection) {
         hasSyncedInitialLocationSelection = true
+      }
+    }
+  )
+
+  // Watch viewer lifecycle and trigger pending camera focus when ready
+  watch(
+    () => workspace.viewerLifecycleState?.value,
+    (state) => {
+      playwrightLog('[useLocations] Viewer lifecycle changed to:', state, 'Pending focus:', pendingCameraFocus)
+      if (state === 'ready' && pendingCameraFocus) {
+        playwrightLog('[useLocations] Viewer ready, focusing on pending location:', pendingCameraFocus)
+        focusLocationInViewer(pendingCameraFocus)
+        pendingCameraFocus = null
       }
     }
   )
@@ -383,6 +515,8 @@ export function useLocations() {
     locationStepX,
     locationStepY,
     setActiveLocation,
+    setActiveLocationByNameOrId,
+    findLocationByNameOrId,
     ensureActiveLocationSelection,
     commitLocations,
     clampLocationPixel,

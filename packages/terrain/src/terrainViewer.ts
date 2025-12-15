@@ -87,8 +87,17 @@ export type LocationPickPayload = {
   world: { x: number; y: number; z: number }
 }
 
+export type ViewerLifecycleState =
+  | 'initializing'
+  | 'loading-textures'
+  | 'building-geometry'
+  | 'first-render'
+  | 'stabilizing'
+  | 'ready'
+
 type TerrainInitOptions = {
   onReady?: () => void
+  onLifecycleChange?: (state: ViewerLifecycleState) => void
   heightScale?: number
   waterLevelPercent?: number
   layers?: LayerToggleState
@@ -800,6 +809,12 @@ export async function initTerrainViewer(
   const height = container.clientHeight || 405
   const disposables: Cleanup[] = []
 
+  let currentLifecycleState: ViewerLifecycleState = 'initializing'
+  function setLifecycleState(state: ViewerLifecycleState) {
+    currentLifecycleState = state
+    options.onLifecycleChange?.(state)
+  }
+
   const legend = dataset.legend
   let themeOverrides = options.theme
   let resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
@@ -1319,6 +1334,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     setLocationMarkers(currentLocations, currentFocusId)
   }
 
+  setLifecycleState('loading-textures')
   const [heightMapSource, topoMapSource] = await Promise.all([
     Promise.resolve(dataset.getHeightMapUrl()),
     Promise.resolve(dataset.getTopologyMapUrl())
@@ -1336,6 +1352,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   topoTexture.wrapS = topoTexture.wrapT = THREE.ClampToEdgeWrapping
   topoTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8)
 
+  setLifecycleState('building-geometry')
   const sampler = createHeightSampler(heightMap)
   if (!sampler) throw new Error('Unable to read heightmap data')
   heightSampler = sampler
@@ -1439,9 +1456,18 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   }
 
   let animationFrame = 0
+  let frameCount = 0
+  let firstRenderComplete = false
+  const frameTimings: number[] = []
+  const STABILITY_FRAME_COUNT = 10
+  const STABILITY_THRESHOLD_MS = 50 // Framerate should be under 50ms (>20fps)
+  const STABILITY_TIMEOUT_MS = 2000 // Force ready after 2 seconds if not stable
+  let stabilizingStartTime: number | null = null
+
   function animate() {
     const now = performance.now()
     const delta = Math.min((now - lastTime) / 1000, 0.15)
+    const frameDuration = now - lastTime
     lastTime = now
     if (cameraTween) {
       const progress = Math.min((now - cameraTween.start) / cameraTween.duration, 1)
@@ -1466,6 +1492,44 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     controls.update()
     updateMarkerVisuals()
     renderer.render(scene, camera)
+
+    frameCount++
+
+    // Track lifecycle progression
+    if (!firstRenderComplete && frameCount === 1) {
+      setLifecycleState('first-render')
+      firstRenderComplete = true
+    }
+
+    // Monitor framerate stability
+    if (currentLifecycleState === 'first-render' || currentLifecycleState === 'stabilizing') {
+      frameTimings.push(frameDuration)
+      if (frameTimings.length > STABILITY_FRAME_COUNT) {
+        frameTimings.shift()
+      }
+
+      if (frameTimings.length === STABILITY_FRAME_COUNT) {
+        const avgFrameTime = frameTimings.reduce((a, b) => a + b, 0) / STABILITY_FRAME_COUNT
+        if (avgFrameTime < STABILITY_THRESHOLD_MS) {
+          setLifecycleState('ready')
+          stabilizingStartTime = null
+        } else if (currentLifecycleState === 'first-render') {
+          setLifecycleState('stabilizing')
+          stabilizingStartTime = now
+        }
+      }
+
+      // Timeout-based fallback: force ready after STABILITY_TIMEOUT_MS
+      if (currentLifecycleState === 'stabilizing' && stabilizingStartTime !== null) {
+        const stabilizingDuration = now - stabilizingStartTime
+        if (stabilizingDuration > STABILITY_TIMEOUT_MS) {
+          console.warn(`[terrainViewer] Framerate did not stabilize after ${STABILITY_TIMEOUT_MS}ms, forcing ready state`)
+          setLifecycleState('ready')
+          stabilizingStartTime = null
+        }
+      }
+    }
+
     animationFrame = window.requestAnimationFrame(animate)
   }
   animate()

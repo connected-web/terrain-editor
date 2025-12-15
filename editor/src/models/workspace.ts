@@ -6,7 +6,8 @@ import type {
   TerrainDataset,
   TerrainHandle,
   TerrainLegend,
-  TerrainLocation
+  TerrainLocation,
+  ViewerLifecycleState
 } from '@connected-web/terrain-editor'
 import { clampNumber } from '../utils/locations'
 
@@ -61,6 +62,7 @@ type WorkspaceDependencies = {
   }
   datasetRef: Ref<TerrainDataset | null>
   handle: Ref<TerrainHandle | null>
+  viewerLifecycleState?: Ref<ViewerLifecycleState>
   persistCurrentProject: () => Promise<void>
   requestViewerRemount: () => void
   localSettings?: LocalSettings
@@ -299,6 +301,7 @@ export function useWorkspaceContext() {
     layerState: layerStateRef,
     datasetRef: workspaceContext.datasetRef,
     handle: workspaceContext.handle,
+    viewerLifecycleState: workspaceContext.viewerLifecycleState,
     persistCurrentProject: workspaceContext.persistCurrentProject,
     requestViewerRemount: workspaceContext.requestViewerRemount,
     localSettings: workspaceContext.localSettings,

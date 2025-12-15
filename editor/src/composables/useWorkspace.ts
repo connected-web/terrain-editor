@@ -4,7 +4,8 @@ import type {
   TerrainDataset,
   TerrainHandle,
   TerrainLegend,
-  TerrainLocation
+  TerrainLocation,
+  ViewerLifecycleState
 } from '@connected-web/terrain-editor'
 import {
   initWorkspaceModel,
@@ -34,6 +35,7 @@ export function useWorkspace(options: {
   }
   datasetRef: Ref<TerrainDataset | null>
   handle: Ref<TerrainHandle | null>
+  viewerLifecycleState?: Ref<ViewerLifecycleState>
   persistCurrentProject: () => Promise<void>
   requestViewerRemount: () => void
   localSettings?: { cameraTracking: boolean; openLocationsOnSelect: boolean }

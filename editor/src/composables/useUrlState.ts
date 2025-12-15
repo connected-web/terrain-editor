@@ -38,13 +38,14 @@ type InitialRouteState = {
   layerVisSignature: string | null
   cameraState: CameraState | null
   layerViewState: LayerViewState | null
+  locationId: string | null
 }
 
 const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations']
 
 function parseInitialState(): InitialRouteState {
   if (typeof window === 'undefined') {
-    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null, layerViewState: null }
+    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null, layerViewState: null, locationId: null }
   }
   const params = new URLSearchParams(window.location.search)
   const panelParam = params.get('panel')
@@ -87,13 +88,15 @@ function parseInitialState(): InitialRouteState {
       layerViewState = { zoom, centerX, centerY }
     }
   }
+  const locationId = params.get('location')
   return {
     panel,
     dockCollapsed,
     layerId,
     layerVisSignature,
     cameraState,
-    layerViewState
+    layerViewState,
+    locationId
   }
 }
 
@@ -159,7 +162,7 @@ function updateQueryParam(name: string, value: string | null, params: URLSearchP
   params.set(name, value)
 }
 
-export function useUrlState(options: Options) {
+export function useUrlState(options: Options & { setActiveLocation?: (id: string | null) => void, selectedLocationId?: Ref<string | null> }) {
   if (typeof window === 'undefined') {
     return
   }
@@ -177,8 +180,12 @@ export function useUrlState(options: Options) {
     id: initial.layerId,
     state: initial.layerViewState
   })
+  if (initial.locationId && options.setActiveLocation) {
+    options.setActiveLocation(initial.locationId)
+  }
   const pendingLayerId = ref<string | null>(initial.layerId)
   const pendingLayerVisibility = ref<string | null>(initial.layerVisSignature)
+  const pendingLocationId = ref<string | null>(initial.locationId)
   const layerVisibilitySignature = computed(() =>
     options.layerEntries.value.map((entry) => (entry.visible ? '1' : '0')).join('')
   )
@@ -273,6 +280,10 @@ export function useUrlState(options: Options) {
     updateQueryParam('layers', visibilityString || null, params)
     updateQueryParam('camera', cameraSignature.value || null, params)
     updateQueryParam('leo', layerViewStateSignature.value || null, params)
+    // Only sync location if we don't have a pending location resolution
+    if (options.selectedLocationId && !pendingLocationId.value) {
+      updateQueryParam('location', options.selectedLocationId.value || null, params)
+    }
     const query = params.toString()
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
     window.history.replaceState({}, '', nextUrl)
@@ -286,7 +297,8 @@ export function useUrlState(options: Options) {
       () => options.layerEditorSelectedLayerId.value,
       layerVisibilitySignature,
       cameraSignature,
-      layerViewStateSignature
+      layerViewStateSignature,
+      () => options.selectedLocationId?.value
     ],
     () => scheduleSync(),
     { deep: false }
@@ -308,6 +320,16 @@ export function useUrlState(options: Options) {
         pendingLayerId.value = null
       } else if (id) {
         pendingLayerId.value = id
+      }
+    }
+  )
+
+  // Clear pending location when a location is successfully selected
+  watch(
+    () => options.selectedLocationId?.value,
+    (id) => {
+      if (id && pendingLocationId.value) {
+        pendingLocationId.value = null
       }
     }
   )

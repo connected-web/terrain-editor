@@ -259,6 +259,7 @@ const {
   handle,
   status,
   statusFaded,
+  viewerLifecycleState,
   updateStatus,
   mountViewer,
   requestViewerRemount,
@@ -281,6 +282,7 @@ const {
   layerBrowserStore,
   datasetRef,
   handle,
+  viewerLifecycleState,
   persistCurrentProject,
   requestViewerRemount,
   localSettings,
@@ -476,7 +478,9 @@ useUrlState({
   cameraViewState: locationsApi.cameraViewState,
   setCameraViewState: applyCameraOverride,
   layerViewState: resolvedLayerViewStateForUrl,
-  setPendingLayerViewState
+  setPendingLayerViewState,
+  setActiveLocation: locationsApi.setActiveLocationByNameOrId,
+  selectedLocationId: locationsApi.selectedLocationId
 })
 
 watch(
@@ -1156,6 +1160,18 @@ onMounted(() => {
   window.addEventListener('dragover', handleWindowDragEvent, true)
   window.addEventListener('drop', handleWindowDragEvent, true)
   loadLocalSettings()
+
+  // Check for autoload parameter
+  const params = new URLSearchParams(window.location.search)
+  const autoload = params.get('autoload')
+
+  if (autoload === 'sample') {
+    // Auto-load the sample map for demos/tests
+    void loadSample()
+    return
+  }
+
+  // Otherwise, check for persisted project
   const saved = readPersistedProject()
   if (saved) {
     persistedProject.value = saved
