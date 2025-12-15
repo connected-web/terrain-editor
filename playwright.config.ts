@@ -27,6 +27,16 @@ export default defineConfig({
       ]
     }
   },
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' }
+    },
+    {
+      name: 'chrome',
+      use: { channel: 'chrome' }
+    }
+  ],
   webServer: {
     command: `PREVIEW_PORT=${previewPort} npm run preview:dist`,
     url: `http://127.0.0.1:${previewPort}`,
