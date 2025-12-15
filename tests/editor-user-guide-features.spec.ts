@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { registerVideoRecordingHooks } from './video-utils'
 
+process.env.RECORD_VIDEO = '1' // Enable video recording for these tests
+
 /**
  * Add debug=PLAYWRIGHT parameter to a URL
  */

@@ -14,16 +14,23 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${previewPort}`,
     headless: process.env.HEADLESS !== 'false',
-    video: process.env.RECORD_VIDEO ? 'on' : 'off',
+    // Lower video resolution to 75% of default (e.g., 720p -> 540p)
+    video: process.env.RECORD_VIDEO ? { mode: 'on', size: { width: 960, height: 540 } } : 'off',
     // Use a fresh context for each test to avoid localStorage pollution
     storageState: undefined,
-    // Enable GPU acceleration for WebGL in headless mode
+    // Add more GPU flags for better hardware acceleration
     launchOptions: {
       args: [
         '--use-gl=angle',
         '--use-angle=swiftshader',
         '--enable-webgl',
-        '--enable-accelerated-2d-canvas'
+        '--enable-accelerated-2d-canvas',
+        '--enable-gpu',
+        '--disable-software-rasterizer',
+        '--ignore-gpu-blocklist',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
       ]
     }
   },
@@ -38,9 +45,10 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `PREVIEW_PORT=${previewPort} npm run preview:dist`,
+    command: 'npm run preview:dist',
     url: `http://127.0.0.1:${previewPort}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000
+    timeout: 180_000,
+    env: { PREVIEW_PORT: String(previewPort) }
   }
 })
