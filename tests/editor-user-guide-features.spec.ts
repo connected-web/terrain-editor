@@ -37,7 +37,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
     await waitForMapReady(page)
 
     // Wait for camera to navigate to Castle (deferred until viewer is ready)
-    await page.waitForTimeout(3000)
+    await page.waitForTimeout(1000)
 
     // Wait for locations panel to be visible
     await expect(
@@ -68,7 +68,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
     await expect(pickerDialog).not.toBeVisible()
 
     // Wait for camera animation to complete (5 seconds)
-    await page.waitForTimeout(5000)
+    await page.waitForTimeout(2000)
 
     // Verify River Delta is now selected
     await expect(locationSelectorButton).toContainText('River Delta')
