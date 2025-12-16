@@ -48,7 +48,9 @@ export async function captureFrames(
 
   console.log(`📹 Capturing ${totalFrames} frames at ${fps}fps...`)
 
-  // Enable frame capture mode
+  const frameBuffers: Buffer[] = []
+
+  // Enable frame capture mode once at the start
   await page.evaluate((fps) => {
     if (!window.__terrainViewer) {
       throw new Error('Terrain viewer not found on window.__terrainViewer')
@@ -56,26 +58,18 @@ export async function captureFrames(
     window.__terrainViewer.enableFrameCaptureMode(fps)
   }, fps)
 
-  // Capture all frames into memory first (avoids disk I/O during rendering)
-  const frameBuffers: Buffer[] = []
-  console.log(`  ├─ Capturing to memory...`)
+  // Capture frames one at a time using Playwright screenshots
+  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+    console.log(`  ├─ Capturing frame ${frameIndex + 1}/${totalFrames}...`)
 
-  for (let frame = 0; frame < totalFrames; frame++) {
-    // Advance frame time
-    await page.evaluate(
-      ({ frameNumber, fps }) => {
-        window.__terrainViewer!.captureFrame(frameNumber, fps)
-      },
-      { frameNumber: frame, fps }
-    )
+    // Advance to next frame
+    await page.evaluate(({ frameNumber, fps }) => {
+      window.__terrainViewer!.captureFrame(frameNumber, fps)
+    }, { frameNumber: frameIndex, fps })
 
-    // Capture full page screenshot to include UI elements
+    // Take screenshot using Playwright (includes all UI elements)
     const screenshot = await page.screenshot({ type: 'png' })
     frameBuffers.push(screenshot)
-
-    if ((frame + 1) % 30 === 0 || frame === totalFrames - 1) {
-      console.log(`  ├─ Rendered frame ${frame + 1}/${totalFrames}`)
-    }
   }
 
   // Disable frame capture mode
@@ -86,7 +80,7 @@ export async function captureFrames(
   console.log(`✓ Rendered all ${totalFrames} frames`)
   console.log(`📝 Writing frames to disk...`)
 
-  // Write all frames to disk (can be done in parallel)
+  // Write all frames to disk in parallel
   await Promise.all(
     frameBuffers.map((buffer, index) => {
       const framePath = path.join(framesDir, `frame-${index.toString().padStart(5, '0')}.png`)

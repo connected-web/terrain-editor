@@ -14,7 +14,7 @@
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
     "dev:website": "npm --prefix website run dev",
     "dev:all": "node ./scripts/dev-all.mjs",
-    "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json theme.json",
+    "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json locations.json theme.json metadata.json icons/ layers/ thumbnails/",
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke && npm run test:e2e",
     "test:e2e": "playwright test",
@@ -48,6 +48,7 @@
     "http-server": "^14.1.1",
     "playwright": "^1.57.0",
     "playwright-video": "^2.4.0",
+    "snapdom": "^0.1.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }

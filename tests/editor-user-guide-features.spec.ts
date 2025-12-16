@@ -28,7 +28,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
 
   test('switching between locations', async ({ page }, testInfo) => {
     // Increase timeout for frame capture (can take a while)
-    test.setTimeout(180_000) // 3 minutes
+    test.setTimeout(1_800_000) // 30 minutes
 
     // Load the editor with Castle location pre-selected
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
@@ -51,6 +51,11 @@ test.describe('Terrain Editor : User Guide Features', () => {
 
     // Wait for camera animation to Castle to complete
     await page.waitForTimeout(2000)
+
+    // Set browser zoom to 90% for better UI visibility
+    await page.evaluate(() => {
+      document.body.style.zoom = '0.9'
+    })
 
     // NOW we're ready to start recording - scene is loaded and stable
     if (process.env.RECORD_VIDEO) {
