@@ -39,6 +39,14 @@ test.describe('Terrain Editor : User Guide Features', () => {
     // Wait for map to be ready
     await waitForMapReady(page)
 
+    // Set browser zoom to 90% for better UI visibility
+    await page.evaluate(() => {
+      const editorLayout = document.querySelector('.editor-layout') as HTMLElement
+      if (editorLayout) {
+        editorLayout.style.zoom = '0.9'
+      }
+    })
+
     // Wait for locations panel to be visible
     await expect(
       page.getByRole('button', { name: 'Add location' })
@@ -51,11 +59,6 @@ test.describe('Terrain Editor : User Guide Features', () => {
 
     // Wait for camera animation to Castle to complete
     await page.waitForTimeout(2000)
-
-    // Set browser zoom to 90% for better UI visibility
-    await page.evaluate(() => {
-      document.body.style.zoom = '0.9'
-    })
 
     // NOW we're ready to start recording - scene is loaded and stable
     if (process.env.RECORD_VIDEO) {

@@ -19,8 +19,8 @@
     "test": "npm run test:smoke && npm run test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:headed": "HEADLESS=false playwright test",
-    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor.spec.ts",
-    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor.spec.ts",
+    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor-user-guide-features.spec.ts",
+    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor-user-guide-features.spec.ts",
     "test:smoke": "node ./scripts/smoke-tests.mjs"
   },
   "repository": {

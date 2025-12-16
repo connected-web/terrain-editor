@@ -21,7 +21,7 @@ async function waitForMapReady(page: Page) {
 
 test.describe('Terrain Editor : Navigation', () => {
   test.use({
-    viewport: { width: 1920, height: 1080 }
+    viewport: { width: 1280, height: 768 }
   })
 
   test('editor loads and shows export button', async ({ page }) => {
