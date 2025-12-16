@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { registerVideoRecordingHooks } from './video-utils'
+import { captureFrames, stitchFramesToVideo, videoNameFromTest } from './video-utils'
 
 process.env.RECORD_VIDEO = '1' // Enable video recording for these tests
 
@@ -23,10 +23,13 @@ async function waitForMapReady(page: any) {
 
 test.describe('Terrain Editor : User Guide Features', () => {
   test.use({
-    viewport: { width: 1920, height: 1080 }
+    viewport: { width: 1280, height: 768 }
   })
 
-  test('switching between locations', async ({ page }) => {
+  test('switching between locations', async ({ page }, testInfo) => {
+    // Increase timeout for frame capture (can take a while)
+    test.setTimeout(180_000) // 3 minutes
+
     // Load the editor with Castle location pre-selected
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
     await expect(
@@ -36,46 +39,62 @@ test.describe('Terrain Editor : User Guide Features', () => {
     // Wait for map to be ready
     await waitForMapReady(page)
 
-    // Wait for camera to navigate to Castle (deferred until viewer is ready)
-    await page.waitForTimeout(1000)
-
     // Wait for locations panel to be visible
     await expect(
       page.getByRole('button', { name: 'Add location' })
     ).toBeEnabled()
 
-    // Verify Castle is selected
+    // Verify Castle is selected and camera has settled
     const locationSelectorButton = page.locator('.locations-panel__selector-button')
     await expect(locationSelectorButton).toBeVisible()
     await expect(locationSelectorButton).toContainText('Castle')
 
-    // Hold on Castle for a moment
+    // Wait for camera animation to Castle to complete
     await page.waitForTimeout(2000)
 
-    // Click the selector to open the picker
-    await locationSelectorButton.click()
+    // NOW we're ready to start recording - scene is loaded and stable
+    if (process.env.RECORD_VIDEO) {
+      const outputName = videoNameFromTest(testInfo)
+      const fps = 30
 
-    // Wait for picker dialog to appear
-    const pickerDialog = page.locator('.location-dialog')
-    await expect(pickerDialog).toBeVisible()
+      // Switch to River Delta to trigger the camera animation
+      const pickerDialog = page.locator('.location-dialog')
+      await locationSelectorButton.click()
+      await expect(pickerDialog).toBeVisible()
+      const riverButton = page.locator('.location-dialog__item').filter({ hasText: 'River Delta' })
+      await expect(riverButton).toBeVisible()
+      await riverButton.click()
+      await expect(pickerDialog).not.toBeVisible()
 
-    // Select River Delta location
-    const riverButton = page.locator('.location-dialog__item').filter({ hasText: 'River Delta' })
-    await expect(riverButton).toBeVisible()
-    await riverButton.click()
+      // Give a moment for the camera tween to be set up
+      await page.waitForTimeout(100)
 
-    // Wait for picker to close
-    await expect(pickerDialog).not.toBeVisible()
+      // Calculate timing: 1s hold at start + 1s camera animation + 2s hold at end
+      const totalDuration = 4
 
-    // Wait for camera animation to complete (5 seconds)
-    await page.waitForTimeout(2000)
+      // Capture all frames of the animation
+      const { framesDir } = await captureFrames(page, {
+        fps,
+        durationSeconds: totalDuration,
+        outputName
+      })
+
+      // Stitch frames into video
+      stitchFramesToVideo({ framesDir, outputName, fps })
+    } else {
+      // Non-recording path: just perform the test actions
+      await page.waitForTimeout(1000)
+      await locationSelectorButton.click()
+      const pickerDialog = page.locator('.location-dialog')
+      await expect(pickerDialog).toBeVisible()
+      const riverButton = page.locator('.location-dialog__item').filter({ hasText: 'River Delta' })
+      await expect(riverButton).toBeVisible()
+      await riverButton.click()
+      await expect(pickerDialog).not.toBeVisible()
+      await page.waitForTimeout(2000)
+    }
 
     // Verify River Delta is now selected
     await expect(locationSelectorButton).toContainText('River Delta')
-
-    // Hold on River Delta for video
-    await page.waitForTimeout(2000)
   })
 })
-
-registerVideoRecordingHooks(test)

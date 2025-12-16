@@ -9,7 +9,7 @@ import {
   type LocationViewState,
   type ViewerLifecycleState
 } from '@connected-web/terrain-editor'
-import { playwrightLog } from '../utils/playwrightDebug'
+import { playwrightLog, exposeTerrainViewer } from '../utils/playwrightDebug'
 
 type MountContext = {
   dataset: TerrainDataset
@@ -88,11 +88,13 @@ export function useViewer(options: {
       onLocationClick: nextContext.onLocationClick,
       onLifecycleChange: handleLifecycleChange
     })
+    exposeTerrainViewer(handle.value)
   }
 
   function disposeViewer() {
     handle.value?.destroy()
     handle.value = null
+    exposeTerrainViewer(null)
   }
 
   function requestViewerRemount() {

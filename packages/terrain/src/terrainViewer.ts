@@ -131,6 +131,10 @@ export type TerrainHandle = {
   setSeaLevel: (level: number) => void
   invalidateIconTextures: (paths?: string[]) => void
   invalidateLayerMasks: (paths?: string[]) => void
+  // Frame capture API for deterministic rendering
+  enableFrameCaptureMode: (fps?: number) => { fps: number }
+  disableFrameCaptureMode: () => void
+  captureFrame: (frameNumber: number, fps?: number) => { frameNumber: number; time: number }
 }
 
 export type Cleanup = () => void
@@ -801,7 +805,10 @@ export async function initTerrainViewer(
       setTheme: () => {},
       setSeaLevel: () => {},
       invalidateIconTextures: () => {},
-      invalidateLayerMasks: () => {}
+      invalidateLayerMasks: () => {},
+      enableFrameCaptureMode: () => ({ fps: 30 }),
+      disableFrameCaptureMode: noop,
+      captureFrame: (frameNumber: number) => ({ frameNumber, time: 0 })
     }
   }
 
@@ -1464,9 +1471,14 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   const STABILITY_TIMEOUT_MS = 2000 // Force ready after 2 seconds if not stable
   let stabilizingStartTime: number | null = null
 
+  // Frame capture mode for deterministic rendering
+  let frameCaptureMode = false
+  let manualFrameTime = 0
+  let frameCaptureStartTime = 0
+
   function animate() {
-    const now = performance.now()
-    const delta = Math.min((now - lastTime) / 1000, 0.15)
+    const now = frameCaptureMode ? manualFrameTime : performance.now()
+    const delta = frameCaptureMode ? (1 / 30) : Math.min((now - lastTime) / 1000, 0.15)
     const frameDuration = now - lastTime
     lastTime = now
     if (cameraTween) {
@@ -1530,7 +1542,9 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       }
     }
 
-    animationFrame = window.requestAnimationFrame(animate)
+    if (!frameCaptureMode) {
+      animationFrame = window.requestAnimationFrame(animate)
+    }
   }
   animate()
 
@@ -1808,6 +1822,29 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     invalidateLayerMasks: (paths?: string[]) => {
       invalidateLayerMaskCache(paths)
+    },
+    // Frame capture API for deterministic rendering
+    enableFrameCaptureMode: (fps: number = 30) => {
+      frameCaptureMode = true
+      frameCaptureStartTime = performance.now()
+      manualFrameTime = frameCaptureStartTime
+      // Reset lastTime to match the frame capture start
+      lastTime = frameCaptureStartTime
+      return { fps }
+    },
+    disableFrameCaptureMode: () => {
+      frameCaptureMode = false
+      animationFrame = window.requestAnimationFrame(animate)
+    },
+    captureFrame: (frameNumber: number, fps: number = 30) => {
+      if (!frameCaptureMode) {
+        throw new Error('Frame capture mode is not enabled. Call enableFrameCaptureMode() first.')
+      }
+      // Set time relative to when frame capture started
+      manualFrameTime = frameCaptureStartTime + (frameNumber / fps) * 1000
+      // Manually trigger one animation frame
+      animate()
+      return { frameNumber, time: manualFrameTime }
     }
   }
 }

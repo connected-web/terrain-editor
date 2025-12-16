@@ -5,7 +5,16 @@
  * This is used during E2E tests to capture detailed logs without polluting production builds.
  */
 
+import type { TerrainHandle } from '@connected-web/terrain-editor'
+
 let isPlaywrightDebug = false
+
+// Extend window interface for terrain viewer handle
+declare global {
+  interface Window {
+    __terrainViewer?: TerrainHandle | null
+  }
+}
 
 if (typeof window !== 'undefined') {
   const params = new URLSearchParams(window.location.search)
@@ -30,4 +39,14 @@ export function playwrightLog(...args: any[]) {
  */
 export function isPlaywrightDebugEnabled() {
   return isPlaywrightDebug
+}
+
+/**
+ * Expose terrain viewer handle to window for Playwright frame capture
+ */
+export function exposeTerrainViewer(handle: TerrainHandle | null) {
+  if (typeof window !== 'undefined' && isPlaywrightDebug) {
+    window.__terrainViewer = handle
+    playwrightLog('[playwrightDebug] Exposed terrain viewer handle to window.__terrainViewer')
+  }
 }
