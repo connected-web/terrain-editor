@@ -109,7 +109,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
     const selector = page.locator('.locations-panel__selector-button')
     await expect(selector).toBeVisible()
 
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(500)
 
     if (!process.env.RECORD_VIDEO) return
 
@@ -117,20 +117,20 @@ test.describe('Terrain Editor : User Guide Features', () => {
     const fps = 30
     const timelineFrames: Buffer[] = []
 
-    const hold = async (seconds: number) => {
+    async function videoHold(seconds: number) {
       const shot = await page.screenshot({ type: 'png' })
       timelineFrames.push(...duplicateFrames(shot, seconds, fps))
     }
 
-    const anim = async (seconds: number) => {
+    async function videoAnim(seconds: number) {
       const frames = await captureAnimationFrames(page, { fps, durationSeconds: seconds })
       timelineFrames.push(...frames)
     }
 
-    const transitionTo = async (
+    async function transitionToLocation(
       name: string,
       opts?: { hoverHold?: number; dialogHold?: number; afterHold?: number; animSeconds?: number }
-    ) => {
+    ) {
       const dialogHold = opts?.dialogHold ?? 0.4
       const hoverHold = opts?.hoverHold ?? 0.25
       const afterHold = opts?.afterHold ?? 0.6
@@ -142,7 +142,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
       await logLocationDialogContents(dialog)
 
       // Pause only after the dialog is definitely rendered (so the pause shows the list)
-      await hold(dialogHold)
+      await videoHold(dialogHold)
 
       const item = locationItem(dialog, name)
 
@@ -151,25 +151,25 @@ test.describe('Terrain Editor : User Guide Features', () => {
 
       await item.hover()
       await page.waitForTimeout(50)
-      await hold(hoverHold)
+      await videoHold(hoverHold)
 
       await item.click()
       await expect(dialog).not.toBeVisible({ timeout: 30_000 })
 
-      await anim(animSeconds)
-      await hold(afterHold)
+      await videoAnim(animSeconds)
+      await videoHold(afterHold)
     }
 
     let framesDir: string | undefined
     try {
       console.log('📸 Establishing hold')
-      await hold(1.0)
+      await videoHold(1.0)
 
-      await transitionTo('Hornsdale')
-      await transitionTo('River Delta')
-      await transitionTo('Castle')
+      await transitionToLocation('Hornsdale')
+      await transitionToLocation('River Delta')
+      await transitionToLocation('Castle')
 
-      await hold(1.0)
+      await videoHold(1.0)
 
       const composed = await composeVideo({
         keyframes: [],
