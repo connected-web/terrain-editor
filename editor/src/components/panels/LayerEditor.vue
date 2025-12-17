@@ -402,6 +402,7 @@ const props = defineProps<{
   colorToCss?: (color: [number, number, number]) => string
   inline?: boolean
   pendingViewState?: LayerViewState | null
+  maskViewMode?: 'grayscale' | 'color'
 }>()
 
 const emit = defineEmits<{
@@ -421,6 +422,7 @@ const emit = defineEmits<{
   (ev: 'delete-layer', id: string): void
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
+  (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
 }>()
 
 const layerName = ref('')
@@ -436,6 +438,29 @@ watch(
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
+const pendingMaskViewOverride = ref<'grayscale' | 'color' | null>(null)
+watch(
+  () => props.maskViewMode,
+  (next) => {
+    if (next && next !== maskViewMode.value) {
+      pendingMaskViewOverride.value = next
+      if (isHeightmap.value && next === 'color') {
+        maskViewMode.value = 'grayscale'
+      } else {
+        maskViewMode.value = next
+      }
+    }
+  },
+  { immediate: true }
+)
+watch(
+  maskViewMode,
+  (next, prev) => {
+    if (next !== prev) {
+      emit('mask-view-change', next)
+    }
+  }
+)
 const cursorCoords = ref({ x: 0, y: 0 })
 const currentZoom = ref(1)
 const historyState = ref({ canUndo: false, canRedo: false, undoSteps: 0, redoSteps: 0 })
@@ -533,6 +558,9 @@ watch(isHeightmap, (isH) => {
   }
   if (isH && maskViewMode.value === 'color') {
     maskViewMode.value = 'grayscale'
+  }
+  if (!isH && pendingMaskViewOverride.value && pendingMaskViewOverride.value !== maskViewMode.value) {
+    maskViewMode.value = pendingMaskViewOverride.value
   }
 })
 
@@ -1486,6 +1514,7 @@ function clamp(value: number, min: number, max: number) {
   padding: 0.25rem 0.9rem;
   font-size: 0.85rem;
   cursor: pointer;
+  flex: 1 auto;
 }
 
 .layer-editor__segment-button--active {

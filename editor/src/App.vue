@@ -65,6 +65,7 @@
             :layer-entries="layerEntriesWithOnion"
             :color-to-css="rgb"
             :pending-view-state="pendingViewStateForEditor"
+            :mask-view-mode="maskViewMode"
             @update:filter-text="setAssetDialogFilter"
             @export-layer="layersApi.exportActiveLayerImage"
             @replace="handleLayerAssetReplace"
@@ -79,6 +80,7 @@
             @delete-layer="handleLayerDelete"
             @view-state-change="handleLayerViewStateChange"
             @consume-pending-view-state="consumePendingLayerViewState"
+            @mask-view-change="handleMaskViewChange"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -351,6 +353,7 @@ const resolvedLayerViewStateForUrl = computed(() => {
   return layersApi.layerEditorOpen.value ? activeLayerViewState.value : null
 })
 const onionLayerState = reactive<Record<string, boolean>>({})
+const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
 const layerEntriesWithOnion = computed(() =>
   Array.isArray(layersApi.layerEntries.value)
     ? layersApi.layerEntries.value.map(entry => ({
@@ -371,6 +374,12 @@ const onionLayersForEditor = computed(() => {
 })
 function toggleOnionLayer(id: string) {
   onionLayerState[id] = !onionLayerState[id]
+}
+function setOnionLayerState(id: string, enabled: boolean) {
+  onionLayerState[id] = enabled
+}
+function handleMaskViewChange(mode: 'grayscale' | 'color') {
+  maskViewMode.value = mode
 }
 watch(
   () => (layersApi.layerEntries.value ?? []).map((entry) => entry.id),
@@ -473,14 +482,16 @@ useUrlState({
   layerEditorOpen: layersApi.layerEditorOpen,
   layerEditorSelectedLayerId: layersApi.layerEditorSelectedLayerId,
   openLayerEditor: layersApi.openLayerEditor,
-  layerEntries: layersApi.layerEntries,
+  layerEntries: layerEntriesWithOnion,
   layerBrowserStore,
   cameraViewState: locationsApi.cameraViewState,
   setCameraViewState: applyCameraOverride,
   layerViewState: resolvedLayerViewStateForUrl,
   setPendingLayerViewState,
   setActiveLocation: locationsApi.setActiveLocationByNameOrId,
-  selectedLocationId: locationsApi.selectedLocationId
+  selectedLocationId: locationsApi.selectedLocationId,
+  setOnionState: setOnionLayerState,
+  maskViewMode
 })
 
 watch(

@@ -1,1 +1,204 @@
-[{"name":"River Delta","icon":"icons/icon_river.png","description":"The Scar","pixel":{"x":523,"y":908},"view":{"distance":1.82,"polar":0.79,"azimuth":1.31},"id":"loc-gld5bl3g","showBorder":true},{"name":"Castle","icon":"icons/icon_castle.png","description":"Seat of power.","pixel":{"x":514,"y":728},"view":{"distance":1.8244294935149643,"polar":0.9613894084255546,"azimuth":1.871659867079187},"id":"loc-0z4izdyu","showBorder":true},{"name":"Cradle Lake","icon":"icons/icon_mountain_stream.png","description":"Stuff","pixel":{"x":791,"y":192},"view":{"distance":1.0923533308033766,"polar":1.2472772784112833,"azimuth":1.9184986625171239},"id":"loc-udpm8qtr","showBorder":true},{"id":"loc-rewcmqgk","name":"Scarton","pixel":{"x":448,"y":784},"showBorder":true,"icon":"icons/icon_city.png","view":{"distance":0.621330675359458,"polar":1.2780221664662992,"azimuth":0.03480565852620149}},{"id":"loc-pbh8cmn6","name":"Fellscar","pixel":{"x":480,"y":96},"showBorder":true,"icon":"icons/icon_mountain.png","view":{"distance":0.9365564369975354,"polar":1.119027987070865,"azimuth":2.0488666642372784}},{"id":"loc-ann51y0w","name":"Mountain Rune Spur","pixel":{"x":249,"y":200},"showBorder":true,"icon":"icons/icon_mountain.png","view":{"distance":0.5607509345119126,"polar":1.2945362643086191,"azimuth":-1.6996289346403926}},{"id":"loc-cys9x8em","name":"Faye Forest","pixel":{"x":176,"y":120},"showBorder":true,"icon":"icons/icon_forest.png","view":{"distance":0.5327133877863158,"polar":1.2012571515013981,"azimuth":-2.7191356569174814}},{"id":"loc-ymctvpgg","name":"Highspire Academy","pixel":{"x":139,"y":466},"showBorder":true,"icon":"icons/icon_castle.png","view":{"distance":1.6465476178972533,"polar":1.1679421697018337,"azimuth":-2.1727516977289167}},{"id":"loc-50a1wrhx","name":"Valecourt","pixel":{"x":408,"y":1310},"showBorder":true,"icon":"icons/icon_city.png","view":{"distance":1.8244294935149554,"polar":1.1013140018820706,"azimuth":0.5723781675581339}},{"id":"loc-n7f1ejaj","name":"Hornsdale","pixel":{"x":267,"y":472},"showBorder":true,"icon":"icons/icon_village.png","view":{"distance":1.8244294935149603,"polar":1.0946562407493,"azimuth":-2.605897413241485}},{"id":"loc-6gq8qnrd","name":"Upper Scar","pixel":{"x":540,"y":516},"showBorder":true,"icon":"icons/icon_valley_stream.png","view":{"distance":1.2740671594149209,"polar":1.1123930902217807,"azimuth":-0.5363252738814407}},{"id":"loc-8uvpaqux","name":"Castleford","pixel":{"x":333,"y":772},"showBorder":true,"icon":"icons/icon_village.png","view":{"distance":0.6213306753594571,"polar":1.264691799212842,"azimuth":-1.53181771035779}},{"id":"loc-ykbv74w4","name":"Harvest","pixel":{"x":680,"y":706},"showBorder":true,"icon":"icons/icon_village.png","view":{"distance":1.210363801444254,"polar":1.2945381521784598,"azimuth":2.2914272842078587,"targetPixel":{"x":680,"y":706}}}]
+[
+  {
+    "name": "River Delta",
+    "icon": "icons/icon_river.png",
+    "description": "The Scar",
+    "pixel": {
+      "x": 523,
+      "y": 908
+    },
+    "view": {
+      "distance": 1.82,
+      "polar": 0.79,
+      "azimuth": 1.31
+    },
+    "id": "loc-gld5bl3g",
+    "showBorder": true
+  },
+  {
+    "name": "Castle",
+    "icon": "icons/icon_castle.png",
+    "description": "Seat of power.",
+    "pixel": {
+      "x": 514,
+      "y": 728
+    },
+    "view": {
+      "distance": 1.8244294935149643,
+      "polar": 0.9613894084255546,
+      "azimuth": 1.871659867079187
+    },
+    "id": "loc-0z4izdyu",
+    "showBorder": true
+  },
+  {
+    "name": "Cradle Lake",
+    "icon": "icons/icon_mountain_stream.png",
+    "description": "Stuff",
+    "pixel": {
+      "x": 791,
+      "y": 192
+    },
+    "view": {
+      "distance": 1.0923533308033766,
+      "polar": 1.2472772784112833,
+      "azimuth": 1.9184986625171239
+    },
+    "id": "loc-udpm8qtr",
+    "showBorder": true
+  },
+  {
+    "id": "loc-rewcmqgk",
+    "name": "Scarton",
+    "pixel": {
+      "x": 448,
+      "y": 784
+    },
+    "showBorder": true,
+    "icon": "icons/icon_city.png",
+    "view": {
+      "distance": 0.621330675359458,
+      "polar": 1.2780221664662992,
+      "azimuth": 0.03480565852620149
+    }
+  },
+  {
+    "id": "loc-pbh8cmn6",
+    "name": "Fellscar",
+    "pixel": {
+      "x": 480,
+      "y": 96
+    },
+    "showBorder": true,
+    "icon": "icons/icon_mountain.png",
+    "view": {
+      "distance": 0.9365564369975354,
+      "polar": 1.119027987070865,
+      "azimuth": 2.0488666642372784
+    }
+  },
+  {
+    "id": "loc-ann51y0w",
+    "name": "Mountain Rune Spur",
+    "pixel": {
+      "x": 249,
+      "y": 200
+    },
+    "showBorder": true,
+    "icon": "icons/icon_mountain.png",
+    "view": {
+      "distance": 0.5607509345119126,
+      "polar": 1.2945362643086191,
+      "azimuth": -1.6996289346403926
+    }
+  },
+  {
+    "id": "loc-cys9x8em",
+    "name": "Faye Forest",
+    "pixel": {
+      "x": 176,
+      "y": 120
+    },
+    "showBorder": true,
+    "icon": "icons/icon_forest.png",
+    "view": {
+      "distance": 0.5327133877863158,
+      "polar": 1.2012571515013981,
+      "azimuth": -2.7191356569174814
+    }
+  },
+  {
+    "id": "loc-ymctvpgg",
+    "name": "Highspire Academy",
+    "pixel": {
+      "x": 139,
+      "y": 466
+    },
+    "showBorder": true,
+    "icon": "icons/icon_castle.png",
+    "view": {
+      "distance": 1.6465476178972533,
+      "polar": 1.1679421697018337,
+      "azimuth": -2.1727516977289167
+    }
+  },
+  {
+    "id": "loc-50a1wrhx",
+    "name": "Valecourt",
+    "pixel": {
+      "x": 408,
+      "y": 1310
+    },
+    "showBorder": true,
+    "icon": "icons/icon_city.png",
+    "view": {
+      "distance": 1.8244294935149554,
+      "polar": 1.1013140018820706,
+      "azimuth": 0.5723781675581339
+    }
+  },
+  {
+    "id": "loc-n7f1ejaj",
+    "name": "Hornsdale",
+    "pixel": {
+      "x": 267,
+      "y": 472
+    },
+    "showBorder": true,
+    "icon": "icons/icon_village.png",
+    "view": {
+      "distance": 1.8244294935149603,
+      "polar": 1.0946562407493,
+      "azimuth": -2.605897413241485
+    }
+  },
+  {
+    "id": "loc-6gq8qnrd",
+    "name": "Upper Scar",
+    "pixel": {
+      "x": 540,
+      "y": 516
+    },
+    "showBorder": true,
+    "icon": "icons/icon_valley_stream.png",
+    "view": {
+      "distance": 1.2740671594149209,
+      "polar": 1.1123930902217807,
+      "azimuth": -0.5363252738814407
+    }
+  },
+  {
+    "id": "loc-8uvpaqux",
+    "name": "Castleford",
+    "pixel": {
+      "x": 333,
+      "y": 772
+    },
+    "showBorder": true,
+    "icon": "icons/icon_village.png",
+    "view": {
+      "distance": 0.6213306753594571,
+      "polar": 1.264691799212842,
+      "azimuth": -1.53181771035779
+    }
+  },
+  {
+    "id": "loc-ykbv74w4",
+    "name": "Harvest",
+    "pixel": {
+      "x": 680,
+      "y": 706
+    },
+    "showBorder": true,
+    "icon": "icons/icon_village.png",
+    "view": {
+      "distance": 1.210363801444254,
+      "polar": 1.2945381521784598,
+      "azimuth": 2.2914272842078587,
+      "targetPixel": {
+        "x": 680,
+        "y": 706
+      }
+    }
+  }
+]

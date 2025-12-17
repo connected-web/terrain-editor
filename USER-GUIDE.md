@@ -7,21 +7,42 @@ This guide summarizes the current capabilities of the terrain editor so new cont
 ### Panel Dock + Toolbar
 Single-column dock hosts Workspace, Layers, Theme, Locations, and Settings panels. Toolbar keeps context-aware actions (Load sample, Export WYN, Close map) and collapses labels automatically when the dock is hidden.
 
+![Terrain Editor home with dock and toolbar](documentation/images/editor-home.png)
+
 ### Workspace Panel
 Edit project title, author, width/height, and sea level. Viewer remounts automatically when map dimensions change so the canvas always matches the declared resolution.
 
-### Layers Panel & Layer Editor
+![Workspace panel showing project metadata form](documentation/images/panel-workspace.png)
+
+### Layers Panel
 - Layer list with drag handles, visibility toggles, onion-skin toggles, and reorder-on-drop within sections.
-- Layer Editor opens inline with mask canvas, tool palette, brush settings, and layer utilities.
-- Mask tools: brush/erase/flatten (heightmap), hand/pan. Brush supports size, opacity, softness, spacing, flow sliders plus advanced settings (spacing/flow).
-- Layer settings: checkerboard or solid black background, **Mask view toggle (B/W or Colour)** using the layer tint, layer colour picker, reset/apply buttons.
-- Mask editor features: zoom/pan, undo/redo history, onion-skin overlays, export mask (with optional alpha), fit/zoom 100%, view-state persistence via URL `leo` param across reloads & layer switches.
+- Hovering a pill shows handles, quick visibility toggles, and onion-skin controls while respecting section hints.
+- Click any layer to open it in the editor or drag to reorder within compatible sections.
+
+![Layers panel overview](documentation/images/panel-layers.png)
+
+### Layer Editor
+- Opens inline with the mask canvas, tool palette, brush settings, and per-layer utilities (export, reset, onion skin).
+- Mask tools include brush/erase/flatten (heightmap), hand/pan, plus size/opacity/softness/spacing/flow sliders and advanced spacing/flow controls.
+- Canvas utilities: checkerboard or solid background, **Mask view toggle (B/W or Colour)**, undo/redo history, onion-skin overlays, export mask (with optional alpha), fit/zoom 100%, view-state persistence via URL `leo` param.
+
+**Height Map tooling example**
+
+![Layer editor height map tools](documentation/images/layer-editor-height-map.png)
+
+**Forest biome editing example**
+
+![Layer editor forest biome tools](documentation/images/layer-editor-forest.png)
 
 ### Theme Panel
 Edit marker sprite, label, and stem colours for normal/hover/focus states. Reset helpers and stem shape selection.
 
+![Theme panel label controls](documentation/images/panel-theme.png)
+
 ### Locations Panel
 List, pick-on-map, drag/drop icon assets, toggle label borders, rename/delete, and camera snapshot controls.
+
+![Locations panel with Castle selected](documentation/images/panel-locations-selected-castle.png)
 
 <a href="documentation/animations/looping-location-demo-capture.mp4">
   <kbd>
@@ -31,6 +52,8 @@ List, pick-on-map, drag/drop icon assets, toggle label borders, rename/delete, a
 
 ### Settings Panel
 Placeholder for local/editor preferences (expand as needed).
+
+![Settings panel local options](documentation/images/panel-settings.png)
 
 ## Project & Assets
 

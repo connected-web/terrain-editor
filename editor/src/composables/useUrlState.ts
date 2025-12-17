@@ -29,6 +29,8 @@ type Options = {
   setCameraViewState: (state: CameraState) => void
   layerViewState: Ref<LayerViewState | null>
   setPendingLayerViewState: (payload: { id: string | null; state: LayerViewState | null }) => void
+  setOnionState?: (id: string, enabled: boolean) => void
+  maskViewMode?: Ref<'grayscale' | 'color'>
 }
 
 type InitialRouteState = {
@@ -39,13 +41,41 @@ type InitialRouteState = {
   cameraState: CameraState | null
   layerViewState: LayerViewState | null
   locationId: string | null
+  maskViewMode: 'grayscale' | 'color' | null
 }
 
 const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations']
 
+function extractMaskViewState(signature: string | null): {
+  signature: string | null
+  maskViewMode: 'grayscale' | 'color' | null
+} {
+  if (!signature) return { signature, maskViewMode: null }
+  const suffixMatch = signature.match(/:(BW|CL)$/i)
+  if (!suffixMatch) return { signature, maskViewMode: null }
+  const base = signature.slice(0, -suffixMatch[0].length)
+  const sequentialPattern = /^LS:[0-9A-Z]*$/i
+  const compactPattern = /^[01VHOI]+$/i
+  if (!sequentialPattern.test(base) && !compactPattern.test(base)) {
+    return { signature, maskViewMode: null }
+  }
+  const token = suffixMatch[1].toUpperCase()
+  const maskViewMode = token === 'CL' ? 'color' : 'grayscale'
+  return { signature: base, maskViewMode }
+}
+
 function parseInitialState(): InitialRouteState {
   if (typeof window === 'undefined') {
-    return { panel: null, dockCollapsed: null, layerId: null, layerVisSignature: null, cameraState: null, layerViewState: null, locationId: null }
+    return {
+      panel: null,
+      dockCollapsed: null,
+      layerId: null,
+      layerVisSignature: null,
+      cameraState: null,
+      layerViewState: null,
+      locationId: null,
+      maskViewMode: null
+    }
   }
   const params = new URLSearchParams(window.location.search)
   const panelParam = params.get('panel')
@@ -54,7 +84,8 @@ function parseInitialState(): InitialRouteState {
   const dockCollapsed =
     dockParam === '1' ? true : dockParam === '0' ? false : dockParam === null ? null : Boolean(dockParam)
   const layerId = params.get('layer')
-  const layerVisSignature = params.get('layers')
+  const rawLayerSignature = params.get('layers')
+  const { signature: layerVisSignature, maskViewMode } = extractMaskViewState(rawLayerSignature)
   const cameraParam = params.get('camera')
   let cameraState: CameraState | null = null
   if (cameraParam) {
@@ -96,7 +127,8 @@ function parseInitialState(): InitialRouteState {
     layerVisSignature,
     cameraState,
     layerViewState,
-    locationId
+    locationId,
+    maskViewMode
   }
 }
 
@@ -133,25 +165,68 @@ function applyPairVisibility(signature: string, entries: LayerEntry[], store: La
   return applied
 }
 
-function applySequentialVisibility(signature: string, entries: LayerEntry[], store: LayerBrowserStore) {
+type LayerStatePatch = { visibility: boolean | null; onion: boolean | null }
+
+function decodeLayerStateToken(token: string): LayerStatePatch | null {
+  if (!token) return null
+  const normalized = token.toUpperCase()
+  switch (normalized) {
+    case '1':
+      return { visibility: true, onion: null }
+    case '0':
+      return { visibility: false, onion: null }
+    case 'V':
+      return { visibility: true, onion: false }
+    case 'H':
+      return { visibility: false, onion: false }
+    case 'O':
+      return { visibility: true, onion: true }
+    case 'I':
+      return { visibility: false, onion: true }
+    default:
+      return null
+  }
+}
+
+function layerEntryStateToken(entry: LayerEntry): 'V' | 'H' | 'O' | 'I' {
+  const onion = Boolean(entry.onionEnabled)
+  if (entry.visible) {
+    return onion ? 'O' : 'V'
+  }
+  return onion ? 'I' : 'H'
+}
+
+function applySequentialVisibility(
+  signature: string,
+  entries: LayerEntry[],
+  store: LayerBrowserStore,
+  setOnionState?: (id: string, enabled: boolean) => void
+) {
   if (!signature.length) return false
   const cleaned = signature.startsWith('LS:') ? signature.slice(3) : signature
   if (!cleaned.length) return false
   if (cleaned.length !== entries.length) return false
   let applied = false
   for (let index = 0; index < cleaned.length && index < entries.length; index += 1) {
-    const flag = parseVisibilityToken(cleaned[index])
-    if (flag === null) continue
-    store.setVisibility(entries[index].id, flag)
-    applied = true
+    const patch = decodeLayerStateToken(cleaned[index])
+    if (!patch) continue
+    if (patch.visibility !== null) {
+      store.setVisibility(entries[index].id, patch.visibility)
+      applied = true
+    }
+    if (setOnionState && patch.onion !== null) {
+      setOnionState(entries[index].id, patch.onion)
+      applied = true
+    }
   }
   return applied
 }
 
-function encodeLayerVisibility(entries: LayerEntry[]): string {
+function encodeLayerVisibility(entries: LayerEntry[], maskViewMode?: 'grayscale' | 'color'): string {
   if (!entries.length) return ''
-  const signature = entries.map((entry) => (entry.visible ? 'V' : 'H')).join('')
-  return `LS:${signature}`
+  const signature = entries.map((entry) => layerEntryStateToken(entry)).join('')
+  const suffix = maskViewMode === 'color' ? ':CL' : ':BW'
+  return `LS:${signature}${suffix}`
 }
 
 function updateQueryParam(name: string, value: string | null, params: URLSearchParams) {
@@ -183,12 +258,17 @@ export function useUrlState(options: Options & { setActiveLocation?: (id: string
   if (initial.locationId && options.setActiveLocation) {
     options.setActiveLocation(initial.locationId)
   }
+  if (initial.maskViewMode && options.maskViewMode) {
+    options.maskViewMode.value = initial.maskViewMode
+  }
   const pendingLayerId = ref<string | null>(initial.layerId)
   const pendingLayerVisibility = ref<string | null>(initial.layerVisSignature)
   const pendingLocationId = ref<string | null>(initial.locationId)
-  const layerVisibilitySignature = computed(() =>
-    options.layerEntries.value.map((entry) => (entry.visible ? '1' : '0')).join('')
-  )
+  const layerVisibilitySignature = computed(() => {
+    const layers = options.layerEntries.value.map((entry) => layerEntryStateToken(entry)).join('')
+    const maskMode = options.maskViewMode?.value ?? 'grayscale'
+    return `${layers}|${maskMode}`
+  })
   const cameraSignature = computed(() => {
     const state = options.cameraViewState.value
     if (!state) return ''
@@ -222,14 +302,14 @@ export function useUrlState(options: Options & { setActiveLocation?: (id: string
     (entries) => {
       if (pendingLayerVisibility.value) {
         const signature = pendingLayerVisibility.value
-        const applied = signature.startsWith('LS:') || /^[01VHvh]+$/.test(signature)
-          ? applySequentialVisibility(signature, entries, options.layerBrowserStore)
+        const applied = signature.startsWith('LS:') || /^[01VHOIvhoi]+$/.test(signature)
+          ? applySequentialVisibility(signature, entries, options.layerBrowserStore, options.setOnionState)
           : signature.includes(':') ||
             signature.includes(',') ||
             signature.includes(';') ||
             signature.includes('|')
           ? applyPairVisibility(signature, entries, options.layerBrowserStore)
-          : applySequentialVisibility(signature, entries, options.layerBrowserStore)
+          : applySequentialVisibility(signature, entries, options.layerBrowserStore, options.setOnionState)
         if (applied) {
           pendingLayerVisibility.value = null
         }
@@ -276,7 +356,10 @@ export function useUrlState(options: Options & { setActiveLocation?: (id: string
         ? options.layerEditorSelectedLayerId.value
         : null
     updateQueryParam('layer', layerId, params)
-    const visibilityString = encodeLayerVisibility(options.layerEntries.value)
+    const visibilityString = encodeLayerVisibility(
+      options.layerEntries.value,
+      options.maskViewMode?.value
+    )
     updateQueryParam('layers', visibilityString || null, params)
     updateQueryParam('camera', cameraSignature.value || null, params)
     updateQueryParam('leo', layerViewStateSignature.value || null, params)

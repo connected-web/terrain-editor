@@ -17,10 +17,12 @@
     "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json locations.json theme.json metadata.json icons/ layers/ thumbnails/",
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke && npm run test:e2e",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "HEADLESS=false playwright test",
-    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor-user-guide-features.spec.ts",
-    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor-user-guide-features.spec.ts",
+    "test:e2e": "playwright test --test-ignore=tests/editor-user-guide-animated-features.spec.ts",
+    "test:e2e:headed": "HEADLESS=false playwright test --test-ignore=tests/editor-user-guide-animated-features.spec.ts",
+    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor-user-guide-animated-features.spec.ts",
+    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor-user-guide-animated-features.spec.ts",
+    "render:user-guide-images": "HEADLESS=false playwright test tests/editor-user-guide.spec.ts",
+    "render:user-guide-images:headless": "playwright test tests/editor-user-guide.spec.ts",
     "test:smoke": "node ./scripts/smoke-tests.mjs"
   },
   "repository": {
