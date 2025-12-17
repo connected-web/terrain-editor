@@ -21,15 +21,16 @@ async function waitForMapReady(page: Page) {
 }
 
 async function rescaleUI(page: Page) {
-  const scale = 0.5
   await page.evaluate(() => {
+    const scale = 0.5
     const editorLayout = document.querySelector<HTMLElement>('.editor-layout')
-    if (editorLayout) editorLayout.style.zoom = String(scale)
-  })
-  await page.waitForTimeout(50)
-  await page.evaluate(() => {
+    if (editorLayout) {
+      editorLayout.style.zoom = String(scale)
+    }
     const panelDock = document.querySelector<HTMLElement>('.panel-dock')
-    if (panelDock) panelDock.style.height = Number(1 / scale * 100).toFixed(0) + 'vh'
+    if (panelDock) {
+      panelDock.style.height = Number(1 / scale * 100).toFixed(0) + 'vh'
+    }
   })
 }
 
