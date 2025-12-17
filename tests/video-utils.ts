@@ -126,7 +126,7 @@ export async function composeVideo(options: {
   fps?: number
 }) {
   const fps = options.fps ?? 30
-  const outputDir = path.join(process.cwd(), 'documentation', 'animations')
+  const outputDir = path.join(process.cwd(), 'documentation', 'renders')
   const framesDir = path.join(outputDir, `${options.outputName}-frames`)
 
   // Clean and create frames directory

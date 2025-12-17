@@ -23,6 +23,12 @@ Edit marker sprite, label, and stem colours for normal/hover/focus states. Reset
 ### Locations Panel
 List, pick-on-map, drag/drop icon assets, toggle label borders, rename/delete, and camera snapshot controls.
 
+<a href="documentation/animations/looping-location-demo-capture.mp4">
+  <kbd>
+    <img alt="Looping Locations demo" src="documentation/animations/looping-location-demo-capture.gif" />
+  </kbd>
+</a>
+
 ### Settings Panel
 Placeholder for local/editor preferences (expand as needed).
 
