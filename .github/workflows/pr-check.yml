@@ -135,14 +135,6 @@ jobs:
               ;;
           esac
 
-      - name: Append Playwright screenshot summary
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CWEB_IMAGES_FTP_USER: ${{ vars.CWEB_IMAGES_FTP_USER }}
-          CWEB_IMAGES_FTP_PASSWORD: '${{ secrets.CWEB_IMAGES_FTP_PASSWORD }}'
-        run: node ./scripts/summary-screenshots.mjs
-
       - name: Upload Playwright artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -153,3 +145,43 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+      - name: Upload screenshot bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.target }}
+          path: test-results/screenshots
+          if-no-files-found: ignore
+
+  summary:
+    name: Screenshot Summary
+    needs: playwright
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies for summary
+        run: npm ci
+
+      - name: Download screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshots-*
+          path: test-results/screenshots
+          merge-multiple: true
+
+      - name: Append Playwright screenshot summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CWEB_IMAGES_FTP_USER: ${{ vars.CWEB_IMAGES_FTP_USER }}
+          CWEB_IMAGES_FTP_PASSWORD: '${{ secrets.CWEB_IMAGES_FTP_PASSWORD }}'
+        run: node ./scripts/summary-screenshots.mjs
