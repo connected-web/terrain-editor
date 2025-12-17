@@ -1,5 +1,5 @@
 // video-utils.ts
-import { TestInfo, Page } from '@playwright/test'
+import { TestInfo, Page, expect, Locator } from '@playwright/test'
 import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
@@ -20,6 +20,81 @@ export function videoNameFromTest(testInfo: any) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
+}
+
+export function addDebugParam(url: string, debugValue = 'PLAYWRIGHT'): string {
+  const urlObj = new URL(url, 'http://localhost')
+  urlObj.searchParams.set('debug', debugValue)
+  return urlObj.pathname + urlObj.search
+}
+
+export async function waitForMapReady(page: Page, timeout = 60_000) {
+  await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({ timeout })
+}
+
+export async function rescaleUI(page: Page, scale = 0.7, dockHeight?: string) {
+  const heightValue =
+    dockHeight ?? `${Math.round((1 / Math.max(scale, 0.01)) * 100)}vh`
+
+  await page.evaluate(
+    ({ scaleValue, heightValue }) => {
+      const editorLayout = document.querySelector<HTMLElement>('.editor-layout')
+      if (editorLayout) editorLayout.style.zoom = String(scaleValue)
+      const panelDock = document.querySelector<HTMLElement>('.panel-dock')
+      if (panelDock) panelDock.style.height = heightValue
+    },
+    { scaleValue: scale, heightValue }
+  )
+  await page.waitForTimeout(50)
+}
+
+export function duplicateFrames(frame: Buffer, seconds: number, fps: number): Buffer[] {
+  const count = Math.max(1, Math.ceil(seconds * fps))
+  return Array.from({ length: count }, () => frame)
+}
+
+function cssAttrEscape(value: string): string {
+  return value.replace(/["\\]/g, '\\$&')
+}
+
+export function locationDialog(page: Page): Locator {
+  const heading = page.getByRole('heading', { name: 'Select a location' })
+  return page.locator('.location-dialog').filter({ has: heading }).first()
+}
+
+export async function openLocationDialog(page: Page, selectorButton: Locator) {
+  const dialog = locationDialog(page)
+
+  const isVisible = await dialog.isVisible().catch(() => false)
+  if (!isVisible) {
+    await selectorButton.click()
+  }
+
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  await expect(dialog.locator('button.location-dialog__item').first()).toBeVisible({
+    timeout: 30_000
+  })
+
+  return dialog
+}
+
+export async function logLocationDialogContents(dialog: Locator) {
+  const buttons = dialog.locator('button.location-dialog__item')
+  const count = await buttons.count()
+
+  const labels = (await buttons.locator('strong').allTextContents()).map((s) => s.trim())
+  const fullTexts = (await buttons.allInnerTexts()).map((s) => s.replace(/\s+/g, ' ').trim())
+
+  console.log(`🧾 Location dialog: ${count} items`)
+  console.log('🧾 Labels:', labels)
+  console.log('🧾 Full button texts:', fullTexts)
+}
+
+export function locationItem(dialog: Locator, name: string): Locator {
+  const attr = cssAttrEscape(name)
+  return dialog
+    .locator(`button.location-dialog__item[data-test-location="${attr}"]`)
+    .first()
 }
 
 /**
