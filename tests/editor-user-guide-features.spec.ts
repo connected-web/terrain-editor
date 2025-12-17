@@ -22,7 +22,7 @@ async function waitForMapReady(page: Page) {
 
 async function rescaleUI(page: Page) {
   await page.evaluate(() => {
-    const scale = 0.5
+    const scale = 0.65
     const editorLayout = document.querySelector<HTMLElement>('.editor-layout')
     if (editorLayout) {
       editorLayout.style.zoom = String(scale)
@@ -100,9 +100,9 @@ test.describe('Terrain Editor : User Guide Features', () => {
 
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
     await expect(page.getByRole('heading', { name: 'Terrain Editor' })).toBeVisible()
+    await rescaleUI(page)
 
     await waitForMapReady(page)
-    await rescaleUI(page)
 
     await expect(page.getByRole('button', { name: 'Add location' })).toBeEnabled()
 
