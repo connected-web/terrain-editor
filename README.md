@@ -4,7 +4,7 @@ An interactive terrain editor and viewer designed for web using three.js.
 
 ## Wyn files
 
-This terrain editor loads compressedd `.wyn` files which have the following package structure:
+This terrain editor loads compressed `.wyn` files which have the following package structure:
 
 - `legend.json`: Metadata about the terrain, including layers, name, author, and description.
 - `layers/layername.png`: PNG files representing different terrain layers (e.g., heightmap, colormap, normalmap).
@@ -34,8 +34,6 @@ During development each harness uses a fixed Vite port so the cross-links keep w
 - Website → `http://localhost:4176/`
 
 The website CTA buttons link directly to those ports during development so you always land on the correct running server.
-
-`npm run dev:all` starts all dev servers together and tears them down cleanly when you hit CTRL+C, so you don’t have to manage PIDs by hand.
 
 ### Testing
 
@@ -132,9 +130,12 @@ Copyright 2025 Connected Web.
 
 - `packages/terrain` – source for the `@connected-web/terrain-editor` package (viewer/editor utilities).
 - `demos/viewer-ts` – Vanilla TypeScript harness that loads `.wyn` files via `loadWynArchive`.
-- `editor` – Early editor workspace with metadata + location tooling.
+- `editor` – Vue 3 editor workspace with layers/masks, locations, theme designer, and export flows.
 - `website` – Vue 3 SPA for marketing pages and the future editor shell.
 - `maps/` – Source assets used to build sample Wyn archives (e.g., `wynnal-terrain.wyn`).
+- `documentation/` – Screenshots, GIFs, and render artifacts referenced by the user guide.
+- `tests/` – Playwright suites (navigation screenshots + animation captures).
+- `scripts/` – Shared build/dev helpers (build-dist, dev-all, smoke tests, etc.).
 
 ## Development roadmap
 
