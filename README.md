@@ -155,9 +155,11 @@ Copyright 2025 Connected Web.
 - ✅ Locations + icons editor with drag/drop asset support
 - ✅ Map sizing + legend metadata management
 - ✅ Theme designer (marker palette) with live preview + JSON export via archive build
-- 🚧 Layer asset uploads (drag/drop) with dimension normalization
 - ✅ Location icon upload surface tied into legend/locations
-- 🚧 Viewer recentering when dock/toolbar visibility changes
 - ✅ Toolbar/dock logic unification for future tools
+
+### Planned Features
+
+- 🚧 Layer asset uploads (drag/drop) with dimension normalization
 - 🚧 Implement mask editing tools (brushes, noise, etc.)
 - 🚧 Implement heightmap editing tools (point files, falloff, rivers, etc.)
