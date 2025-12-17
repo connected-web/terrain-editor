@@ -61,8 +61,16 @@ jobs:
         run: npm run test:smoke
 
   playwright:
-    name: Playwright E2E
+    name: Playwright E2E (${{ matrix.target }})
     needs: smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - docs-blue
+          - docs-green
+          - docs-orange
+          - docs-red
     permissions:
       contents: read
       pull-requests: write
@@ -111,7 +119,21 @@ jobs:
         run: sudo npx playwright install-deps chromium
 
       - name: Run Playwright end-to-end tests
-        run: npm run test:e2e
+        run: |
+          case "${{ matrix.target }}" in
+            docs-blue)
+              npx playwright test --grep "🟦"
+              ;;
+            docs-green)
+              npx playwright test --grep "🟩"
+              ;;
+            docs-orange)
+              npx playwright test --grep "🟧"
+              ;;
+            docs-red)
+              npx playwright test --grep "🟥"
+              ;;
+          esac
 
       - name: Append Playwright screenshot summary
         if: always()

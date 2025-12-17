@@ -93,7 +93,7 @@ test.describe('Terrain Editor : Navigation', () => {
     viewport: { width: 1920, height: 1080 }
   })
 
-  test('editor loads and shows export button', async ({ page }) => {
+  test('🟦 Terrain Editor : Navigation › editor loads and shows export button', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('', 'River Delta')))
     await expect(
       page.getByRole('heading', { name: 'Terrain Editor' })
@@ -110,7 +110,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'editor-home')
   })
 
-  test('workspace panel shows metadata form', async ({ page }) => {
+  test('🟩 Terrain Editor : Navigation › workspace panel shows metadata form', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=workspace', 'Cradle Lake')))
     await waitForMapReady(page)
 
@@ -123,7 +123,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-workspace')
   })
 
-  test('theme panel shows colour controls', async ({ page }) => {
+  test('🟩 Terrain Editor : Navigation › theme panel shows colour controls', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=theme', 'Faye Forest')))
     await waitForMapReady(page)
 
@@ -133,7 +133,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-theme')
   })
 
-  test('locations panel shows add location button', async ({ page }) => {
+  test('🟩 Terrain Editor : Navigation › locations panel shows add location button', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=locations', 'Hornsdale')))
     await waitForMapReady(page)
 
@@ -143,7 +143,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-locations')
   })
 
-  test('settings panel shows local options', async ({ page }) => {
+  test('🟩 Terrain Editor : Navigation › settings panel shows local options', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=settings', 'Valecourt')))
     await waitForMapReady(page)
 
@@ -153,7 +153,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-settings')
   })
 
-  test('layers panel shows layer list', async ({ page }) => {
+  test('🟧 Terrain Editor : Navigation › layers panel shows layer list', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=layers', 'Upper Scar')))
     await waitForMapReady(page)
 
@@ -161,7 +161,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-layers')
   })
 
-  test('location selection via URL parameter', async ({ page }) => {
+  test('🟧 Terrain Editor : Navigation › location selection via URL parameter', async ({ page }) => {
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
     await waitForMapReady(page)
 
@@ -172,7 +172,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'panel-locations-selected-castle')
   })
 
-  test('layer editor height map view', async ({ page }) => {
+  test('🟥 Terrain Editor : Navigation › layer editor height map view', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=layers', 'Mountain Rune Spur')))
     await waitForMapReady(page)
 
@@ -183,7 +183,7 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'layer-editor-height-map')
   })
 
-  test('layer editor forest biome view', async ({ page }) => {
+  test('🟥 Terrain Editor : Navigation › layer editor forest biome view', async ({ page }) => {
     await page.goto(
       addDebugParam(
         '/editor/?autoload=sample&panel=layers&layer=biome%3Aforest&layers=LS%3AOVVVVVOHVVVVV%3ACL&leo=1.200%2C0.5037%2C0.6555'

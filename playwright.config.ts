@@ -5,7 +5,7 @@ const previewPort = Number(process.env.PLAYWRIGHT_PREVIEW_PORT || 4178)
 export default defineConfig({
   testDir: './tests',
   testIgnore: ['tests/editor-user-guide-animated-features.spec.ts'],
-  workers: 1,
+  workers: process.env.CI ? '50%' : 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   timeout: 90_000,
