@@ -1,108 +1,186 @@
-import { test, expect } from '@playwright/test'
-import { captureFrames, stitchFramesToVideo, videoNameFromTest } from './video-utils'
+import { test, expect, type Page, type Locator } from '@playwright/test'
+import {
+  captureAnimationFrames,
+  composeVideo,
+  stitchFramesToVideo,
+  videoNameFromTest
+} from './video-utils'
 
-process.env.RECORD_VIDEO = '1' // Enable video recording for these tests
+process.env.RECORD_VIDEO = '1'
 
-/**
- * Add debug=PLAYWRIGHT parameter to a URL
- */
 function addDebugParam(url: string): string {
   const urlObj = new URL(url, 'http://localhost')
   urlObj.searchParams.set('debug', 'PLAYWRIGHT')
   return urlObj.pathname + urlObj.search
 }
 
+async function waitForMapReady(page: Page) {
+  await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({
+    timeout: 60_000
+  })
+}
+
+async function rescaleUI(page: Page) {
+  const scale = 0.5
+  await page.evaluate(() => {
+    const editorLayout = document.querySelector<HTMLElement>('.editor-layout')
+    if (editorLayout) editorLayout.style.zoom = String(scale)
+  })
+  await page.waitForTimeout(50)
+  await page.evaluate(() => {
+    const panelDock = document.querySelector<HTMLElement>('.panel-dock')
+    if (panelDock) panelDock.style.height = Number(1 / scale * 100).toFixed(0) + 'vh'
+  })
+}
+
+function duplicateFrames(frame: Buffer, seconds: number, fps: number): Buffer[] {
+  const count = Math.max(1, Math.ceil(seconds * fps))
+  return Array.from({ length: count }, () => frame)
+}
+
+function cssAttrEscape(value: string): string {
+  return value.replace(/["\\]/g, '\\$&')
+}
+
 /**
- * Wait for the sample archive to be loaded and ready.
+ * Get a stable locator for the *visible* location picker dialog.
+ * We anchor on .location-dialog and require it contains the heading.
  */
-async function waitForMapReady(page: any) {
-  await expect(
-    page.getByText('Map ready.', { exact: true })
-  ).toBeVisible({ timeout: 60_000 })
+function locationDialog(page: Page): Locator {
+  const heading = page.getByRole('heading', { name: 'Select a location' })
+  return page.locator('.location-dialog').filter({ has: heading }).first()
+}
+
+async function openLocationDialog(page: Page, selectorButton: Locator) {
+  const dialog = locationDialog(page)
+
+  // Idempotent open: only click if not already visible
+  const isVisible = await dialog.isVisible().catch(() => false)
+  if (!isVisible) {
+    await selectorButton.click()
+  }
+
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  await expect(dialog.locator('button.location-dialog__item').first()).toBeVisible({
+    timeout: 30_000
+  })
+
+  return dialog
+}
+
+async function logLocationDialogContents(dialog: Locator) {
+  const buttons = dialog.locator('button.location-dialog__item')
+  const count = await buttons.count()
+
+  const labels = (await buttons.locator('strong').allTextContents()).map((s) => s.trim())
+  const fullTexts = (await buttons.allInnerTexts()).map((s) => s.replace(/\s+/g, ' ').trim())
+
+  console.log(`🧾 Location dialog: ${count} items`)
+  console.log('🧾 Labels:', labels)
+  console.log('🧾 Full button texts:', fullTexts)
+}
+
+/**
+ * Find the button for a location name robustly.
+ * - Uses a dedicated data attribute so punctuation / layout changes do not matter
+ */
+function locationItem(dialog: Locator, name: string): Locator {
+  const attr = cssAttrEscape(name)
+  return dialog
+    .locator(`button.location-dialog__item[data-test-location="${attr}"]`)
+    .first()
 }
 
 test.describe('Terrain Editor : User Guide Features', () => {
-  test.use({
-    viewport: { width: 1280, height: 768 }
-  })
+  test.use({ viewport: { width: 1280, height: 768 } })
 
-  test('switching between locations', async ({ page }, testInfo) => {
-    // Increase timeout for frame capture (can take a while)
-    test.setTimeout(1_800_000) // 30 minutes
+  test('looping location demo capture', async ({ page }, testInfo) => {
+    test.setTimeout(1_800_000)
 
-    // Load the editor with Castle location pre-selected
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
-    await expect(
-      page.getByRole('heading', { name: 'Terrain Editor' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Terrain Editor' })).toBeVisible()
 
-    // Wait for map to be ready
     await waitForMapReady(page)
+    await rescaleUI(page)
 
-    // Set browser zoom to 90% for better UI visibility
-    await page.evaluate(() => {
-      const editorLayout = document.querySelector('.editor-layout') as HTMLElement
-      if (editorLayout) {
-        editorLayout.style.zoom = '0.9'
-      }
-    })
+    await expect(page.getByRole('button', { name: 'Add location' })).toBeEnabled()
 
-    // Wait for locations panel to be visible
-    await expect(
-      page.getByRole('button', { name: 'Add location' })
-    ).toBeEnabled()
+    const selector = page.locator('.locations-panel__selector-button')
+    await expect(selector).toBeVisible()
 
-    // Verify Castle is selected and camera has settled
-    const locationSelectorButton = page.locator('.locations-panel__selector-button')
-    await expect(locationSelectorButton).toBeVisible()
-    await expect(locationSelectorButton).toContainText('Castle')
-
-    // Wait for camera animation to Castle to complete
     await page.waitForTimeout(2000)
 
-    // NOW we're ready to start recording - scene is loaded and stable
-    if (process.env.RECORD_VIDEO) {
-      const outputName = videoNameFromTest(testInfo)
-      const fps = 30
+    if (!process.env.RECORD_VIDEO) return
 
-      // Switch to River Delta to trigger the camera animation
-      const pickerDialog = page.locator('.location-dialog')
-      await locationSelectorButton.click()
-      await expect(pickerDialog).toBeVisible()
-      const riverButton = page.locator('.location-dialog__item').filter({ hasText: 'River Delta' })
-      await expect(riverButton).toBeVisible()
-      await riverButton.click()
-      await expect(pickerDialog).not.toBeVisible()
+    const outputName = `${videoNameFromTest(testInfo)}-${testInfo.project.name}`
+    const fps = 30
+    const timelineFrames: Buffer[] = []
 
-      // Give a moment for the camera tween to be set up
-      await page.waitForTimeout(100)
-
-      // Calculate timing: 1s hold at start + 1s camera animation + 2s hold at end
-      const totalDuration = 4
-
-      // Capture all frames of the animation
-      const { framesDir } = await captureFrames(page, {
-        fps,
-        durationSeconds: totalDuration,
-        outputName
-      })
-
-      // Stitch frames into video
-      stitchFramesToVideo({ framesDir, outputName, fps })
-    } else {
-      // Non-recording path: just perform the test actions
-      await page.waitForTimeout(1000)
-      await locationSelectorButton.click()
-      const pickerDialog = page.locator('.location-dialog')
-      await expect(pickerDialog).toBeVisible()
-      const riverButton = page.locator('.location-dialog__item').filter({ hasText: 'River Delta' })
-      await expect(riverButton).toBeVisible()
-      await riverButton.click()
-      await expect(pickerDialog).not.toBeVisible()
-      await page.waitForTimeout(2000)
+    const hold = async (seconds: number) => {
+      const shot = await page.screenshot({ type: 'png' })
+      timelineFrames.push(...duplicateFrames(shot, seconds, fps))
     }
 
-    // Verify River Delta is now selected
-    await expect(locationSelectorButton).toContainText('River Delta')
+    const anim = async (seconds: number) => {
+      const frames = await captureAnimationFrames(page, { fps, durationSeconds: seconds })
+      timelineFrames.push(...frames)
+    }
+
+    const transitionTo = async (
+      name: string,
+      opts?: { hoverHold?: number; dialogHold?: number; afterHold?: number; animSeconds?: number }
+    ) => {
+      const dialogHold = opts?.dialogHold ?? 0.4
+      const hoverHold = opts?.hoverHold ?? 0.25
+      const afterHold = opts?.afterHold ?? 0.6
+      const animSeconds = opts?.animSeconds ?? 0.9
+
+      console.log(`🧭 Transition → ${name}`)
+
+      const dialog = await openLocationDialog(page, selector)
+      await logLocationDialogContents(dialog)
+
+      // Pause only after the dialog is definitely rendered (so the pause shows the list)
+      await hold(dialogHold)
+
+      const item = locationItem(dialog, name)
+
+      // Use a longer timeout here; if it fails, your log above will tell us what's in the list.
+      await expect(item).toBeVisible({ timeout: 30_000 })
+
+      await item.hover()
+      await page.waitForTimeout(50)
+      await hold(hoverHold)
+
+      await item.click()
+      await expect(dialog).not.toBeVisible({ timeout: 30_000 })
+
+      await anim(animSeconds)
+      await hold(afterHold)
+    }
+
+    let framesDir: string | undefined
+    try {
+      console.log('📸 Establishing hold')
+      await hold(1.0)
+
+      await transitionTo('Hornsdale')
+      await transitionTo('River Delta')
+      await transitionTo('Castle')
+
+      await hold(1.0)
+
+      const composed = await composeVideo({
+        keyframes: [],
+        animationFrames: timelineFrames,
+        outputName,
+        fps
+      })
+      framesDir = composed.framesDir
+    } finally {
+      if (framesDir) {
+        stitchFramesToVideo({ framesDir, outputName, fps })
+      }
+    }
   })
 })

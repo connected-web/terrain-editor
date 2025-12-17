@@ -23,20 +23,34 @@ export function videoNameFromTest(testInfo: any) {
 }
 
 /**
- * Capture frames deterministically by manually advancing the scene time
- * and taking screenshots. This produces smooth, consistent videos regardless
- * of machine performance.
+ * Keyframe for video composition
  */
-export async function captureFrames(
+export interface Keyframe {
+  screenshot: Buffer
+  durationSeconds: number
+}
+
+/**
+ * Capture a single keyframe (screenshot held for a duration)
+ */
+export async function captureKeyframe(
   page: Page,
-  options: {
-    fps?: number
-    durationSeconds: number
-    outputName: string
-  }
-) {
+  durationSeconds: number
+): Promise<Keyframe> {
+  const screenshot = await page.screenshot({ type: 'png' })
+  return { screenshot, durationSeconds }
+}
+
+/**
+ * Compose keyframes and animation frames into a single video
+ */
+export async function composeVideo(options: {
+  keyframes: Keyframe[]
+  animationFrames?: Buffer[]
+  outputName: string
+  fps?: number
+}) {
   const fps = options.fps ?? 30
-  const totalFrames = Math.ceil(options.durationSeconds * fps)
   const outputDir = path.join(process.cwd(), 'documentation', 'animations')
   const framesDir = path.join(outputDir, `${options.outputName}-frames`)
 
@@ -46,7 +60,55 @@ export async function captureFrames(
   }
   fs.mkdirSync(framesDir, { recursive: true })
 
-  console.log(`📹 Capturing ${totalFrames} frames at ${fps}fps...`)
+  console.log(`🎬 Composing video from ${options.keyframes.length} keyframes and ${options.animationFrames?.length ?? 0} animation frames...`)
+
+  const allFrames: Buffer[] = []
+
+  // Add keyframes (duplicate each frame for the duration)
+  for (const keyframe of options.keyframes) {
+    const framesToDuplicate = Math.ceil(keyframe.durationSeconds * fps)
+    console.log(`  ├─ Adding keyframe for ${keyframe.durationSeconds}s (${framesToDuplicate} frames)`)
+    for (let i = 0; i < framesToDuplicate; i++) {
+      allFrames.push(keyframe.screenshot)
+    }
+  }
+
+  // Add animation frames
+  if (options.animationFrames) {
+    console.log(`  ├─ Adding ${options.animationFrames.length} animation frames`)
+    allFrames.push(...options.animationFrames)
+  }
+
+  console.log(`📝 Writing ${allFrames.length} total frames to disk...`)
+
+  // Write all frames to disk in parallel
+  await Promise.all(
+    allFrames.map((buffer, index) => {
+      const framePath = path.join(framesDir, `frame-${index.toString().padStart(5, '0')}.png`)
+      return fs.promises.writeFile(framePath, buffer)
+    })
+  )
+
+  console.log(`✓ Wrote all ${allFrames.length} frames to disk`)
+
+  return { framesDir, totalFrames: allFrames.length, fps }
+}
+
+/**
+ * Capture animation frames deterministically by manually advancing the scene time
+ * and taking screenshots. Returns frames without writing to disk.
+ */
+export async function captureAnimationFrames(
+  page: Page,
+  options: {
+    fps?: number
+    durationSeconds: number
+  }
+): Promise<Buffer[]> {
+  const fps = options.fps ?? 30
+  const totalFrames = Math.ceil(options.durationSeconds * fps)
+
+  console.log(`📹 Capturing ${totalFrames} animation frames at ${fps}fps...`)
 
   const frameBuffers: Buffer[] = []
 
@@ -77,20 +139,9 @@ export async function captureFrames(
     window.__terrainViewer?.disableFrameCaptureMode()
   })
 
-  console.log(`✓ Rendered all ${totalFrames} frames`)
-  console.log(`📝 Writing frames to disk...`)
+  console.log(`✓ Captured all ${totalFrames} animation frames`)
 
-  // Write all frames to disk in parallel
-  await Promise.all(
-    frameBuffers.map((buffer, index) => {
-      const framePath = path.join(framesDir, `frame-${index.toString().padStart(5, '0')}.png`)
-      return fs.promises.writeFile(framePath, buffer)
-    })
-  )
-
-  console.log(`✓ Wrote all ${totalFrames} frames to disk`)
-
-  return { framesDir, totalFrames, fps }
+  return frameBuffers
 }
 
 /**
@@ -100,10 +151,13 @@ export function stitchFramesToVideo(options: {
   framesDir: string
   outputName: string
   fps: number
+  gifFps?: number
 }) {
   const outputDir = path.join(process.cwd(), 'documentation', 'animations')
   const mp4Output = path.join(outputDir, `${options.outputName}.mp4`)
   const gifOutput = path.join(outputDir, `${options.outputName}.gif`)
+
+  const gifFps = options.gifFps ?? Math.min(options.fps, 12)
 
   console.log(`🎬 Stitching frames into video...`)
 
@@ -122,7 +176,7 @@ export function stitchFramesToVideo(options: {
   // Create GIF from MP4
   try {
     execSync(
-      `ffmpeg -y -i "${mp4Output}" -vf "fps=${options.fps},scale=512:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "${gifOutput}"`,
+      `ffmpeg -y -i "${mp4Output}" -vf "fps=${gifFps},scale=512:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "${gifOutput}"`,
       { stdio: 'inherit' }
     )
     console.log(`✓ Created GIF: ${gifOutput}`)

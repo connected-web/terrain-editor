@@ -1478,7 +1478,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   function animate() {
     const now = frameCaptureMode ? manualFrameTime : performance.now()
-    const delta = frameCaptureMode ? (1 / 30) : Math.min((now - lastTime) / 1000, 0.15)
+    const delta = frameCaptureMode ? (1 / captureFps) : Math.min((now - lastTime) / 1000, 0.15)
     const frameDuration = now - lastTime
     lastTime = now
     if (cameraTween) {
@@ -1743,6 +1743,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     if (locationId) currentFocusId = locationId
   }
 
+  let captureFps = 30
+
   return {
     destroy: () => {
       window.cancelAnimationFrame(animationFrame)
@@ -1825,6 +1827,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     // Frame capture API for deterministic rendering
     enableFrameCaptureMode: (fps: number = 30) => {
+      captureFps = fps
       frameCaptureMode = true
       frameCaptureStartTime = performance.now()
       manualFrameTime = frameCaptureStartTime

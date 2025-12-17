@@ -22,6 +22,7 @@
           :key="location.id"
           type="button"
           class="location-dialog__item"
+          :data-test-location="location.name || location.id || ''"
           :class="{ 'location-dialog__item--active': location.id === activeId }"
           @click="$emit('select', location.id!)"
         >
