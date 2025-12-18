@@ -56,3 +56,5 @@ jobs:
       - name: Publish to npm
         working-directory: packages/terrain
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ''  # Clear default token from setup-node to allow OIDC
