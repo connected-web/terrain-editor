@@ -140,7 +140,7 @@ Copyright 2025 Connected Web.
 ## Development roadmap
 
 - ✅ Setup basic website hosting through github pages
-- 🚧 Publish reusable packages to npm as `@connected-web/terrain-editor`
+- ✅ Publish reusable packages to npm as `@connected-web/terrain-editor`
 
 ### Viewer
 
