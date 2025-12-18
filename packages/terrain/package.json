@@ -31,5 +31,9 @@
     "three": "^0.181.1"
   },
   "license": "ISC",
-  "author": "Connected Web"
+  "author": "Connected Web",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/connected-web/terrain-editor.git"
+  }
 }
