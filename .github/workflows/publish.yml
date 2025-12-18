@@ -25,6 +25,12 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Generate npm token
+        id: npm
+        uses: npm/action@v1
+        with:
+          environment: live
+
       - name: Extract version from tag
         id: version
         run: |
@@ -55,6 +61,6 @@ jobs:
 
       - name: Publish to npm
         working-directory: packages/terrain
-        run: npm publish --provenance --access public
         env:
-          NODE_AUTH_TOKEN: ''  # Clear default token from setup-node to allow OIDC
+          NODE_AUTH_TOKEN: ${{ steps.npm.outputs.token }}
+        run: npm publish --provenance --access public
