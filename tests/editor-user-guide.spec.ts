@@ -60,7 +60,7 @@ async function captureDocumentationScreenshot(page: Page, slug: string) {
   const outputDir = path.join(process.cwd(), 'documentation', 'images')
   fs.mkdirSync(outputDir, { recursive: true })
 
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(750)
 
   const outputPath = path.join(outputDir, `${slug}.png`)
   await page.screenshot({ path: outputPath, fullPage: true })
