@@ -1,0 +1,32 @@
+{
+  "name": "@connected-web/terrain-editor-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare:map": "node ./scripts/copy-map.mjs",
+    "predev": "npm run prepare:map",
+    "prebuild": "npm run prepare:map",
+    "prepreview": "npm run prepare:map"
+  },
+  "dependencies": {
+    "@connected-web/terrain-editor": "file:../packages/terrain",
+    "@fortawesome/fontawesome-svg-core": "^7.1.0",
+    "@fortawesome/free-brands-svg-icons": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@fortawesome/vue-fontawesome": "^3.1.2",
+    "jszip": "^3.10.1",
+    "three": "^0.181.1",
+    "vue": "^3.5.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "snapdom": "^0.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}

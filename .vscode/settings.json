@@ -1,0 +1,11 @@
+{
+  "workbench.colorCustomizations": {
+    "statusBar.background": "#7C5B8B",
+    "statusBar.foreground": "#ffffff",
+    "titleBar.activeBackground": "#60476B",
+    "titleBar.activeForeground": "#ffffff",
+    "activityBar.background": "#4D395B",
+    "activityBar.foreground": "#ffffff"
+  },
+  "window.title": "🟪🗺️ terrain-editor - ${activeEditorShort}"
+}

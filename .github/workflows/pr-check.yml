@@ -15,8 +15,8 @@ on:
       - '.github/workflows/pr-check.yml'
 
 jobs:
-  test:
-    name: Test Playwright E2E
+  smoke:
+    name: Build & Smoke Test
     permissions:
       contents: read
       pull-requests: write
@@ -41,15 +41,67 @@ jobs:
       - name: Install website dependencies
         run: npm --prefix website ci
 
-      - name: Install demos dependencies
+      - name: Install viewer + editor dependencies
         run: |
           npm --prefix demos/viewer-ts install
-          npm --prefix demos/viewer-vue3 install
-          npm --prefix demos/editor-vue3 install
+          npm --prefix editor install
 
       - name: Determine Playwright version
         id: playwright-version
         run: echo "version=$(node -p 'require("./package-lock.json").packages["node_modules/playwright"].version')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Run smoke tests (build + preview checks)
+        run: npm run test:smoke
+
+  playwright:
+    name: Playwright E2E (${{ matrix.target }})
+    needs: smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - docs-blue
+          - docs-green
+          - docs-orange
+          - docs-red
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install shared package dependencies
+        run: npm --prefix packages/terrain ci
+
+      - name: Install website dependencies
+        run: npm --prefix website ci
+
+      - name: Install viewer + editor dependencies
+        run: |
+          npm --prefix demos/viewer-ts install
+          npm --prefix editor install
+
+      - name: Determine Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p 'require(\"./package-lock.json\").packages[\"node_modules/playwright\"].version')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -67,15 +119,27 @@ jobs:
         run: sudo npx playwright install-deps chromium
 
       - name: Run Playwright end-to-end tests
-        run: npm run test:e2e
+        run: |
+          case "${{ matrix.target }}" in
+            docs-blue)
+              npx playwright test --grep "🟦"
+              ;;
+            docs-green)
+              npx playwright test --grep "🟩"
+              ;;
+            docs-orange)
+              npx playwright test --grep "🟧"
+              ;;
+            docs-red)
+              npx playwright test --grep "🟥"
+              ;;
+          esac
 
-      - name: Append Playwright screenshot summary
+      - name: Collect screenshots for artifact
         if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CWEB_IMAGES_FTP_USER: ${{ vars.CWEB_IMAGES_FTP_USER }}
-          CWEB_IMAGES_FTP_PASSWORD: '${{ secrets.CWEB_IMAGES_FTP_PASSWORD }}'
-        run: node ./scripts/summary-screenshots.mjs
+        run: |
+          mkdir -p test-results/screenshots
+          find documentation/images -maxdepth 1 -name '*.png' -print -exec cp {} test-results/screenshots/ \;
 
       - name: Upload Playwright artifacts on failure
         if: failure()
@@ -87,3 +151,43 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+      - name: Upload screenshot bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.target }}
+          path: test-results/screenshots
+          if-no-files-found: ignore
+
+  summary:
+    name: Screenshot Summary
+    needs: playwright
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies for summary
+        run: npm ci
+
+      - name: Download screenshot artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: screenshots-*
+          path: test-results/screenshots
+          merge-multiple: true
+
+      - name: Append Playwright screenshot summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CWEB_IMAGES_FTP_USER: ${{ vars.CWEB_IMAGES_FTP_USER }}
+          CWEB_IMAGES_FTP_PASSWORD: '${{ secrets.CWEB_IMAGES_FTP_PASSWORD }}'
+        run: node ./scripts/summary-screenshots.mjs

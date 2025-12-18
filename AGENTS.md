@@ -1,49 +1,147 @@
-# Terrain Editor Task List
+# Terrain Editor — Product Specification (Roadmap)
 
-## Active Sprint (19 Nov 2025)
-- [x] Re-export `initTerrainViewer` from `terrainViewer.ts` and ensure public API uses the new path. *Touch files:* `packages/terrain/src/index.ts`, `terrainViewer.ts`. *Test:* `npm run build:lib`.
-- [x] Embed shared viewer chrome inside the package:
-  - [x] Inject overlay DOM (status text, load button, pop-out/full-screen, drag/drop prompt) when the viewer mounts. *Files:* `packages/terrain/src/viewerOverlay.ts`, `terrainViewer.ts`.
-  - [x] Inject the required stylesheet into the document head to keep demos minimal.
-  - [x] Wire overlay controls to host helper + local `.wyn` loader so hosts only pass callbacks. *Ensure `loadWynArchive` utilities remain the single entry point.*
-- [x] Update TS and Vue demos to the “single container div/ref” contract:
-  - [x] Remove bespoke buttons/markup; each demo now provides a container + overlay helper.
-  - [x] Verify both demos support URL load, file upload, drag/drop, pop-out, and fullscreen. *Tests:* `npm run build:viewer`, `npm run build:viewer-vue`, `npm run test:smoke`.
-- [ ] Document the new embed API in README/AGENTS so other agents know how to bootstrap the viewer.
+## Overview
 
-## Backlog – Editor
-- [ ] Persist active project into local storage for offline editing.
-- [ ] Allow decompress/edit/repack of `.wyn` archives entirely in-browser.
-- [ ] Expand layer tooling: view, add, edit, and paint masks with undo/redo.
-- [ ] Implement point-based heightmap editor + JSON/PNG export path.
-- [ ] Author river polylines that respect terrain slope and widening rules.
-- [ ] Extend editor UI to edit heightmap, theme, locations, layer masks, and thumbnails from one workspace.
+A web-based 3D terrain editing environment built on the shared `@connected-web/terrain-editor` package.
 
-## Backlog – Viewer
-- [ ] Support embed mode as default output from the shared package.
-- [ ] Provide pop-out dialog + fullscreen controls via host helper (in progress).
-- [ ] Expose configuration hooks for host apps (theme overrides, UI toggles, analytics events).
-- [ ] Expose configuration hooks for host apps (theme overrides, UI toggles, analytics events).
+### Host Responsibilities
 
-## Completed / Guardrails
-- Theme system with per-state sprite/stem styling and `.wyn` overrides. **Guardrail:** keep JSON schema backward compatible; tests should cover default + map override merges.
-- Local `.wyn` loading (URL + file/drag-drop) and resource cleanup. **Guardrail:** never leak object URLs; always call `dataset.cleanup()` on viewer destroy/reload.
-- Viewer host helper for pop-out/fullscreen scaffolding. **Guardrail:** overlay and control hooks must remain accessible via the shared helper—demos should never re-implement modal logic.
-- Height/terrain rendering pipeline (terrain mesh, water volume, markers). **Guardrail:** sprite scaling and opacity depend on camera distance/focus; changes must preserve hover/focus behavior and theme-driven styles.
+* [x] Expose a single viewer container
+* [x] Connect the shared overlay helper
+* [x] Load `.wyn` archives through loader utilities
 
-## How to Work on This Repo
-- `npm run build:lib` – builds the package (must pass before publishing or consuming from demos).
-- `npm run build:viewer`, `npm run build:viewer-vue` – smoke-test TS and Vue harnesses.
-- `.wyn` archives live under `maps/`; use `npm run packmap` to regenerate after edits.
-- Preferred branch: `fix/marker-sizes-by-setting-location-ids` (current working branch). Keep changes scoped; avoid rewriting unrelated files.
-- Always destroy viewer handles (`TerrainHandle.destroy()`) and call `dataset.cleanup()` when tearing down live demos to avoid leaking object URLs.
-- **Script guide (agent-friendly usage):**
-  - ✅ `npm run build:lib` – safe; required after editing package source.
-  - ✅ `npm run build:viewer`, `npm run build:viewer-vue`, `npm run build:editor-vue` – deterministic builds for demos; run after UI changes.
-  - ✅ `npm run packmap` – regenerates the sample `.wyn`; harmless but only needed when changing map assets.
-  - ✅ `npm run build` – bundles the entire monorepo; slower but acceptable before releases.
-  - ⚠️ `npm run dev:*` – starts Vite dev servers; avoid unless interactive debugging is explicitly requested.
-  - ⚠️ `npm run preview:dist` – spins up a web server; requires user approval/network access.
-- ⚠️ `npm run test:smoke` – builds every demo, serves `dist`, and now validates response bodies. Requires opening a local HTTP server; may fail in restricted environments.
-- ⚠️ `npm run test:e2e` – Playwright suite that captures screenshots (useful for LLM review). Expect multi-minute runtime.
-- ⚠️ `npm test` – runs the full smoke + e2e pipeline (10+ minutes). Only launch when the user specifically asks for comprehensive validation.
+### Editor Shell Components
+
+* [x] 3D viewer
+* [x] Multi-panel dock + toolbar
+* [x] Asset dialogs
+* [x] Project persistence + storage helpers
+
+---
+
+# Feature Roadmap
+
+## ✓ Completed Features
+
+### Core Editor Facilities
+
+* [x] Panel dock + toolbar contract with single-active-panel behavior
+* [x] Workspace panel for metadata (title, author, size, sea level) with viewer remount
+* [x] Persist active project into local storage
+* [x] In-browser `.wyn` decompress/edit/repack pipeline (`buildWynArchive`, `projectStore`)
+
+### Locations & Theme Tooling
+
+* [x] Locations tool: list, inspector, drag/drop uploads, asset picker, pick-on-map
+* [x] Theme editor: label + stem styling, hover/focus variants, reset-to-default
+
+### Marker Rendering
+
+* [x] Correct icon aspect ratio
+* [x] Optional border honoring theme settings
+* [x] Zoom-reactive stems
+* [x] Placement waits for map click
+
+### Mask & Layer Editing (Current Capabilities)
+
+* [x] Mask editing persists and remounts correctly
+* [x] Biome colour editing updates viewer without reload
+* [x] Toolbar-integrated colour picker
+* [x] Canvas zoom/pan
+* [x] Brush cursor reflects size
+
+### Export / Repack Pipeline
+
+* [x] `buildWynArchive` (JSZip)
+* [x] Deterministic file table tracking in `projectStore`
+* [x] Export `.wyn` and refresh local snapshot
+
+### Shared Helpers
+
+* [x] `createProjectStore`
+* [x] `buildWynArchive`
+* [x] `createLayerBrowserStore`
+* [x] `createMaskEditor`
+
+### Development Workflow
+
+* [x] `npm run build:lib`
+* [x] `npm run build:viewer` / `npm run build:editor`
+* [x] `npm run dev:all`
+* [x] `.wyn` sample regeneration with `npm run packmap`
+
+---
+
+## ▶ Planned / In Progress Features
+
+### Layer & Mask Tooling
+
+* [ ] Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
+* [x] Topology editor (greyscale) with brush support
+* [ ] Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
+* [x] Ensure mask preview never loads blank (dataset fallback reliability)
+* [ ] Preserve unsaved strokes on biome colour change (temp buffer + warnings)
+* [x] Editable layer titles persisted into `legend`
+* [x] Add biome / overlay dialogs (generate legend entry + seed mask asset)
+* [ ] Layer reorder via drag/drop (needs between-item drop + better z-indexing)
+* [ ] Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
+* [ ] Create/delete layer flows (with confirmation)
+* [ ] Fill tool (paint bucket)
+* [x] Mask view toggle: B/W vs colour-coded
+* [x] Onion-skin neighbouring layers with fading alpha
+* [x] Brush opacity slider
+* [x] Export mask directly from the Layer Editor (grayscale + alpha variants)
+* [x] Layer editor viewport state persists via URL reloads & layer switches
+* [ ] Brush type menu (basic, spray, Perlin noise)
+* [ ] Save/load custom brushes (name + icon)
+* [ ] Icon picker for brushes and locations based on FontAwesome Free icon set
+* [ ] FontAwesome icon support for the viewer location markers
+* [ ] Layer import via drag/drop or file upload
+
+### Viewer & Interaction Improvements
+
+* [ ] Camera recentering responding to dock + toolbar layout changes
+* [ ] Zoom/pan calibration and cursor-to-world accuracy
+* [x] Smooth scroll behavior (no jitter)
+* [x] Layer editor wrapper must remain pointer-transparent
+* [x] Cleanup of spacing/borders in layer toolbar + workspace UI
+
+### Layer Editor Improvements
+
+* [x] Undo/redo history for mask tooling
+* [ ] Point-based heightmap editor (with JSON/PNG export)
+* [ ] River polyline authoring that respects slope + widening rules
+* [ ] Unified workspace covering heightmap, theme, locations, masks, thumbnails
+* [ ] Image import + resize tools ensuring legend-dimension consistency
+* [ ] Define command history + data contracts for sculpting, rivers, etc., with deterministic pack/unpack
+* [ ] Expanded greyscale topology editor with undo/redo
+* [ ] More advanced brush modes (spray, Perlin, texture-based)
+* [ ] Brush preset manager (save/load brushes with icons)
+* [ ] Additional mask visualization modes
+* [ ] Advanced onion-skin controls
+* [ ] High-level sculpting workflow (to pair with future topology editing)
+* [ ] Break up `App.vue` into targeted composables/models (`useLayerEditor`, `useLayerAssets`, viewer helpers) so cross-cutting logic lives outside the root component
+* [x] Brush spacing/flow controls + advanced panel menu for mask tooling
+* [ ] Grid snap + measurement settings for mask tools
+* [ ] Transform tool interactions (translate/scale/rotate selections)
+* [ ] Layer editor + layers panel integration (shared layout, collapsible tools, dock-aware)
+* [ ] Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background
+
+### Viewer Backlog
+
+* [ ] Make embed mode the default output
+* [ ] Full pop-out and fullscreen controls via host helper
+* [ ] Configuration hooks for host apps (theme overrides, UI toggles, analytics)
+
+### Export / Repack Enhancements
+
+* [ ] Export “JSON only” (`legend.json`, `locations.json`, `theme.json`)
+
+### Guardrails & Architecture
+
+* [ ] Maintain theme schema backward compatibility
+* [ ] Always destroy `TerrainHandle` and call `dataset.cleanup()` on unload
+* [ ] Require hosts to use shared overlay/popup helpers
+* [ ] Preserve sprite scaling + opacity tied to camera distance + theme rules
+* [ ] Avoid leaking object URLs (dispose preview caches)
+* [ ] Run heavy tests only when necessary

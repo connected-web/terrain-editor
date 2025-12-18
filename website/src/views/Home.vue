@@ -1,21 +1,16 @@
 <template>
   <section class="hero">
-    <p class="muted">Connected Web experiments</p>
+    <p class="muted">Connected Web Experiments</p>
     <h1>Build, edit, and explore Wyn terrain files directly in the browser.</h1>
     <p class="muted">
-      A suite of Three.js powered tools and demos for inspecting rich terrain datasets, editing
-      metadata, and validating Wyn archive workflows.
+      A collection of Three.js powered tools for building and navigating layered map topologies; sharable as <code>.wyn</code> archives.
     </p>
     <div class="cta-row">
-      <a class="button primary" href="./viewer-js/" target="_blank" rel="noreferrer">
-        Launch Viewer (TS)
+      <a class="button primary" :href="viewerTsUrl" target="_blank" rel="noreferrer">
+        Launch Viewer
       </a>
-      <a class="button primary" href="./viewer-vue3/" target="_blank" rel="noreferrer">
-        Launch Viewer (Vue)
-      </a>
-      <RouterLink class="button secondary" to="/editor">Visit Editor Preview</RouterLink>
-      <a class="button secondary" href="./editor-vue3/" target="_blank" rel="noreferrer">
-        Open Editor Demo
+      <a class="button primary" :href="editorUrl" target="_blank" rel="noreferrer">
+        Launch Editor
       </a>
       <a
         class="button secondary"
@@ -29,15 +24,12 @@
   </section>
 
   <section class="section-card" id="demos">
-    <h2>Demos & Test Harnesses</h2>
-    <p class="muted">Each demo validates reusable packages in different environments.</p>
+    <h2>Interactive Demos</h2>
+    <p class="muted">The following demos showcase the terrain viewer package for its intended use cases.</p>
     <div class="card-grid">
       <article v-for="demo in demos" :key="demo.title" class="info-card">
-        <div class="status-pill" :class="demo.available ? 'done' : 'todo'">
-          <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
-        </div>
         <h3>{{ demo.title }}</h3>
-        <p class="muted">{{ demo.description }}</p>
+        <p class="muted spacer">{{ demo.description }}</p>
         <a
           v-if="demo.url"
           class="button secondary"
@@ -47,12 +39,18 @@
         >
           Open Demo
         </a>
+        <div class="status-pill" :class="demo.available ? 'done' : 'todo'">
+          <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
+        </div>
       </article>
     </div>
   </section>
 
   <section class="section-card" id="roadmap">
-    <h2>Roadmap Snapshot</h2>
+    <h2 class="row">
+      <label class="spacer">Roadmap</label>
+      <code>Nov 2025</code>
+    </h2>
     <div class="card-grid">
       <article class="info-card">
         <h3>Viewer</h3>
@@ -77,55 +75,58 @@
         </ul>
       </article>
     </div>
+    <p class="muted spacer">
+      See activity on the <a href="https://github.com/connected-web/terrain-editor" target="_blank" rel="noreferrer">GitHub project page</a> for the latest updates and upcoming features.
+    </p>
   </section>
 
-  <section class="section-card">
-    <h2>Need the Editor?</h2>
-    <p class="muted">
-      The editor SPA will live at <RouterLink to="/editor">/editor</RouterLink>. Today it’s a stub,
-      but it will grow into a fully featured Wyn authoring experience with metadata editing,
-      location tools, and layer manipulation.
-    </p>
-    <RouterLink class="button primary" to="/editor">Preview the editor route</RouterLink>
-  </section>
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-
 type RoadmapItem = { label: string; done?: boolean }
 type DemoCard = { title: string; description: string; available: boolean; url?: string }
 
+const devUrls =
+  typeof window !== 'undefined' && import.meta.env.DEV
+    ? (() => {
+        const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+        const protocol = window.location.protocol || 'http:'
+        const hostname = isLoopback ? window.location.hostname : 'localhost'
+        const base = (port: number, path: string) => `${protocol}//${hostname}:${port}${path}`
+        return {
+          viewerTs: base(4173, '/viewer-js/'),
+          editor: base(4175, '/editor/')
+        }
+      })()
+    : null
+
+const viewerTsUrl = devUrls?.viewerTs ?? './viewer-js/'
+const editorUrl = devUrls?.editor ?? './editor/'
+
 const demos: DemoCard[] = [
   {
-    title: 'Viewer (Vanilla TS)',
-    description: 'SSG-hosted harness that loads Wyn archives asynchronously with JSZip.',
+    title: 'Terrain Viewer',
+    description: 'Browser based harness that loads Wyn archives asynchronously and decodes with JSZip.',
     available: true,
-    url: './viewer-js/'
+    url: viewerTsUrl
   },
   {
-    title: 'Viewer (Vue 3)',
-    description: 'Vue 3 wrapper that binds viewer events to reactive UI controls.',
+    title: 'Terrain Editor',
+    description: 'Full terrain editor for creating and modifying metadata and locations in existing Wyn archives.',
     available: true,
-    url: './viewer-vue3/'
-  },
-  {
-    title: 'Editor (Vue 3)',
-    description: 'Early editor playground for modifying metadata and locations.',
-    available: true,
-    url: './editor-vue3/'
+    url: editorUrl
   }
 ]
 
 const viewerRoadmap: RoadmapItem[] = [
-  { label: 'Shared Three.js renderer', done: true },
-  { label: 'Vanilla TS demo & loader', done: true },
-  { label: 'Vue 3 wrapper demo', done: true },
-  { label: 'Location & layer UX polish', done: true }
+  { label: 'Self-contained Three.js renderer', done: true },
+  { label: 'TS based viewer and .wyn loader', done: true },
+  { label: 'Popout and full screen modes', done: true },
+  { label: 'Location and layer UX polish', done: true }
 ]
 
 const editorRoadmap: RoadmapItem[] = [
-  { label: 'Editor SPA skeleton', done: true },
+  { label: 'Editor skeleton with basic viewer', done: true },
   { label: 'Wyn import/export pipeline', done: false },
   { label: 'Layer + mask editing tools', done: false },
   { label: 'Height + location workflows', done: false }

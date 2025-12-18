@@ -3,9 +3,9 @@ dist
 website/dist
 demos/viewer-ts/dist
 demos/viewer-ts/public/maps
-demos/viewer-vue3/dist
-demos/viewer-vue3/public/maps
-demos/editor-vue3/dist
-demos/editor-vue3/public/maps
+editor/dist
+editor/public/maps
 packages/terrain/dist
 test-results
+.devservers.json
+documentation/renders

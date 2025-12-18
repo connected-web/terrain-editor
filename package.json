@@ -6,18 +6,23 @@
   "main": "index.js",
   "scripts": {
     "build": "node ./scripts/build-dist.mjs",
-    "build:editor-vue": "npm --prefix demos/editor-vue3 run build",
+    "build:editor": "npm --prefix editor run build",
     "build:lib": "npm --prefix packages/terrain run build",
     "build:viewer": "npm --prefix demos/viewer-ts run build",
-    "build:viewer-vue": "npm --prefix demos/viewer-vue3 run build",
-    "dev:editor-vue": "npm --prefix demos/editor-vue3 run dev -- --host",
+    "validate:viewer": "node ./scripts/validate-viewer-package.mjs",
+    "dev:editor": "npm --prefix editor run dev -- --host",
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",
-    "dev:viewer-vue": "npm --prefix demos/viewer-vue3 run dev -- --host",
     "dev:website": "npm --prefix website run dev",
-    "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json layers/ thumbnails/ locations.json theme.json",
+    "dev:all": "node ./scripts/dev-all.mjs",
+    "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json locations.json theme.json metadata.json icons/ layers/ thumbnails/",
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke && npm run test:e2e",
     "test:e2e": "playwright test",
+    "test:e2e:headed": "HEADLESS=false playwright test",
+    "render:user-guide-animations": "RECORD_VIDEO=true HEADLESS=false playwright test tests/editor-user-guide-animated-features.spec.ts",
+    "render:user-guide-animations:headless": "RECORD_VIDEO=true playwright test tests/editor-user-guide-animated-features.spec.ts",
+    "render:user-guide-images": "HEADLESS=false playwright test tests/editor-user-guide.spec.ts",
+    "render:user-guide-images:headless": "playwright test tests/editor-user-guide.spec.ts",
     "test:smoke": "node ./scripts/smoke-tests.mjs"
   },
   "repository": {
@@ -31,6 +36,7 @@
   "workspaces": [
     "packages/*",
     "demos/*",
+    "editor",
     "website"
   ],
   "bugs": {
@@ -38,10 +44,13 @@
   },
   "homepage": "https://github.com/connected-web/terrain-editor#readme",
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
+    "@playwright/test": "^1.57.0",
     "basic-ftp": "^5.0.5",
+    "gifski": "^1.7.1",
     "http-server": "^14.1.1",
-    "playwright": "^1.56.1",
+    "playwright": "^1.57.0",
+    "playwright-video": "^2.4.0",
+    "snapdom": "^0.1.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }

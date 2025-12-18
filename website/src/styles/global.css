@@ -221,6 +221,14 @@ main {
   gap: var(--spacing-md);
 }
 
+.info-card h3 {
+  margin: 0;
+}
+.info-card p {
+  margin: 0 0 1rem 0;
+  flex-grow: 1;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

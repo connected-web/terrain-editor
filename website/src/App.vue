@@ -2,7 +2,7 @@
   <div id="app">
     <AppHeader />
     <main>
-      <router-view />
+      <HomeSection />
     </main>
     <AppFooter />
   </div>
@@ -11,4 +11,5 @@
 <script lang="ts" setup>
 import AppHeader from './components/AppHeader.vue'
 import AppFooter from './components/AppFooter.vue'
+import HomeSection from './views/Home.vue'
 </script>

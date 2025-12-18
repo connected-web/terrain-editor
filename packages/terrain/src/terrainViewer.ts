@@ -18,12 +18,14 @@ import {
   TerrainThemeOverrides
 } from './theme'
 
-const DEFAULT_MAP_WIDTH = 1024
-const DEFAULT_MAP_HEIGHT = 1536
+const DEFAULT_MAP_WIDTH = 512
+const DEFAULT_MAP_HEIGHT = 512
 const DEFAULT_MAP_RATIO = DEFAULT_MAP_HEIGHT / DEFAULT_MAP_WIDTH
 const DEFAULT_TERRAIN_WIDTH = 4.2
 const DEFAULT_TERRAIN_DEPTH = DEFAULT_TERRAIN_WIDTH * DEFAULT_MAP_RATIO
-const SEGMENTS_X = 256
+const DEFAULT_SEGMENTS_X = 256
+const MIN_TERRAIN_SEGMENTS = 64
+const MAX_TERRAIN_SEGMENTS = 512
 const EDGE_RIM = 0.25
 const BASE_THICKNESS = 0.65
 
@@ -41,10 +43,19 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
   roads: 0.85
 }
 const DEFAULT_STEM_SCALE = 0.01
+const MARKER_HEIGHT_RATIO = 0.11
+const MARKER_HEIGHT_SCALE = 0.25
+const MARKER_MIN_HEIGHT = 0.35
+const MARKER_MAX_HEIGHT = 0.85
+const MARKER_SPRITE_GAP = 0.08
+const MARKER_LABEL_EXTRA_OFFSET = -0.08
+const MARKER_SURFACE_OFFSET = 0.00
 const BASE_FILL_COLOR = '#7b5c3a'
 const SPRITE_CANVAS_WIDTH = 240
 const SPRITE_CANVAS_HEIGHT = 160
+const ICON_TEXTURE_SIZE = 256
 const ICON_CANVAS_MARGIN = 18
+const ICON_SCALE_MULTIPLIER = 0.5
 const ICON_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i
 
 export type LayerToggleState = {
@@ -56,12 +67,14 @@ export type LocationViewState = {
   distance: number
   polar: number
   azimuth: number
+  targetPixel?: { x: number; y: number }
 }
 
 export type TerrainLocation = {
   id: string
   name?: string
   icon?: string
+  showBorder?: boolean
   pixel: { x: number; y: number }
   uv?: { u: number; v: number }
   world?: { x: number; y: number; z: number }
@@ -74,8 +87,17 @@ export type LocationPickPayload = {
   world: { x: number; y: number; z: number }
 }
 
+export type ViewerLifecycleState =
+  | 'initializing'
+  | 'loading-textures'
+  | 'building-geometry'
+  | 'first-render'
+  | 'stabilizing'
+  | 'ready'
+
 type TerrainInitOptions = {
   onReady?: () => void
+  onLifecycleChange?: (state: ViewerLifecycleState) => void
   heightScale?: number
   waterLevelPercent?: number
   layers?: LayerToggleState
@@ -85,6 +107,7 @@ type TerrainInitOptions = {
   onLocationClick?: (locationId: string) => void
   locations?: TerrainLocation[]
   theme?: TerrainThemeOverrides
+  cameraView?: LocationViewState
 }
 
 export type TerrainHandle = {
@@ -92,15 +115,26 @@ export type TerrainHandle = {
   updateLayers: (state: LayerToggleState) => Promise<void>
   setInteractiveMode: (enabled: boolean) => void
   updateLocations: (locations: TerrainLocation[], focusedId?: string) => void
+  setFocusedLocation: (locationId?: string | null) => void
   navigateTo: (payload: {
     pixel: { x: number; y: number }
     locationId?: string
     world?: { x: number; y: number; z: number }
     view?: LocationViewState
+    instant?: boolean
   }) => void
   setHoveredLocation: (id: string | null) => void
   setCameraOffset: (offset: number, focusId?: string) => void
+  onCameraMove: (callback: (newState: LocationViewState) => void) => void
   getViewState: () => LocationViewState
+  setTheme: (overrides?: TerrainThemeOverrides) => void
+  setSeaLevel: (level: number) => void
+  invalidateIconTextures: (paths?: string[]) => void
+  invalidateLayerMasks: (paths?: string[]) => void
+  // Frame capture API for deterministic rendering
+  enableFrameCaptureMode: (fps?: number) => { fps: number }
+  disableFrameCaptureMode: () => void
+  captureFrame: (frameNumber: number, fps?: number) => { frameNumber: number; time: number }
 }
 
 export type Cleanup = () => void
@@ -110,6 +144,7 @@ type Resolvable<T> = T | Promise<T>
 export type LegendLayer = {
   mask: string
   rgb: [number, number, number]
+  label?: string
 }
 
 export type TerrainLegend = {
@@ -152,6 +187,21 @@ function uvToWorld(
   const z = (v - 0.5) * dimensions.depth
   const y = (heightSample - seaLevel) * heightScale
   return new THREE.Vector3(x, y, z)
+}
+
+function worldToPixel(
+  point: THREE.Vector3,
+  dimensions: { width: number; depth: number },
+  mapSize: { width: number; height: number }
+) {
+  const width = dimensions.width || 1
+  const depth = dimensions.depth || 1
+  const u = THREE.MathUtils.clamp(point.x / width + 0.5, 0, 1)
+  const v = THREE.MathUtils.clamp(point.z / depth + 0.5, 0, 1)
+  return {
+    x: u * mapSize.width,
+    y: v * mapSize.height
+  }
 }
 
 function easeInOut(t: number) {
@@ -388,9 +438,14 @@ function resolveSpriteState(
 
 type SpriteVisualOptions = {
   iconTexture?: THREE.Texture
+  showBorder?: boolean
 }
 
-function createIconSpriteTexture(iconTexture: THREE.Texture) {
+function createIconSpriteTexture(
+  iconTexture: THREE.Texture,
+  style: MarkerSpriteStateStyle,
+  showBorder: boolean
+) {
   const source = iconTexture.image as
     | HTMLImageElement
     | HTMLCanvasElement
@@ -403,8 +458,8 @@ function createIconSpriteTexture(iconTexture: THREE.Texture) {
     return fallback
   }
   const canvas = document.createElement('canvas')
-  canvas.width = SPRITE_CANVAS_WIDTH
-  canvas.height = SPRITE_CANVAS_HEIGHT
+  canvas.width = ICON_TEXTURE_SIZE
+  canvas.height = ICON_TEXTURE_SIZE
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     const fallback = iconTexture.clone()
@@ -412,18 +467,40 @@ function createIconSpriteTexture(iconTexture: THREE.Texture) {
     return fallback
   }
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.save()
+  if (showBorder) {
+    const borderRadius = 24
+    const inset = 12
+    ctx.fillStyle = style.backgroundColor
+    drawRoundedRect(
+      ctx,
+      inset,
+      inset,
+      canvas.width - inset * 2,
+      canvas.height - inset * 2,
+      borderRadius
+    )
+    ctx.fill()
+    if (style.borderThickness > 0) {
+      ctx.strokeStyle = style.borderColor
+      ctx.lineWidth = Math.max(1, style.borderThickness * 1.5)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
   const imageLike = source as any
   const rawWidth =
     imageLike?.naturalWidth ??
     imageLike?.width ??
-    SPRITE_CANVAS_WIDTH
+    ICON_TEXTURE_SIZE
   const rawHeight =
     imageLike?.naturalHeight ??
     imageLike?.height ??
-    SPRITE_CANVAS_HEIGHT
+    ICON_TEXTURE_SIZE
   const aspect = rawWidth > 0 && rawHeight > 0 ? rawWidth / rawHeight : 1
-  const maxWidth = canvas.width - ICON_CANVAS_MARGIN * 2
-  const maxHeight = canvas.height - ICON_CANVAS_MARGIN * 2
+  const margin = ICON_CANVAS_MARGIN + (showBorder ? 16 : 4)
+  const maxWidth = canvas.width - margin * 2
+  const maxHeight = canvas.height - margin * 2
   let drawWidth = maxWidth
   let drawHeight = drawWidth / aspect
   if (drawHeight > maxHeight) {
@@ -445,7 +522,11 @@ function createMarkerSpriteResource(
   options?: SpriteVisualOptions
 ): MarkerSpriteVisualResource {
   if (options?.iconTexture) {
-    const texture = createIconSpriteTexture(options.iconTexture)
+    const texture = createIconSpriteTexture(
+      options.iconTexture,
+      style,
+      options.showBorder ?? true
+    )
     texture.needsUpdate = true
     const material = new THREE.SpriteMaterial({
       map: texture,
@@ -478,13 +559,15 @@ function createMarkerSpriteResource(
     const boxHeight = fontSize + spriteTheme.paddingY * 2
     const boxX = (canvas.width - boxWidth) / 2
     const boxY = (canvas.height - boxHeight) / 2
-    ctx.fillStyle = style.backgroundColor
-    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, spriteTheme.borderRadius)
-    ctx.fill()
-    if (style.borderThickness > 0) {
-      ctx.strokeStyle = style.borderColor
-      ctx.lineWidth = style.borderThickness
-      ctx.stroke()
+    if (options?.showBorder ?? true) {
+      ctx.fillStyle = style.backgroundColor
+      drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, spriteTheme.borderRadius)
+      ctx.fill()
+      if (style.borderThickness > 0) {
+        ctx.strokeStyle = style.borderColor
+        ctx.lineWidth = style.borderThickness
+        ctx.stroke()
+      }
     }
     ctx.fillStyle = style.textColor
     ctx.fillText(text, canvas.width / 2, canvas.height / 2 + fontSize * 0.05)
@@ -713,10 +796,19 @@ export async function initTerrainViewer(
       updateLayers: async () => {},
       setInteractiveMode: noop,
       updateLocations: noop,
+      setFocusedLocation: noop,
       navigateTo: noop,
       setHoveredLocation: noop,
       setCameraOffset: noop,
-      getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 })
+      getViewState: () => ({ distance: 1, polar: Math.PI / 3, azimuth: 0 }),
+      onCameraMove: () => {},
+      setTheme: () => {},
+      setSeaLevel: () => {},
+      invalidateIconTextures: () => {},
+      invalidateLayerMasks: () => {},
+      enableFrameCaptureMode: () => ({ fps: 30 }),
+      disableFrameCaptureMode: noop,
+      captureFrame: (frameNumber: number) => ({ frameNumber, time: 0 })
     }
   }
 
@@ -724,39 +816,89 @@ export async function initTerrainViewer(
   const height = container.clientHeight || 405
   const disposables: Cleanup[] = []
 
+  let currentLifecycleState: ViewerLifecycleState = 'initializing'
+  function setLifecycleState(state: ViewerLifecycleState) {
+    currentLifecycleState = state
+    options.onLifecycleChange?.(state)
+  }
+
   const legend = dataset.legend
-  const theme = resolveTerrainTheme(dataset.theme, options.theme)
-  const markerTheme = theme.locationMarkers
-  const seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
+  let themeOverrides = options.theme
+  let resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
+  let markerTheme = resolvedTheme.locationMarkers
+  let seaLevel = legend.sea_level ?? SEA_LEVEL_DEFAULT
   const [rawLegendWidth, rawLegendHeight] = legend.size
   const safeLegendWidth = Math.max(1, rawLegendWidth || DEFAULT_MAP_WIDTH)
   const safeLegendHeight = Math.max(1, rawLegendHeight || DEFAULT_MAP_HEIGHT)
-  const mapWidth = Math.max(1, safeLegendWidth - 1)
-  const mapHeight = Math.max(1, safeLegendHeight - 1)
+  const mapWidth = Math.max(1, safeLegendWidth)
+  const mapHeight = Math.max(1, safeLegendHeight)
   const mapRatio =
     safeLegendWidth > 0 ? safeLegendHeight / safeLegendWidth : DEFAULT_MAP_RATIO
   const terrainWidth = DEFAULT_TERRAIN_WIDTH
   const terrainDepth = terrainWidth * mapRatio
-  const terrainSegmentsZ = Math.max(1, Math.round(SEGMENTS_X * mapRatio))
+  const desiredSegments = THREE.MathUtils.clamp(
+    safeLegendWidth,
+    MIN_TERRAIN_SEGMENTS,
+    MAX_TERRAIN_SEGMENTS
+  )
+  const terrainSegmentsX = Math.max(DEFAULT_SEGMENTS_X, Math.round(desiredSegments))
+  const terrainSegmentsZ = Math.max(1, Math.round(terrainSegmentsX * mapRatio))
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
+  const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
+  function computeMarkerStemHeight() {
+    const scaledMin = MARKER_MIN_HEIGHT * MARKER_HEIGHT_SCALE
+    const scaledMax = MARKER_MAX_HEIGHT * MARKER_HEIGHT_SCALE
+    const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO * MARKER_HEIGHT_SCALE
+    return THREE.MathUtils.clamp(rawHeight, scaledMin, scaledMax)
+  }
+  const markerStemHeight = computeMarkerStemHeight()
+  let terrainHeightRange = { min: FLOOR_Y, max: 0 }
   const baseWidth = terrainWidth + EDGE_RIM * 2
   const baseDepth = terrainDepth + EDGE_RIM * 2
-  const rawStemScale = markerTheme.stem.scale
-  const stemScale =
-    typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
-      ? Math.max(0, rawStemScale)
-      : DEFAULT_STEM_SCALE
-  const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
-  const stemRadius = Number.isFinite(maxStemRadiusCandidate)
-    ? Math.min(markerTheme.stem.radius, Math.max(0, maxStemRadiusCandidate))
-    : markerTheme.stem.radius
+  function computeStemRadius(stemTheme: MarkerStemTheme) {
+    const rawStemScale = stemTheme.scale
+    const stemScale =
+      typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
+        ? Math.max(0, rawStemScale)
+        : DEFAULT_STEM_SCALE
+    const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
+    return Number.isFinite(maxStemRadiusCandidate)
+      ? Math.min(stemTheme.radius, Math.max(0, maxStemRadiusCandidate))
+      : stemTheme.radius
+  }
+
+  let stemRadius = computeStemRadius(markerTheme.stem)
   const layerImageCache = new Map<string, HTMLImageElement>()
   const maskCanvasCache = new Map<string, HTMLCanvasElement>()
+
+  function invalidateLayerMaskCache(paths?: string[]) {
+    if (!paths || paths.length === 0) {
+      layerImageCache.clear()
+      maskCanvasCache.clear()
+      return
+    }
+    paths.forEach((path) => {
+      layerImageCache.delete(path)
+      maskCanvasCache.delete(path)
+    })
+  }
 
   function pixelToUV(pixel: { x: number; y: number }) {
     const u = THREE.MathUtils.clamp(pixel.x, 0, mapWidth) / mapWidth
     const v = THREE.MathUtils.clamp(pixel.y, 0, mapHeight) / mapHeight
     return { u, v }
+  }
+
+  function uvToPixel(u: number, v: number) {
+    const x = THREE.MathUtils.clamp(u * safeLegendWidth, 0, safeLegendWidth)
+    const y = THREE.MathUtils.clamp((1 - v) * safeLegendHeight, 0, safeLegendHeight)
+    return { x, y }
+  }
+
+  function pixelToWorld(pixel: { x: number; y: number }) {
+    if (!heightSampler) return null
+    const { u, v } = pixelToUV(pixel)
+    return uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel, terrainDimensions)
   }
 
   const heightScale = options.heightScale ?? HEIGHT_SCALE_DEFAULT
@@ -767,13 +909,18 @@ export async function initTerrainViewer(
     100
   )
   const waterPercentNormalized = waterPercent / 100
-  const waterHeight = THREE.MathUtils.mapLinear(
-    waterPercentNormalized,
-    0,
-    1,
-    WATER_MIN * heightScale,
-    WATER_MAX * heightScale
-  )
+
+  function computeWaterHeight() {
+    return THREE.MathUtils.mapLinear(
+      waterPercentNormalized,
+      0,
+      1,
+      WATER_MIN * currentHeightScale,
+      WATER_MAX * currentHeightScale
+    )
+  }
+
+  let waterHeight = computeWaterHeight()
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(43, width / height, 0.1, 100)
@@ -781,7 +928,9 @@ export async function initTerrainViewer(
 
   const raycaster = new THREE.Raycaster()
   const pointer = new THREE.Vector2()
-  const upAxis = new THREE.Vector3(0, 1, 0)
+  const downAxis = new THREE.Vector3(0, -1, 0)
+  const surfaceRaycaster = new THREE.Raycaster()
+  const surfaceRayOrigin = new THREE.Vector3()
   let interactiveEnabled = options.interactive ?? false
   let heightSampler: HeightSampler | null = null
   let currentLocations: TerrainLocation[] = options.locations ?? []
@@ -873,6 +1022,9 @@ const markerMap = new Map<
     stem: THREE.Mesh
     spriteVisuals: MarkerSpriteVisualSet
     stemStates: MarkerStemVisualSet
+    iconScale: number
+    stemBaseHeight: number
+    spriteGap: number
   }
 >()
   const markerInteractiveTargets: THREE.Object3D[] = []
@@ -887,16 +1039,25 @@ const markerMap = new Map<
     duration: number
   } | null = null
   let terrain: THREE.Mesh | null = null
-  function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3) {
-    cameraTween = {
-      startPos: camera.position.clone(),
-      endPos,
-      startTarget: controls.target.clone(),
-      endTarget,
-      start: performance.now(),
-      duration: 650
-    }
+  function projectWorldToSurface(world: THREE.Vector3 | null) {
+    if (!world) return null
+    if (!terrain) return world.clone()
+    const originY = (terrainHeightRange.max ?? 0) + 2
+    surfaceRayOrigin.set(world.x, originY, world.z)
+    surfaceRaycaster.set(surfaceRayOrigin, downAxis)
+    const hit = surfaceRaycaster.intersectObject(terrain, true)
+    return hit[0]?.point.clone() ?? world.clone()
   }
+function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, duration = 650) {
+  cameraTween = {
+    startPos: camera.position.clone(),
+    endPos,
+    startTarget: controls.target.clone(),
+    endTarget,
+    start: performance.now(),
+    duration
+  }
+}
   const locationWorldCache = new Map<string, THREE.Vector3>()
   let markerGeneration = 0
 
@@ -918,6 +1079,22 @@ const markerMap = new Map<
   const loader = new THREE.TextureLoader()
   const iconTextureCache = new Map<string, THREE.Texture>()
   const iconTexturePromises = new Map<string, Promise<THREE.Texture | null>>()
+  function invalidateIconCache(paths?: string[]) {
+    if (!paths || paths.length === 0) {
+      iconTextureCache.forEach((texture) => texture.dispose())
+      iconTextureCache.clear()
+      iconTexturePromises.clear()
+      return
+    }
+    paths.forEach((path) => {
+      const cached = iconTextureCache.get(path)
+      if (cached) {
+        cached.dispose()
+        iconTextureCache.delete(path)
+      }
+      iconTexturePromises.delete(path)
+    })
+  }
 
   function clearMarkerResources() {
     markerResources.splice(0).forEach(({ spriteMaterials, spriteTextures, stemMaterial, stemGeometry }) => {
@@ -976,16 +1153,22 @@ const markerMap = new Map<
     return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
   }
 
+
   function updateMarkerVisuals() {
     const distance = camera.position.distanceTo(controls.target)
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
     const baseScale = lerp / 80
+    const zoomRange = controls.maxDistance - controls.minDistance
+    const normalizedZoom =
+      zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
+    const heightScaleFactor = THREE.MathUtils.lerp(0.55, 1.1, normalizedZoom)
 
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates }, id) => {
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
-      sprite.scale.set(baseScale, baseScale, baseScale).multiplyScalar(emphasis)
+      const scaled = baseScale * (iconScale ?? 1) * emphasis
+      sprite.scale.set(scaled, scaled, scaled)
       const visualState: MarkerVisualState = isFocused ? 'focus' : isHovered ? 'hover' : 'default'
       const nextVisual = spriteVisuals[visualState]
       if (sprite.material !== nextVisual.material) {
@@ -995,7 +1178,43 @@ const markerMap = new Map<
       const stemState = stemStates[visualState]
       stemMat.opacity = stemState.opacity
       stemMat.color.set(stemState.color)
+      const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
+      const stemScale = heightScaleFactor
+      stem.scale.set(stemWidth, stemScale, stemWidth)
+      const currentStemHeight = stemBaseHeight * stemScale
+      stem.position.y = currentStemHeight / 2
+      const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
+      const spriteHeight = scaled
+      sprite.position.y = spriteBase + spriteHeight / 2
     })
+  }
+
+  function rebuildRimMesh() {
+    if (!rimMesh) return
+    scene.remove(rimMesh)
+    rimMesh.geometry.dispose()
+    rimMesh = buildRimMesh(terrainGeometry, FLOOR_Y, rimMaterial)
+    rimMesh.receiveShadow = true
+    scene.add(rimMesh)
+  }
+
+  function rebuildOceanMesh() {
+    if (!heightSampler) return
+    if (ocean) {
+      scene.remove(ocean.mesh)
+      ocean.dispose()
+    }
+    waterHeight = computeWaterHeight()
+    ocean = createOceanMesh(
+      heightMap,
+      heightSampler,
+      currentHeightScale,
+      waterHeight,
+      seaLevel,
+      terrainWidth,
+      terrainDepth
+    )
+    scene.add(ocean.mesh)
   }
 
   function setLocationMarkers(locations: TerrainLocation[], focusedId?: string) {
@@ -1027,15 +1246,22 @@ const markerMap = new Map<
             terrainDimensions
           )
           if (!world) return
-          locationWorldCache.set(id, world.clone())
+          const surfacePoint = projectWorldToSurface(world)
+          if (!surfacePoint) return
+          locationWorldCache.set(id, surfacePoint.clone())
+          location.world = { x: surfacePoint.x, y: surfacePoint.y, z: surfacePoint.z }
           const glyph = formatMarkerGlyph(location)
+          const iconTexture = iconTextures[i] ?? undefined
           const spriteVisuals = createMarkerSpriteVisuals(glyph, markerTheme.sprite, {
-            iconTexture: iconTextures[i] ?? undefined
+            iconTexture,
+            showBorder: location.showBorder !== false
           })
           const sprite = new THREE.Sprite(spriteVisuals.default.material)
           sprite.userData.locationId = location.id
           sprite.renderOrder = 10
-          const stemHeight = Math.max(world.y - FLOOR_Y + 0.1, 0.4)
+          const stemHeight = markerStemHeight
+          const spriteGap = MARKER_SPRITE_GAP
+          const spriteBaseOffset = stemHeight + spriteGap
           const stemStates = createMarkerStemVisuals(markerTheme.stem)
           const stemMaterial = new THREE.MeshStandardMaterial({
             color: stemStates.default.color,
@@ -1046,16 +1272,27 @@ const markerMap = new Map<
           const stemGeometry = createStemGeometry(markerTheme.stem.shape, stemRadius, stemHeight)
           const stem = new THREE.Mesh(stemGeometry, stemMaterial)
           stem.renderOrder = 9
-          stem.position.y = -(stemHeight / 4)
-          sprite.position.set(0, 0.05 + stemHeight / 4, 0)
+          stem.position.set(0, stemHeight / 2, 0)
+          sprite.position.set(0, spriteBaseOffset, 0)
           stem.userData.locationId = location.id
           const container = new THREE.Group()
-          container.position.copy(world)
+          container.position.copy(surfacePoint)
+          container.position.y += MARKER_SURFACE_OFFSET
           container.userData.locationId = location.id
           container.add(stem)
           container.add(sprite)
           markersGroup.add(container)
-          markerMap.set(location.id, { container, sprite, stem, spriteVisuals, stemStates })
+          const iconScale = iconTexture ? ICON_SCALE_MULTIPLIER : 1
+          markerMap.set(location.id, {
+            container,
+            sprite,
+            stem,
+            spriteVisuals,
+            stemStates,
+            iconScale,
+            stemBaseHeight: stemHeight,
+            spriteGap
+          })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
           const spriteTextures = new Set<THREE.Texture>()
@@ -1077,6 +1314,34 @@ const markerMap = new Map<
       .catch((error) => console.error('[TerrainViewer] Failed to populate location markers', error))
   }
 
+  function applyThemeUpdate(overrides?: TerrainThemeOverrides) {
+    themeOverrides = overrides
+    resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
+    markerTheme = resolvedTheme.locationMarkers
+    stemRadius = computeStemRadius(markerTheme.stem)
+    setLocationMarkers(currentLocations, currentFocusId)
+  }
+
+  function applySeaLevelUpdate(nextSeaLevel: number) {
+    if (!heightSampler) {
+      return
+    }
+    seaLevel = nextSeaLevel
+    legend.sea_level = nextSeaLevel
+    dataset.legend.sea_level = nextSeaLevel
+    const stats = applyHeightField(terrainGeometry, heightSampler, {
+      seaLevel,
+      heightScale: currentHeightScale
+    })
+    terrainHeightRange = { min: stats.minY, max: stats.maxY }
+    terrainGeometry.attributes.position.needsUpdate = true
+    terrainGeometry.computeVertexNormals()
+    rebuildRimMesh()
+    rebuildOceanMesh()
+    setLocationMarkers(currentLocations, currentFocusId)
+  }
+
+  setLifecycleState('loading-textures')
   const [heightMapSource, topoMapSource] = await Promise.all([
     Promise.resolve(dataset.getHeightMapUrl()),
     Promise.resolve(dataset.getTopologyMapUrl())
@@ -1094,6 +1359,7 @@ const markerMap = new Map<
   topoTexture.wrapS = topoTexture.wrapT = THREE.ClampToEdgeWrapping
   topoTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8)
 
+  setLifecycleState('building-geometry')
   const sampler = createHeightSampler(heightMap)
   if (!sampler) throw new Error('Unable to read heightmap data')
   heightSampler = sampler
@@ -1101,11 +1367,12 @@ const markerMap = new Map<
   const terrainGeometry = new THREE.PlaneGeometry(
     terrainWidth,
     terrainDepth,
-    SEGMENTS_X,
+    terrainSegmentsX,
     terrainSegmentsZ
   )
   terrainGeometry.rotateX(-Math.PI / 2)
-  applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
+  const heightStats = applyHeightField(terrainGeometry, sampler, { seaLevel, heightScale })
+  terrainHeightRange = { min: heightStats.minY, max: heightStats.maxY }
 
   let legendTexture = await composeLegendTexture(
     legend,
@@ -1134,28 +1401,27 @@ const markerMap = new Map<
   const base = createBaseSlice(baseWidth, baseDepth)
   scene.add(base.mesh)
 
-  const rimMesh = buildRimMesh(
-    terrainGeometry,
-    FLOOR_Y,
-    new THREE.MeshStandardMaterial({
-      color: 0x14121f,
-      roughness: 0.5,
-      metalness: 0.2,
-      side: THREE.DoubleSide
-    })
-  )
+  const rimMaterial = new THREE.MeshStandardMaterial({
+    color: 0x14121f,
+    roughness: 0.5,
+    metalness: 0.2,
+    side: THREE.DoubleSide
+  })
+  let rimMesh = buildRimMesh(terrainGeometry, FLOOR_Y, rimMaterial)
   rimMesh.receiveShadow = true
   scene.add(rimMesh)
 
-  const ocean = createOceanMesh(
-    heightMap,
-    sampler,
-    heightScale,
-    waterHeight,
-    seaLevel,
-    terrainWidth,
-    terrainDepth
-  )
+  const createOcean = () =>
+    createOceanMesh(
+      heightMap,
+      sampler,
+      heightScale,
+      waterHeight,
+      seaLevel,
+      terrainWidth,
+      terrainDepth
+    )
+  let ocean = createOcean()
   scene.add(ocean.mesh)
 
   disposables.push(() => {
@@ -1163,9 +1429,7 @@ const markerMap = new Map<
     terrainMaterial.dispose()
     base.dispose()
     rimMesh.geometry.dispose()
-    Array.isArray(rimMesh.material)
-      ? rimMesh.material.forEach((mat) => mat.dispose())
-      : rimMesh.material.dispose()
+    rimMaterial.dispose()
     ocean.dispose()
     heightMap.dispose()
     topoTexture.dispose()
@@ -1199,9 +1463,23 @@ const markerMap = new Map<
   }
 
   let animationFrame = 0
+  let frameCount = 0
+  let firstRenderComplete = false
+  const frameTimings: number[] = []
+  const STABILITY_FRAME_COUNT = 10
+  const STABILITY_THRESHOLD_MS = 50 // Framerate should be under 50ms (>20fps)
+  const STABILITY_TIMEOUT_MS = 2000 // Force ready after 2 seconds if not stable
+  let stabilizingStartTime: number | null = null
+
+  // Frame capture mode for deterministic rendering
+  let frameCaptureMode = false
+  let manualFrameTime = 0
+  let frameCaptureStartTime = 0
+
   function animate() {
-    const now = performance.now()
-    const delta = Math.min((now - lastTime) / 1000, 0.15)
+    const now = frameCaptureMode ? manualFrameTime : performance.now()
+    const delta = frameCaptureMode ? (1 / captureFps) : Math.min((now - lastTime) / 1000, 0.15)
+    const frameDuration = now - lastTime
     lastTime = now
     if (cameraTween) {
       const progress = Math.min((now - cameraTween.start) / cameraTween.duration, 1)
@@ -1226,7 +1504,47 @@ const markerMap = new Map<
     controls.update()
     updateMarkerVisuals()
     renderer.render(scene, camera)
-    animationFrame = window.requestAnimationFrame(animate)
+
+    frameCount++
+
+    // Track lifecycle progression
+    if (!firstRenderComplete && frameCount === 1) {
+      setLifecycleState('first-render')
+      firstRenderComplete = true
+    }
+
+    // Monitor framerate stability
+    if (currentLifecycleState === 'first-render' || currentLifecycleState === 'stabilizing') {
+      frameTimings.push(frameDuration)
+      if (frameTimings.length > STABILITY_FRAME_COUNT) {
+        frameTimings.shift()
+      }
+
+      if (frameTimings.length === STABILITY_FRAME_COUNT) {
+        const avgFrameTime = frameTimings.reduce((a, b) => a + b, 0) / STABILITY_FRAME_COUNT
+        if (avgFrameTime < STABILITY_THRESHOLD_MS) {
+          setLifecycleState('ready')
+          stabilizingStartTime = null
+        } else if (currentLifecycleState === 'first-render') {
+          setLifecycleState('stabilizing')
+          stabilizingStartTime = now
+        }
+      }
+
+      // Timeout-based fallback: force ready after STABILITY_TIMEOUT_MS
+      if (currentLifecycleState === 'stabilizing' && stabilizingStartTime !== null) {
+        const stabilizingDuration = now - stabilizingStartTime
+        if (stabilizingDuration > STABILITY_TIMEOUT_MS) {
+          console.warn(`[terrainViewer] Framerate did not stabilize after ${STABILITY_TIMEOUT_MS}ms, forcing ready state`)
+          setLifecycleState('ready')
+          stabilizingStartTime = null
+        }
+      }
+    }
+
+    if (!frameCaptureMode) {
+      animationFrame = window.requestAnimationFrame(animate)
+    }
   }
   animate()
 
@@ -1304,10 +1622,9 @@ const markerMap = new Map<
       if (!hit || !hit.uv) return
       const u = hit.uv.x
       const v = hit.uv.y
-      const pixelX = Math.round(u * mapWidth)
-      const pixelY = Math.round((1 - v) * mapHeight)
+      const pixel = uvToPixel(u, v)
       options.onLocationPick?.({
-        pixel: { x: pixelX, y: pixelY },
+        pixel,
         uv: { u, v },
         world: { x: hit.point.x, y: hit.point.y, z: hit.point.z }
       })
@@ -1329,11 +1646,9 @@ const markerMap = new Map<
     const hit = intersectTerrain()
     if (!hit) return
     const worldPoint = hit.point.clone()
+    const pixel = hit.uv ? uvToPixel(hit.uv.x, hit.uv.y) : { x: worldPoint.x, y: worldPoint.z }
     navigateToLocation({
-      pixel: {
-        x: Math.round(hit.uv?.x ? hit.uv.x * mapWidth : worldPoint.x),
-        y: Math.round(hit.uv?.y ? (1 - hit.uv.y) * mapHeight : worldPoint.z)
-      },
+      pixel,
       world: worldPoint
     })
   }
@@ -1380,6 +1695,17 @@ const markerMap = new Map<
   if (options.layers) await updateLayers(options.layers)
   if (options.locations?.length) setLocationMarkers(options.locations)
   if (interactiveEnabled) setInteractiveMode(true)
+  if (options.cameraView) {
+    const fallbackPixel = {
+      x: options.cameraView.targetPixel?.x ?? mapWidth / 2,
+      y: options.cameraView.targetPixel?.y ?? mapHeight / 2
+    }
+    navigateToLocation({
+      pixel: fallbackPixel,
+      view: options.cameraView,
+      instant: true
+    })
+  }
 
   function normalizeWorld(value?: THREE.Vector3 | { x: number; y: number; z: number }) {
     if (!value) return null
@@ -1392,19 +1718,14 @@ const markerMap = new Map<
     locationId?: string
     world?: THREE.Vector3 | { x: number; y: number; z: number }
     view?: LocationViewState
+    instant?: boolean
   }) {
-    const { pixel, locationId, world: worldOverride, view } = payload
+    const { pixel, locationId, world: worldOverride, view, instant } = payload
     let world =
       normalizeWorld(worldOverride) ||
       (locationId && locationWorldCache.get(locationId)?.clone()) ||
-      uvToWorld(
-        pixelToUV(pixel).u,
-        pixelToUV(pixel).v,
-        heightSampler,
-        currentHeightScale,
-        seaLevel,
-        terrainDimensions
-      )
+      pixelToWorld(pixel)
+    world = projectWorldToSurface(world)
     if (!world) return
     const distance =
       view?.distance ?? Math.max(camera.position.distanceTo(controls.target), 0.1)
@@ -1417,9 +1738,12 @@ const markerMap = new Map<
     const endTarget = baseTarget.clone()
     const endPos = basePos.clone()
     cameraOffset.current = cameraOffset.target
-    startCameraTween(endPos, endTarget)
+    const duration = instant ? 0 : 650
+    startCameraTween(endPos, endTarget, duration)
     if (locationId) currentFocusId = locationId
   }
+
+  let captureFps = 30
 
   return {
     destroy: () => {
@@ -1433,6 +1757,12 @@ const markerMap = new Map<
     setInteractiveMode,
     updateLocations: (locations: TerrainLocation[], focusedId?: string) => {
       setLocationMarkers(locations, focusedId)
+    },
+    setFocusedLocation: (locationId?: string | null) => {
+      const nextId = locationId ?? undefined
+      if (currentFocusId === nextId) return
+      currentFocusId = nextId
+      updateMarkerVisuals()
     },
     navigateTo: navigateToLocation,
     setHoveredLocation: (id: string | null) => {
@@ -1448,15 +1778,76 @@ const markerMap = new Map<
           navigateToLocation({
             pixel: loc.pixel,
             locationId: targetId,
-            view: loc.view
+            view: loc.view,
+            instant: true
           })
         }
       }
     },
-    getViewState: () => ({
-      distance: Math.max(camera.position.distanceTo(controls.target), 0.1),
-      polar: controls.getPolarAngle(),
-      azimuth: controls.getAzimuthalAngle()
-    })
+    onCameraMove: (callback: (newState: LocationViewState) => void) => {
+      const handler = () => {
+        const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+        const targetPixel = worldToPixel(controls.target, terrainDimensions, {
+          width: mapWidth,
+          height: mapHeight
+        })
+        callback({
+          distance,
+          polar: controls.getPolarAngle(),
+          azimuth: controls.getAzimuthalAngle(),
+          targetPixel
+        })
+      }
+      controls.addEventListener('change', handler)
+      return () => {
+        controls.removeEventListener('change', handler)
+      }
+    },
+    getViewState: () => {
+      const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+      const targetPixel = worldToPixel(controls.target, terrainDimensions, {
+        width: mapWidth,
+        height: mapHeight
+      })
+      return {
+        distance,
+        polar: controls.getPolarAngle(),
+        azimuth: controls.getAzimuthalAngle(),
+        targetPixel
+      }
+    },
+    setTheme: applyThemeUpdate,
+    setSeaLevel: applySeaLevelUpdate,
+    invalidateIconTextures: (paths?: string[]) => {
+      invalidateIconCache(paths)
+      setLocationMarkers(currentLocations, currentFocusId)
+    },
+    invalidateLayerMasks: (paths?: string[]) => {
+      invalidateLayerMaskCache(paths)
+    },
+    // Frame capture API for deterministic rendering
+    enableFrameCaptureMode: (fps: number = 30) => {
+      captureFps = fps
+      frameCaptureMode = true
+      frameCaptureStartTime = performance.now()
+      manualFrameTime = frameCaptureStartTime
+      // Reset lastTime to match the frame capture start
+      lastTime = frameCaptureStartTime
+      return { fps }
+    },
+    disableFrameCaptureMode: () => {
+      frameCaptureMode = false
+      animationFrame = window.requestAnimationFrame(animate)
+    },
+    captureFrame: (frameNumber: number, fps: number = 30) => {
+      if (!frameCaptureMode) {
+        throw new Error('Frame capture mode is not enabled. Call enableFrameCaptureMode() first.')
+      }
+      // Set time relative to when frame capture started
+      manualFrameTime = frameCaptureStartTime + (frameNumber / fps) * 1000
+      // Manually trigger one animation frame
+      animate()
+      return { frameNumber, time: manualFrameTime }
+    }
   }
 }

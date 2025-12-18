@@ -24,6 +24,10 @@ export default defineConfig({
       )
     }
   },
+  server: {
+    port: 4176,
+    strictPort: true
+  },
   assetsInclude: ['**/*.svg'],
   build: {
     chunkSizeWarningLimit: 2048
