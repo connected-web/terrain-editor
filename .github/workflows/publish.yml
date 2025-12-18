@@ -41,13 +41,8 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
-      - name: Install package dependencies
-        working-directory: packages/terrain
-        run: npm ci
-
       - name: Build package
-        working-directory: packages/terrain
-        run: npm run build
+        run: npm run build:lib
 
       - name: Verify build output
         working-directory: packages/terrain
