@@ -1771,6 +1771,13 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     setCameraOffset: (offset: number, focusId?: string) => {
       cameraOffset.target = THREE.MathUtils.clamp(offset, -0.45, 0.45)
+
+      // Don't interrupt an in-progress camera animation
+      // The damping in animate() will smoothly transition the offset
+      if (cameraTween) {
+        return
+      }
+
       const targetId = focusId ?? currentFocusId
       if (targetId) {
         const loc = currentLocations.find((item) => item.id === targetId)
