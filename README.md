@@ -41,7 +41,7 @@ The website CTA buttons link directly to those ports during development so you a
 
 ### Quick start
 
-`@connected-web/terrain-editor` exposes `createTerrainViewerHost`, `createViewerOverlay`, `initTerrainViewer`, `loadWynArchive`, and `loadWynArchiveFromFile`. The viewer now assumes a single long-lived container plus an overlay helper that injects file inputs, drag/drop status, and pop-out/fullscreen buttons. Wire them together as shown below:
+`@connected-web/terrain-editor` exposes `createTerrainViewerHost`, `createViewerOverlay`, `initTerrainViewer`, `loadWynArchive`, `loadWynArchiveFromFile`, `createIconUrlMap`, and `enhanceLocationsWithIconUrls`. The viewer now assumes a single long-lived container plus an overlay helper that injects file inputs, drag/drop status, and pop-out/fullscreen buttons. Wire them together as shown below:
 
 ```ts
 import {
@@ -84,6 +84,30 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
 ```
 
 This mirrors the TS viewer demo, so run `npm run build:viewer` if you want a reference implementation.
+
+#### Working with icon assets
+
+When you pass `{ includeFiles: true }` to `loadWynArchive`, the response includes the `icons/` directory as raw `ArrayBuffer`s. Use `createIconUrlMap` to convert those assets into object URLs (plus a `cleanup()` helper), or `enhanceLocationsWithIconUrls` to hydrate each location with a ready-to-use `iconUrl`:
+
+```ts
+import {
+  enhanceLocationsWithIconUrls,
+  loadWynArchive
+} from '@connected-web/terrain-editor'
+
+const archive = await loadWynArchive('/maps/wynnal-terrain.wyn', {
+  includeFiles: true
+})
+
+const { locations, cleanup } = enhanceLocationsWithIconUrls(
+  archive.locations ?? [],
+  archive.files
+)
+
+// render locations[i].iconUrl in your UI...
+
+onBeforeUnmount(cleanup)
+```
 
 ### Embedding the shared viewer UI
 
