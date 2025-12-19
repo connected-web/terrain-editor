@@ -142,7 +142,6 @@ onBeforeUnmount(cleanup)
 ```
 
 Both helpers keep their own URL cache, so call `cleanup()` when the archive is unloaded or when you need to reclaim browser memory.
-
 ### Embedding the shared viewer UI
 
 The package ships a self-contained overlay (status text, load button, pop-out/fullscreen controls, drag/drop prompt) plus a host helper that moves the `<canvas>` between an embed slot and a modal pop-out. Stick to the “single container div/ref” contract outlined in `AGENTS.md` so Vue/React/TS demos all share the same behavior.
