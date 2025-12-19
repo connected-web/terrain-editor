@@ -12,6 +12,8 @@ This terrain editor loads compressed `.wyn` files which have the following packa
 - `locations.json` : (Optional) A JSON file containing predefined camera locations and related information for the terrain.
 - `theme.json`: (Optional) A JSON file defining the visual theme for the terrain viewer, including colors and styles for various UI elements.
 
+Full spec: `documentation/WYN-FILE-FORMAT.md`
+
 ## Usage
 
 The viewer component creates a 3D scene which can load and unpack Wyn files into browser memory. This provides a navigable interface for exploring terrain data.

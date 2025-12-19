@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://connected-web.github.io/terrain-editor/schemas/metadata.schema.json",
+  "title": "WYN Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "label": { "type": "string" },
+    "author": { "type": "string" },
+    "source": { "type": "string", "enum": ["archive", "scratch"] }
+  }
+}

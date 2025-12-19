@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://connected-web.github.io/terrain-editor/schemas/theme.schema.json",
+  "title": "WYN Theme Overrides",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "locationMarkers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sprite": { "$ref": "#/definitions/sprite" },
+        "stem": { "$ref": "#/definitions/stem" }
+      }
+    }
+  },
+  "definitions": {
+    "sprite": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fontFamily": { "type": "string" },
+        "fontWeight": { "type": "string" },
+        "maxFontSize": { "type": "number" },
+        "minFontSize": { "type": "number" },
+        "paddingX": { "type": "number" },
+        "paddingY": { "type": "number" },
+        "borderRadius": { "type": "number" },
+        "states": { "$ref": "#/definitions/spriteStates" }
+      }
+    },
+    "spriteStates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/definitions/spriteState" },
+        "hover": { "$ref": "#/definitions/spriteState" },
+        "focus": { "$ref": "#/definitions/spriteState" }
+      }
+    },
+    "spriteState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "textColor": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "borderColor": { "type": "string" },
+        "borderThickness": { "type": "number" },
+        "opacity": { "type": "number" }
+      }
+    },
+    "stem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shape": {
+          "type": "string",
+          "enum": ["cylinder", "triangle", "square", "pentagon", "hexagon"]
+        },
+        "radius": { "type": "number" },
+        "scale": { "type": "number" },
+        "states": { "$ref": "#/definitions/stemStates" }
+      }
+    },
+    "stemStates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": { "$ref": "#/definitions/stemState" },
+        "hover": { "$ref": "#/definitions/stemState" },
+        "focus": { "$ref": "#/definitions/stemState" }
+      }
+    },
+    "stemState": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": { "type": "string" },
+        "opacity": { "type": "number" }
+      }
+    }
+  }
+}

@@ -11,14 +11,17 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./documentation/*": "./documentation/*",
+    "./schemas/*": "./documentation/schemas/*"
   },
   "files": [
     "dist",
+    "documentation",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --dts --format cjs,esm --out-dir dist --clean --tsconfig tsconfig.json"
+    "build": "node ./scripts/copy-docs.mjs && tsup src/index.ts --dts --format cjs,esm --out-dir dist --clean --tsconfig tsconfig.json"
   },
   "dependencies": {
     "jszip": "^3.10.1",
