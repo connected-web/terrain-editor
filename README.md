@@ -87,27 +87,48 @@ This mirrors the TS viewer demo, so run `npm run build:viewer` if you want a ref
 
 #### Working with icon assets
 
-When you pass `{ includeFiles: true }` to `loadWynArchive`, the response includes the `icons/` directory as raw `ArrayBuffer`s. Use `createIconUrlMap` to convert those assets into object URLs (plus a `cleanup()` helper), or `enhanceLocationsWithIconUrls` to hydrate each location with a ready-to-use `iconUrl`:
+`loadWynArchive(..., { includeFiles: true })` returns the original file table so you can read arbitrary blobs from the `.wyn` archive:
 
 ```ts
-import {
-  enhanceLocationsWithIconUrls,
-  loadWynArchive
-} from '@connected-web/terrain-editor'
+const archive = await loadWynArchive('/maps/wynnal-terrain.wyn', { includeFiles: true })
+console.log(archive.files?.[0])
+// {
+//   path: 'icons/pins/quest.png',
+//   data: ArrayBuffer,
+//   type: 'image/png',
+//   lastModified: 1702784635000,
+//   sourceFileName: 'quest.png'
+// }
+```
 
-const archive = await loadWynArchive('/maps/wynnal-terrain.wyn', {
-  includeFiles: true
+To display those icons, convert the buffers into object URLs. `createIconUrlMap` does that once and hands back a `Map` (keyed by file path) plus a `cleanup()` helper that revokes all generated URLs:
+
+```ts
+const { urls, cleanup } = createIconUrlMap(archive.files)
+const questIconUrl = urls.get('icons/pins/quest.png') // -> blob:http://... object URL
+```
+
+`enhanceLocationsWithIconUrls` is a convenience wrapper on top of the same map. It accepts the raw `archive.locations` array and returns a cloned list in which each item optionally includes an `iconUrl` property (sourced from the matching icon file):
+
+```ts
+import { enhanceLocationsWithIconUrls, loadWynArchive } from '@connected-web/terrain-editor'
+
+const archive = await loadWynArchive('/maps/wynnal-terrain.wyn', { includeFiles: true })
+
+const { locations, cleanup } = enhanceLocationsWithIconUrls(archive.locations ?? [], archive.files)
+
+locations.forEach((loc) => {
+  renderMarker({
+    id: loc.id,
+    iconUrl: loc.iconUrl, // undefined if no matching icon file
+    coordinates: loc.pixel
+  })
 })
-
-const { locations, cleanup } = enhanceLocationsWithIconUrls(
-  archive.locations ?? [],
-  archive.files
-)
-
-// render locations[i].iconUrl in your UI...
 
 onBeforeUnmount(cleanup)
 ```
+
+Both helpers keep their own URL cache, so call `cleanup()` when the archive is unloaded or when you need to reclaim browser memory.
 
 ### Embedding the shared viewer UI
 
