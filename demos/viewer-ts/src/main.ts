@@ -32,6 +32,9 @@ const locationPopupCounterEl = locationPopupEl.querySelector(
 ) as HTMLElement
 const locationPrevButton = locationPopupEl.querySelector('[data-location-prev]') as HTMLButtonElement
 const locationNextButton = locationPopupEl.querySelector('[data-location-next]') as HTMLButtonElement
+const locationCloseButton = locationPopupEl.querySelector(
+  '[data-location-close]'
+) as HTMLButtonElement
 const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-tab]'))
 const tabPanels = Array.from(document.querySelectorAll<HTMLElement>('[data-panel]'))
 
@@ -52,8 +55,16 @@ function renderLayerControls(
   onChange: () => void
 ) {
   layerControlsEl.innerHTML = ''
-  function makeCheckbox(group: 'biomes' | 'overlays', id: string, label: string) {
+  function makeCheckbox(
+    group: 'biomes' | 'overlays',
+    id: string,
+    label: string,
+    rgb?: [number, number, number]
+  ) {
     const wrapper = document.createElement('label')
+    const swatch = document.createElement('span')
+    swatch.className = 'layer-swatch'
+    swatch.style.background = rgb ? `rgb(${rgb.join(',')})` : '#1b1f2a'
     const input = document.createElement('input')
     input.type = 'checkbox'
     input.checked = state[group][id]
@@ -64,15 +75,20 @@ function renderLayerControls(
     const text = document.createElement('span')
     text.textContent = label
     wrapper.appendChild(input)
+    wrapper.appendChild(swatch)
     wrapper.appendChild(text)
     return wrapper
   }
 
-  Object.entries(legend.biomes).forEach(([id]) => {
-    layerControlsEl.appendChild(makeCheckbox('biomes', id, id.replace(/_/g, ' ')))
+  Object.entries(legend.biomes).forEach(([id, layer]) => {
+    layerControlsEl.appendChild(
+      makeCheckbox('biomes', id, id.replace(/_/g, ' '), layer.rgb)
+    )
   })
-  Object.entries(legend.overlays).forEach(([id]) => {
-    layerControlsEl.appendChild(makeCheckbox('overlays', id, id.replace(/_/g, ' ')))
+  Object.entries(legend.overlays).forEach(([id, layer]) => {
+    layerControlsEl.appendChild(
+      makeCheckbox('overlays', id, id.replace(/_/g, ' '), layer.rgb)
+    )
   })
 }
 
@@ -88,7 +104,16 @@ function renderLocations(locations: TerrainLocation[] = [], navigate: (loc: Terr
   locations.forEach((location) => {
     const button = document.createElement('button')
     button.type = 'button'
-    button.textContent = location.name ?? location.id
+    const row = document.createElement('span')
+    row.className = 'location-list__item'
+    const icon = document.createElement('span')
+    icon.className = 'location-list__icon'
+    icon.appendChild(resolveIconMarkup(location))
+    const label = document.createElement('span')
+    label.textContent = location.name ?? location.id
+    row.appendChild(icon)
+    row.appendChild(label)
+    button.appendChild(row)
     button.addEventListener('click', () => navigate(location))
     locationListEl.appendChild(button)
   })
@@ -111,6 +136,7 @@ let overlayHandle: ViewerOverlayHandle | null = null
 let iconCleanup: (() => void) | null = null
 let locationsWithIcons: Array<TerrainLocation & { iconUrl?: string }> = []
 let activeLocationIndex = -1
+let popupOpen = false
 
 function setActiveTab(id: string) {
   tabButtons.forEach((button) => {
@@ -127,7 +153,7 @@ tabButtons.forEach((button) => {
     if (target) setActiveTab(target)
   })
 })
-setActiveTab('layers')
+setActiveTab('locations')
 
 function resolveIconMarkup(location: TerrainLocation & { iconUrl?: string }) {
   const url = location.iconUrl
@@ -147,7 +173,7 @@ function resolveIconMarkup(location: TerrainLocation & { iconUrl?: string }) {
 
 function updateLocationPopup() {
   const location = locationsWithIcons[activeLocationIndex]
-  if (!location) {
+  if (!location || !popupOpen) {
     locationPopupEl.classList.add('is-hidden')
     locationPopupIconEl.innerHTML = '?'
     locationPopupNameEl.textContent = 'Unknown'
@@ -180,11 +206,16 @@ function setActiveLocationIndex(index: number, shouldNavigate = true) {
   if (shouldNavigate) {
     navigateToLocation(location)
   }
+  popupOpen = true
   updateLocationPopup()
 }
 
 locationPrevButton.addEventListener('click', () => setActiveLocationIndex(activeLocationIndex - 1))
 locationNextButton.addEventListener('click', () => setActiveLocationIndex(activeLocationIndex + 1))
+locationCloseButton.addEventListener('click', () => {
+  popupOpen = false
+  updateLocationPopup()
+})
 
 function updateStatus(message: string) {
   overlayHandle?.setStatus(message)
@@ -271,6 +302,7 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
         }
       }
     })
+    popupOpen = locationsWithIcons.length > 0
     setActiveLocationIndex(locationsWithIcons.length ? 0 : -1, false)
     updateStatus('Terrain loaded. Use the controls to explore.')
   } catch (error) {

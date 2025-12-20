@@ -91,8 +91,8 @@ main {
 }
 
 .tabs {
-  display: inline-flex;
-  gap: 0.5rem;
+  display: flex;
+  gap: 0.35rem;
   padding: 0.25rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
@@ -100,6 +100,7 @@ main {
 }
 
 .tab-button {
+  flex: 1;
   background: transparent;
   border: none;
   color: inherit;
@@ -160,10 +161,42 @@ main {
   transition: border-color 0.2s ease;
 }
 
+.location-list__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.location-list__icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.location-list__icon img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.layer-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
 .location-popup {
   position: absolute;
-  top: 1rem;
-  left: 1rem;
+  top: 3rem;
+  left: 1.5rem;
   width: min(260px, 40%);
   z-index: 5;
 }
@@ -243,4 +276,15 @@ main {
   padding: 0.3rem 0.65rem;
   cursor: pointer;
   font-size: 0.85rem;
+}
+
+.ghost-button--icon {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  line-height: 1;
 }
