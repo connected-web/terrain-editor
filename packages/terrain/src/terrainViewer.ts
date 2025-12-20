@@ -1603,6 +1603,10 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     const markerId = pickMarkerId()
     if (markerId !== hoveredLocationId) {
       hoveredLocationId = markerId
+      const hoveredLocation = markerId
+        ? currentLocations.find((location) => location.id === markerId)
+        : undefined
+      renderer.domElement.title = hoveredLocation?.name || hoveredLocation?.id || ''
       options.onLocationHover?.(markerId)
       updateMarkerVisuals()
     }
