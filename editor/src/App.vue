@@ -454,7 +454,7 @@ const locationsApi = useLocations()
 
 const cameraOffsetTarget = computed(() => {
   if (isCompactViewport.value || isDockCollapsed.value) return 0
-  return activeDockPanel.value === 'locations' ? 0.28 : 0
+  return activeDockPanel.value === 'locations' ? -0.28 : 0
 })
 
 watch(
