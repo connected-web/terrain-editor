@@ -6,6 +6,7 @@ demos/viewer-ts/public/maps
 editor/dist
 editor/public/maps
 packages/terrain/dist
+packages/terrain/documentation
 test-results
 .devservers.json
 documentation/renders

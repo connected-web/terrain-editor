@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://connected-web.github.io/terrain-editor/schemas/locations.schema.json",
+  "title": "WYN Locations",
+  "type": "array",
+  "items": { "$ref": "#/definitions/location" },
+  "definitions": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pixel"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "description": { "type": "string" },
+        "showBorder": { "type": "boolean" },
+        "pixel": { "$ref": "#/definitions/pixel" },
+        "uv": { "$ref": "#/definitions/uv" },
+        "world": { "$ref": "#/definitions/world" },
+        "view": { "$ref": "#/definitions/view" }
+      }
+    },
+    "pixel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "uv": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["u", "v"],
+      "properties": {
+        "u": { "type": "number" },
+        "v": { "type": "number" }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["distance", "polar", "azimuth"],
+      "properties": {
+        "distance": { "type": "number" },
+        "polar": { "type": "number" },
+        "azimuth": { "type": "number" },
+        "targetPixel": { "$ref": "#/definitions/pixel" }
+      }
+    }
+  }
+}

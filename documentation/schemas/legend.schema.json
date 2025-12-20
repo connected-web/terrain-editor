@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://connected-web.github.io/terrain-editor/schemas/legend.schema.json",
+  "title": "WYN Legend",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["size", "heightmap", "biomes", "overlays"],
+  "properties": {
+    "size": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "sea_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "heightmap": {
+      "type": "string",
+      "minLength": 1
+    },
+    "topology": {
+      "type": "string",
+      "minLength": 1
+    },
+    "biomes": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/legendLayer" }
+    },
+    "overlays": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/legendLayer" }
+    }
+  },
+  "definitions": {
+    "legendLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mask", "rgb"],
+      "properties": {
+        "mask": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rgb": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
