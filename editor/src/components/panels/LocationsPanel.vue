@@ -78,6 +78,15 @@
           />
         </label>
         <label class="locations-panel__field">
+          <span>Description</span>
+          <textarea
+            v-model="activeLocation.description"
+            @blur="commitLocations"
+            placeholder="Short description"
+            rows="3"
+          />
+        </label>
+        <label class="locations-panel__field">
           <span>Icon reference</span>
           <input
             type="text"

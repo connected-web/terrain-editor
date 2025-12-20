@@ -74,6 +74,7 @@ export type TerrainLocation = {
   id: string
   name?: string
   icon?: string
+  description?: string
   showBorder?: boolean
   pixel: { x: number; y: number }
   uv?: { u: number; v: number }
