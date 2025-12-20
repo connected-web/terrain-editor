@@ -100,6 +100,7 @@ type TerrainInitOptions = {
   onLifecycleChange?: (state: ViewerLifecycleState) => void
   heightScale?: number
   waterLevelPercent?: number
+  maxPixelRatio?: number
   layers?: LayerToggleState
   interactive?: boolean
   onLocationPick?: (payload: LocationPickPayload) => void
@@ -940,10 +941,17 @@ export async function initTerrainViewer(
   let viewportHeight = height
   let viewOffsetPixels = 0
 
+  const maxPixelRatio = Math.max(1, options.maxPixelRatio ?? 1.5)
+  let currentPixelRatio = 1
+  function resolvePixelRatio() {
+    return Math.max(1, Math.min(window.devicePixelRatio || 1, maxPixelRatio))
+  }
+
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.08
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  currentPixelRatio = resolvePixelRatio()
+  renderer.setPixelRatio(currentPixelRatio)
   const hostStyle = window.getComputedStyle(container)
   if (hostStyle.position === 'static') {
     container.style.position = 'relative'
@@ -1559,6 +1567,11 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     viewOffsetPixels = shiftTarget
     camera.aspect = clientWidth / clientHeight
     camera.updateProjectionMatrix()
+    const nextPixelRatio = resolvePixelRatio()
+    if (nextPixelRatio !== currentPixelRatio) {
+      currentPixelRatio = nextPixelRatio
+      renderer.setPixelRatio(currentPixelRatio)
+    }
     renderer.setSize(clientWidth, clientHeight, false)
     applyViewOffset()
   })
