@@ -307,24 +307,23 @@ main {
   object-fit: contain;
 }
 
+.location-popup__title {
+  min-width: 0;
+  max-width: 65%;
+}
+
 .location-popup__title strong {
   display: block;
   font-size: 1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 70%;
 }
 
 .location-popup__title span {
   display: block;
   font-size: 0.8rem;
   color: var(--color-muted);
-}
-
-.location-popup__title {
-  min-width: 0;
-  max-width: 70%;
 }
 
 .location-popup__description {
