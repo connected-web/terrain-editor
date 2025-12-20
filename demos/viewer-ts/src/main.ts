@@ -18,7 +18,8 @@ import {
 
 const viewerEl = document.getElementById('viewer-root') as HTMLElement
 const embedSlot = document.getElementById('viewer-embed-slot') as HTMLElement
-const layerControlsEl = document.getElementById('layer-controls') as HTMLElement
+const layerControlsBiomesEl = document.getElementById('layer-controls-biomes') as HTMLElement
+const layerControlsOverlaysEl = document.getElementById('layer-controls-overlays') as HTMLElement
 const locationListEl = document.getElementById('location-list') as HTMLElement
 const locationPopupEl = document.getElementById('location-popup') as HTMLElement
 const locationPopupIconEl = locationPopupEl.querySelector('[data-location-icon]') as HTMLElement
@@ -54,7 +55,8 @@ function renderLayerControls(
   state: LayerToggleState,
   onChange: () => void
 ) {
-  layerControlsEl.innerHTML = ''
+  layerControlsBiomesEl.innerHTML = ''
+  layerControlsOverlaysEl.innerHTML = ''
   function makeCheckbox(
     group: 'biomes' | 'overlays',
     id: string,
@@ -81,12 +83,12 @@ function renderLayerControls(
   }
 
   Object.entries(legend.biomes).forEach(([id, layer]) => {
-    layerControlsEl.appendChild(
+    layerControlsBiomesEl.appendChild(
       makeCheckbox('biomes', id, id.replace(/_/g, ' '), layer.rgb)
     )
   })
   Object.entries(legend.overlays).forEach(([id, layer]) => {
-    layerControlsEl.appendChild(
+    layerControlsOverlaysEl.appendChild(
       makeCheckbox('overlays', id, id.replace(/_/g, ' '), layer.rgb)
     )
   })
