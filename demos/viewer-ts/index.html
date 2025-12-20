@@ -16,15 +16,53 @@
     </header>
     <main>
       <section class="viewer-panel">
-        <div id="viewer-embed-slot" class="viewer-root-slot">
-          <div id="viewer-root" class="viewer-root"></div>
+        <div class="viewer-surface">
+          <div id="viewer-embed-slot" class="viewer-root-slot">
+            <div id="viewer-root" class="viewer-root">
+              <aside id="location-popup" class="location-popup is-hidden" aria-live="polite">
+                <div class="location-popup__card">
+                  <div class="location-popup__header">
+                    <div class="location-popup__icon" data-location-icon>?</div>
+                    <div class="location-popup__title">
+                      <strong data-location-name>Unknown</strong>
+                      <span data-location-coords>0, 0</span>
+                    </div>
+                    <button type="button" class="ghost-button ghost-button--icon" data-location-close>×</button>
+                  </div>
+                  <p class="location-popup__description" data-location-description>
+                    No description provided.
+                  </p>
+                  <div class="location-popup__nav">
+                    <button type="button" class="ghost-button" data-location-prev>&lt; Prev</button>
+                    <span class="location-popup__counter" data-location-counter>0 / 0</span>
+                    <button type="button" class="ghost-button" data-location-next>Next &gt;</button>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
         </div>
       </section>
       <section class="controls-panel">
-        <h2>Layers</h2>
-        <div id="layer-controls" class="control-grid"></div>
-        <h2>Locations</h2>
-        <div id="location-list" class="location-list"></div>
+        <div class="tabs">
+          <button type="button" class="tab-button is-active" data-tab="layers">Layers</button>
+          <button type="button" class="tab-button" data-tab="locations">Locations</button>
+        </div>
+        <div class="tab-panel is-active" data-panel="layers">
+          <h2>Layers</h2>
+          <div class="layer-group">
+            <h3>Biomes</h3>
+            <div id="layer-controls-biomes" class="control-grid"></div>
+          </div>
+          <div class="layer-group">
+            <h3>Overlays</h3>
+            <div id="layer-controls-overlays" class="control-grid"></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="locations">
+          <h2>Locations</h2>
+          <div id="location-list" class="location-list"></div>
+        </div>
       </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
