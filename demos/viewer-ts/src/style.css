@@ -4,6 +4,18 @@
   font-family: 'Inter', 'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
   background-color: #05070d;
   color: #f2ede0;
+  --color-bg: #05070d;
+  --color-panel: #0b1020;
+  --color-card: rgba(7, 11, 18, 0.92);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-text: #f2ede0;
+  --color-muted: rgba(242, 237, 224, 0.6);
+  --color-hover: rgba(255, 255, 255, 0.08);
+  --color-active: rgba(223, 195, 135, 0.2);
+  --color-selected: rgba(223, 195, 135, 0.35);
+  --color-accent: #dfc387;
+  --scrollbar-thumb: rgba(223, 195, 135, 0.35);
+  --scrollbar-track: rgba(255, 255, 255, 0.04);
 }
 
 * {
@@ -43,7 +55,7 @@ main {
 
 .viewer-panel {
   flex: 2 0 auto;
-  background: #0b1020;
+  background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 1rem;
@@ -71,13 +83,13 @@ main {
   min-width: 400px;
   border-radius: 10px;
   overflow: hidden;
-  background: radial-gradient(circle at top, #16233c, #05070d);
+  background: radial-gradient(circle at top, #16233c, var(--color-bg));
   position: relative;
 }
 
 .controls-panel {
   flex: 1;
-  background: #0b1020;
+  background: var(--color-panel);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 1rem;
@@ -97,7 +109,7 @@ main {
   gap: 0.35rem;
   padding: 0.25rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-hover);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -114,8 +126,12 @@ main {
 }
 
 .tab-button.is-active {
-  background: rgba(223, 195, 135, 0.2);
+  background: var(--color-active);
   color: #f7e5c0;
+}
+
+.tab-button:hover {
+  background: var(--color-hover);
 }
 
 .tab-panel {
@@ -162,10 +178,34 @@ main {
   padding-right: 0.25rem;
 }
 
+.location-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.location-list::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+.location-list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.location-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
 .location-list button {
   justify-content: space-between;
   cursor: pointer;
   transition: border-color 0.2s ease;
+}
+
+.location-list button:hover {
+  border-color: var(--color-selected);
+  background: var(--color-hover);
 }
 
 .location-list__item {
@@ -214,6 +254,12 @@ main {
   color: rgba(242, 237, 224, 0.55);
 }
 
+.control-grid label span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .location-popup {
   position: absolute;
   top: 3.5rem;
@@ -227,8 +273,8 @@ main {
 }
 
 .location-popup__card {
-  background: rgba(7, 11, 18, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 0.85rem;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
@@ -267,16 +313,18 @@ main {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 70%;
 }
 
 .location-popup__title span {
   display: block;
   font-size: 0.8rem;
-  color: rgba(242, 237, 224, 0.6);
+  color: var(--color-muted);
 }
 
 .location-popup__title {
   min-width: 0;
+  max-width: 70%;
 }
 
 .location-popup__description {
@@ -294,7 +342,7 @@ main {
 
 .location-popup__counter {
   font-size: 0.85rem;
-  color: rgba(242, 237, 224, 0.6);
+  color: var(--color-muted);
 }
 
 .ghost-button {
@@ -305,6 +353,11 @@ main {
   padding: 0.3rem 0.65rem;
   cursor: pointer;
   font-size: 0.85rem;
+}
+
+.ghost-button:hover {
+  border-color: var(--color-selected);
+  background: var(--color-hover);
 }
 
 .ghost-button--icon {
