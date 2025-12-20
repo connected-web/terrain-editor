@@ -2,6 +2,8 @@
 
 An interactive terrain editor and viewer designed for web using three.js.
 
+>*The goal was to make an interactive map for my website, and a long the way it grew into a full layer, location, and heightmap editor, with full import/export options.*
+
 ## Wyn files
 
 This terrain editor loads compressed `.wyn` files which have the following package structure:
@@ -12,14 +14,23 @@ This terrain editor loads compressed `.wyn` files which have the following packa
 - `locations.json` : (Optional) A JSON file containing predefined camera locations and related information for the terrain.
 - `theme.json`: (Optional) A JSON file defining the visual theme for the terrain viewer, including colors and styles for various UI elements.
 
-Full spec: `documentation/WYN-FILE-FORMAT.md`
+Full spec: [`documentation/WYN-FILE-FORMAT.md`](./documentation/WYN-FILE-FORMAT.md)
 
 ## Usage
 
 The viewer component creates a 3D scene which can load and unpack Wyn files into browser memory. This provides a navigable interface for exploring terrain data.
 
-- [Viewer demo](https://connected-web.github.io/terrain-editor/viewer-js/)
-- [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
+- [Project Website](https://connected-web.github.io/terrain-editor/)
+- [Example Viewer](https://connected-web.github.io/terrain-editor/viewer-js/)
+- [Editor Website](https://connected-web.github.io/terrain-editor/editor/)
+
+<kbd>
+<img width="1439" height="788" alt="terrain-editor" src="https://github.com/user-attachments/assets/fb54609e-9de6-46d5-9c78-9a0b6cf89c7a" />
+</kbd>
+
+<kbd>
+<img width="1177" height="685" alt="terrain-viewer" src="https://github.com/user-attachments/assets/0deb5467-a0e7-4e1e-a311-1dc1e8c62c97" />
+</kbd>
 
 ### Demos
 
@@ -138,10 +149,10 @@ The package ships a self-contained overlay (status text, load button, pop-out/fu
 
 ## Editor
 
-To make construction of the terrain easier, a Vue 3 based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
+To make construction of the map files and terrain easier, a browser based editor application is provided in the `editor/` directory. This application allows users to create and modify terrain data, which can then be exported as `.wyn` files for use in the viewer. You can also host your own instance of the editor if desired to make customizations.
 
-- [Website](https://connected-web.github.io/terrain-editor/)
-- [Editor (Vue 3)](https://connected-web.github.io/terrain-editor/editor/)
+- [Project Website](https://connected-web.github.io/terrain-editor/)
+- [Terrain Editor](https://connected-web.github.io/terrain-editor/editor/)
 
 #### Workspace features
 
