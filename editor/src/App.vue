@@ -451,6 +451,20 @@ function resetStemState(state: StemStateKey) {
   resetStemStateHelper(themeForm, state, scheduleThemeUpdate)
 }
 const locationsApi = useLocations()
+
+const cameraOffsetTarget = computed(() => {
+  if (isCompactViewport.value || isDockCollapsed.value) return 0
+  return activeDockPanel.value === 'locations' ? -0.28 : 0
+})
+
+watch(
+  [handle, cameraOffsetTarget, () => locationsApi.activeLocation.value?.id],
+  ([viewerHandle, offset, focusId]) => {
+    if (!viewerHandle) return
+    viewerHandle.setCameraOffset(offset, offset !== 0 ? focusId : undefined)
+  },
+  { immediate: true }
+)
 const pendingCameraOverride = ref<LocationViewState | null>(null)
 
 function applyCameraOverride(state: LocationViewState) {

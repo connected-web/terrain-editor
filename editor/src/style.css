@@ -364,6 +364,15 @@ body {
   padding: 0.45rem 0.65rem;
 }
 
+.locations-panel__field textarea {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  padding: 0.45rem 0.65rem;
+  resize: vertical;
+}
+
 .locations-panel__hint {
   font-size: 0.75rem;
   letter-spacing: 0.05em;

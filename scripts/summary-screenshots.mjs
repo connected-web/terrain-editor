@@ -6,6 +6,7 @@ const marker = '<!-- pr-check-step-summary -->'
 const summaryPath = process.env.GITHUB_STEP_SUMMARY
 const githubToken = process.env.GITHUB_TOKEN
 const githubRepo = process.env.GITHUB_REPOSITORY
+const githubRunId = process.env.GITHUB_RUN_ID
 const eventPath = process.env.GITHUB_EVENT_PATH
 const screenshotDir = path.join(process.cwd(), 'test-results', 'screenshots')
 
@@ -62,11 +63,12 @@ function buildSummary(screenshots) {
 
   let content = `${marker}\n\n## Playwright Screenshots\n\n`
   for (const screenshot of screenshots) {
+    const url = screenshot.url ? withCacheBuster(screenshot.url) : null
     // Use FTP URL if available, otherwise fall back to base64
-    if (screenshot.url) {
+    if (url) {
       content += [
         `### ${screenshot.title}`,
-        `[![${screenshot.title}](${screenshot.url})](${screenshot.url})`,
+        `[![${screenshot.title}](${url})](${url})`,
       ].join('\n\n')
     } else {
       content += [
@@ -210,13 +212,21 @@ function buildCommentBody(screenshots) {
 
   let content = `${marker}\n\n## Playwright Screenshots\n\n`
   for (const screenshot of screenshots) {
+    const url = screenshot.url ? withCacheBuster(screenshot.url) : null
+    if (!url) continue
     content += [
       `### ${screenshot.title}`,
-      `![${screenshot.title}](${screenshot.url})`,
+      `![${screenshot.title}](${url})`,
     ].join('\n\n')
     content += '\n\n'
   }
   return content.trimEnd() + '\n'
+}
+
+function withCacheBuster(url) {
+  if (!githubRunId) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}v=${githubRunId}`
 }
 
 async function upsertPullRequestComment(screenshots) {
