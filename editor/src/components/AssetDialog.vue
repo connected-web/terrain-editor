@@ -10,7 +10,7 @@
           class="pill-button pill-button--ghost"
           @click="$emit('close')"
         >
-          <Icon icon="xmark" />
+          <Icon :icon="closeIcon">{{ closeLabel }}</Icon>
         </button>
       </header>
       <label class="asset-dialog__search">
@@ -72,6 +72,8 @@ const props = defineProps<{
   showSelect?: boolean
   selectLabel?: string
   showClose?: boolean
+  closeLabel?: string
+  closeIcon?: string
 }>()
 
 const emit = defineEmits<{
@@ -92,6 +94,8 @@ const embedded = computed(() => Boolean(props.embedded))
 const showSelect = computed(() => props.showSelect !== false)
 const selectLabel = computed(() => props.selectLabel ?? 'Use asset')
 const showClose = computed(() => props.showClose !== false)
+const closeLabel = computed(() => props.closeLabel ?? 'Close')
+const closeIcon = computed(() => props.closeIcon ?? 'xmark')
 
 function handleSelect(path: string) {
   if (!showSelect.value) return
