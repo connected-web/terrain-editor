@@ -107,8 +107,3 @@ This will open the editor with the Locations panel active, select the location w
 
 These parameters are useful for Playwright tests, documentation screenshots, and sharing reproducible scenes.
 
----
-
-**Future updates**
-- **Editing**: layer asset uploads, more brush types/noise, custom brush presets.
-- **Documentation & playback**: GIF/Video captures via Playwright traces + ffmpeg.
