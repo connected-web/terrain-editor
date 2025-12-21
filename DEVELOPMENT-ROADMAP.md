@@ -71,7 +71,7 @@
 - ✅ Brush spacing/flow controls + advanced panel menu for mask tooling
 - 🏗️ Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
 - 🏗️ Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
-- 🏗️ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
+- ✅ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
 - 🏗️ Layer reorder via drag/drop (needs between-item drop + better z-indexing)
 - 🏗️ Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
 - 🏗️ Create/delete layer flows (with confirmation)
