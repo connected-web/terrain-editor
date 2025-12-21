@@ -4,7 +4,7 @@ import type { UIAction } from '../types/uiActions'
 
 export function useUiActions(options: {
   hasActiveArchive: ComputedRef<boolean>
-  setActivePanel: (panel: 'workspace' | 'layers' | 'locations' | 'theme' | 'settings') => void
+  setActivePanel: (panel: 'workspace' | 'layers' | 'locations' | 'theme' | 'settings' | 'assets') => void
   setDockExpanded: () => void
   loadSample: () => void
   triggerFileSelect: () => void
@@ -13,7 +13,7 @@ export function useUiActions(options: {
   promptCloseArchive: () => void
 }) {
   const actions = computed<UIAction[]>(() => {
-    const setPanel = (panel: 'workspace' | 'layers' | 'locations' | 'theme' | 'settings') => {
+    const setPanel = (panel: 'workspace' | 'layers' | 'locations' | 'theme' | 'settings' | 'assets') => {
       options.setActivePanel(panel)
       options.setDockExpanded()
     }
@@ -77,6 +77,13 @@ export function useUiActions(options: {
         label: 'Settings',
         description: 'Adjust editor preferences + viewer behavior.',
         callback: () => setPanel('settings')
+      },
+      {
+        id: 'assets',
+        icon: 'image',
+        label: 'Assets',
+        description: 'Browse imported assets.',
+        callback: () => setPanel('assets')
       },
       {
         id: 'export',

@@ -33,7 +33,7 @@
               <span>{{ item.label }}</span>
             </button>
             <div class="panel-dock__nav-divider"></div>
-            <button type="button" class="panel-dock__nav-button" @click="openAssetLibrary">
+            <button type="button" class="panel-dock__nav-button" @click="openAssetsPanel()">
               <Icon icon="image" aria-hidden="true" />
               <span>Assets</span>
             </button>
@@ -86,6 +86,7 @@
             @consume-pending-view-state="consumePendingLayerViewState"
             @mask-view-change="handleMaskViewChange"
             @replace-layer-file="handleLayerFileReplace"
+            @open-assets="openAssetsPanelForLayer"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -112,6 +113,20 @@
           @reset-sprite="resetSpriteState"
           @stem-input="handleStemStateInput"
           @reset-stem="resetStemState"
+        />
+
+        <AssetsPanel
+          v-else-if="activeDockPanel === 'assets'"
+          :assets="projectAssets"
+          :get-preview="getIconPreview"
+          :filter-text="assetDialogFilter"
+          :mode="assetsPanelMode"
+          @update:filter-text="setAssetDialogFilter"
+          @select="handleAssetPanelSelect"
+          @replace="beginAssetReplacement"
+          @upload="() => triggerLibraryUpload()"
+          @remove="removeAsset"
+          @close="setActivePanel('workspace')"
         />
 
         <SettingsPanel v-else-if="activeDockPanel === 'settings'" :local-settings="localSettings" />
@@ -148,18 +163,6 @@
         @upload="() => triggerLibraryUpload()"
         @remove="removeAsset"
         @close="closeIconPicker"
-      />
-      <AssetDialog
-        v-if="assetLibraryOpen"
-        :assets="projectAssets"
-        :get-preview="getIconPreview"
-        :filter-text="assetDialogFilter"
-        @update:filter-text="setAssetDialogFilter"
-        @select="closeAssetLibrary"
-        @replace="beginAssetReplacement"
-        @upload="() => triggerLibraryUpload()"
-        @remove="removeAsset"
-        @close="closeAssetLibrary"
       />
       <LocationPickerDialog
         v-if="locationsApi.locationPickerOpen.value"
@@ -238,6 +241,7 @@ import LayersPanel from './components/panels/LayersPanel.vue'
 import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
+import AssetsPanel from './components/panels/AssetsPanel.vue'
 import Icon from './components/Icon.vue'
 import { useUiActions } from './composables/useUiActions'
 import { useLayersModel, type LayerEntry } from './composables/useLayersModel'
@@ -265,6 +269,7 @@ const dockNavItems: Array<{ id: DockPanel; label: string; icon: string }> = [
   { id: 'layers', label: 'Layers', icon: 'layer-group' },
   { id: 'locations', label: 'Locations', icon: 'location-dot' },
   { id: 'theme', label: 'Theme', icon: 'palette' },
+  { id: 'assets', label: 'Assets', icon: 'image' },
   { id: 'settings', label: 'Settings', icon: 'sliders' }
 ]
 const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
@@ -595,16 +600,25 @@ const {
   closeIconPicker,
 } = useIconPicker(setAssetDialogFilter)
 
-const assetLibraryOpen = ref(false)
+const assetsPanelMode = ref<'default' | 'icon' | 'layer'>('default')
+const assetsPanelLayerTargetId = ref<string | null>(null)
 
-function openAssetLibrary() {
-  assetLibraryOpen.value = true
+function openAssetsPanel(mode: 'default' | 'icon' | 'layer' = 'default', layerId?: string | null) {
+  assetsPanelMode.value = mode
+  assetsPanelLayerTargetId.value = layerId ?? null
+  if (mode === 'icon') {
+    setAssetDialogFilter('icon')
+  } else if (mode === 'layer') {
+    setAssetDialogFilter('layers/')
+  } else {
+    setAssetDialogFilter('')
+  }
   iconPickerTarget.value = null
-  assetLibraryOpen.value = false
+  setActivePanel('assets')
 }
 
-function closeAssetLibrary() {
-  assetLibraryOpen.value = false
+function openAssetsPanelForLayer(payload: { id: string }) {
+  openAssetsPanel('layer', payload.id)
 }
 
 const {
@@ -713,6 +727,8 @@ function closeActiveArchive() {
   locationsApi.setActiveLocation(null)
   confirmState.value = null
   iconPickerTarget.value = null
+  assetsPanelLayerTargetId.value = null
+  assetsPanelMode.value = 'default'
   locationsApi.locationsDragActive.value = false
   handle.value = null
   baseThemeRef.value = undefined
@@ -1195,6 +1211,25 @@ function handleLayerFileReplace(payload: { id: string; file: File }) {
     `Replace "${entry.label ?? entry.id}" with ${payload.file.name}?`,
     () => {
       void replaceLayerAssetFromFile(entry, payload.file)
+    },
+    { confirmLabel: 'Replace layer' }
+  )
+}
+
+function handleAssetPanelSelect(path: string) {
+  if (assetsPanelMode.value !== 'layer') {
+    return
+  }
+  const targetId = assetsPanelLayerTargetId.value
+  if (!targetId) return
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
+  const asset = projectAssets.value.find((item) => item.path === path)
+  if (!entry || !entry.mask || !asset?.data) return
+  const file = new File([asset.data], asset.sourceFileName ?? asset.path, { type: asset.type ?? 'image/png' })
+  requestConfirm(
+    `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
+    () => {
+      void replaceLayerAssetFromFile(entry, file)
     },
     { confirmLabel: 'Replace layer' }
   )

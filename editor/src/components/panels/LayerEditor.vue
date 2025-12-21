@@ -40,6 +40,14 @@
           >
             <Icon icon="file-export">Export</Icon>
           </button>
+          <button
+            v-if="activeLayer"
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="emit('open-assets', { id: activeLayer.id })"
+          >
+            <Icon icon="image">Assets</Icon>
+          </button>
           <div v-if="activeLayer" class="layer-editor__overflow">
             <button
               type="button"
@@ -427,6 +435,7 @@ const emit = defineEmits<{
   (ev: 'toggle-onion', id: string): void
   (ev: 'delete-layer', id: string): void
   (ev: 'replace-layer-file', payload: { id: string; file: File }): void
+  (ev: 'open-assets', payload: { id: string }): void
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void

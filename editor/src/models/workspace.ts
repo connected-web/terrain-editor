@@ -37,7 +37,7 @@ type ProjectSnapshot = {
 
 export type WorkspaceSnapshot = ProjectSnapshot
 
-export type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings'
+export type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings' | 'assets'
 
 type LocalSettings = {
   cameraTracking: boolean

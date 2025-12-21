@@ -44,7 +44,7 @@ type InitialRouteState = {
   maskViewMode: 'grayscale' | 'color' | null
 }
 
-const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations']
+const VALID_PANELS: DockPanel[] = ['workspace', 'layers', 'theme', 'settings', 'locations', 'assets']
 
 function extractMaskViewState(signature: string | null): {
   signature: string | null
