@@ -73,7 +73,7 @@
 - 💡 Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
 - ✅ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
 - ✅ Layer reorder via drag/drop
-- 💡 Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
+- ✅ Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
 - ✅ Create/delete layer flows (with confirmation)
 - 💡 Fill tool (paint bucket)
 - 💡 Brush type menu (basic, spray, Perlin noise)
