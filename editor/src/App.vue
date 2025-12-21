@@ -316,7 +316,7 @@ const layersApi = useLayersModel({ layerState, handle })
 const dockExpanded = computed(
   () => activeDockPanel.value === 'layers' && layersApi.layerEditorOpen.value
 )
-const hideDockNav = computed(() => false)
+const hideDockNav = computed(() => !isDockCollapsed.value || dockExpanded.value)
 const activeLayerViewState = ref<LayerViewState | null>(null)
 const pendingLayerViewStateRoute = ref<{ id: string | null; state: LayerViewState | null }>({
   id: null,
