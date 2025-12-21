@@ -33,6 +33,10 @@
               <span>{{ item.label }}</span>
             </button>
             <div class="panel-dock__nav-divider"></div>
+            <button type="button" class="panel-dock__nav-button" @click="openAssetLibrary">
+              <Icon icon="image" aria-hidden="true" />
+              <span>Assets</span>
+            </button>
             <button type="button" class="panel-dock__nav-button" @click="exportArchive">
               <Icon icon="file-export" aria-hidden="true" />
               <span>Export WYN</span>
@@ -81,6 +85,7 @@
             @view-state-change="handleLayerViewStateChange"
             @consume-pending-view-state="consumePendingLayerViewState"
             @mask-view-change="handleMaskViewChange"
+            @replace-layer-file="handleLayerFileReplace"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -143,6 +148,18 @@
         @upload="() => triggerLibraryUpload()"
         @remove="removeAsset"
         @close="closeIconPicker"
+      />
+      <AssetDialog
+        v-if="assetLibraryOpen"
+        :assets="projectAssets"
+        :get-preview="getIconPreview"
+        :filter-text="assetDialogFilter"
+        @update:filter-text="setAssetDialogFilter"
+        @select="closeAssetLibrary"
+        @replace="beginAssetReplacement"
+        @upload="() => triggerLibraryUpload()"
+        @remove="removeAsset"
+        @close="closeAssetLibrary"
       />
       <LocationPickerDialog
         v-if="locationsApi.locationPickerOpen.value"
@@ -223,7 +240,7 @@ import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
 import Icon from './components/Icon.vue'
 import { useUiActions } from './composables/useUiActions'
-import { useLayersModel } from './composables/useLayersModel'
+import { useLayersModel, type LayerEntry } from './composables/useLayersModel'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
@@ -577,6 +594,18 @@ const {
   openIconPicker,
   closeIconPicker,
 } = useIconPicker(setAssetDialogFilter)
+
+const assetLibraryOpen = ref(false)
+
+function openAssetLibrary() {
+  assetLibraryOpen.value = true
+  iconPickerTarget.value = null
+  assetLibraryOpen.value = false
+}
+
+function closeAssetLibrary() {
+  assetLibraryOpen.value = false
+}
 
 const {
   loadArchiveFromBytes,
@@ -1145,6 +1174,30 @@ function getViewerMountContext(): ViewerMountContext | null {
     onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId),
     initialCameraView: locationsApi.cameraViewState.value
   }
+}
+
+async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
+  if (!entry.mask) return
+  const data = await file.arrayBuffer()
+  await layerEditorHelpers.replaceLayerAsset({
+    path: entry.mask,
+    data,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+}
+
+function handleLayerFileReplace(payload: { id: string; file: File }) {
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
+  if (!entry || !entry.mask) return
+  requestConfirm(
+    `Replace "${entry.label ?? entry.id}" with ${payload.file.name}?`,
+    () => {
+      void replaceLayerAssetFromFile(entry, payload.file)
+    },
+    { confirmLabel: 'Replace layer' }
+  )
 }
 
 const handleLayerAssetReplace = layerEditorHelpers.replaceLayerAsset

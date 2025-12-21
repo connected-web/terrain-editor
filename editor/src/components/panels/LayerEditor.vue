@@ -148,7 +148,13 @@
             </button>
           </aside>
 
-          <div class="layer-editor__canvas">
+        <div
+          class="layer-editor__canvas"
+          @dragenter.prevent="handleLayerDragEnter"
+          @dragover.prevent="handleLayerDragOver"
+          @dragleave.prevent="handleLayerDragLeave"
+          @drop.prevent="handleLayerDrop"
+        >
             <LayerMaskEditor
               v-if="maskUrl"
               ref="maskEditorRef"
@@ -420,6 +426,7 @@ const emit = defineEmits<{
   (ev: 'reorder-layer', payload: { sourceId: string; targetId: string | null }): void
   (ev: 'toggle-onion', id: string): void
   (ev: 'delete-layer', id: string): void
+  (ev: 'replace-layer-file', payload: { id: string; file: File }): void
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
@@ -970,6 +977,33 @@ function handleLayerAdd() {
 function handleCloseEditor() {
   cacheActiveLayerViewState()
   emit('close')
+}
+
+function hasFilePayload(event: DragEvent) {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+function handleLayerDragEnter(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+}
+
+function handleLayerDragOver(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+function handleLayerDragLeave(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+}
+
+function handleLayerDrop(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  const file = event.dataTransfer?.files?.[0]
+  if (!file || !props.activeLayer) return
+  if (!file.type.startsWith('image/')) return
+  emit('replace-layer-file', { id: props.activeLayer.id, file })
 }
 
 
