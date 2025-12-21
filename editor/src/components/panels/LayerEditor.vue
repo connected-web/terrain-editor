@@ -446,6 +446,7 @@ const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
 const pendingMaskViewOverride = ref<'grayscale' | 'color' | null>(null)
+const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
 watch(
   () => props.maskViewMode,
   (next) => {
@@ -558,7 +559,6 @@ const onionLayerSources = ref<OnionLayerSource[]>([])
 const onionCache = new Map<string, { path: string | null; url: string | null; owned: boolean }>()
 let onionLoadToken = 0
 
-const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
 watch(isHeightmap, (isH) => {
   if (!isH && activeTool.value === 'flat') {
     activeTool.value = 'brush'
