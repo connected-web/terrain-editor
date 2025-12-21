@@ -16,3 +16,8 @@ Use `DEVELOPMENT-ROADMAP.md` as the single source of truth for feature status an
 - `npm run build`
 - `npm run test:smoke`
 - `npm run packmap`
+
+## Pull Requests
+
+- `gh` is allowed for creating and updating PRs (drafts are fine).
+- Keep the PR description updated as commits land or scope changes.
