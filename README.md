@@ -197,28 +197,4 @@ Copyright 2025 Connected Web.
 
 ## Development roadmap
 
-- ✅ Setup basic website hosting through github pages
-- ✅ Publish reusable packages to npm as `@connected-web/terrain-editor`
-
-### Viewer
-
-- ✅ Create shared three.js logic for viewing maps
-- ✅ Create example viewer application (pure Vanilla TS)
-- ✅ Create example `.wyn` file using local assets
-- ✅ Implement loading and unpacking of `.wyn` files
-
-### Editor
-
-- ✅ Create basic editor application (Vue 3 + TS)
-- ✅ Implement loading and unpacking of `.wyn` files into editor
-- ✅ Locations + icons editor with drag/drop asset support
-- ✅ Map sizing + legend metadata management
-- ✅ Theme designer (marker palette) with live preview + JSON export via archive build
-- ✅ Location icon upload surface tied into legend/locations
-- ✅ Toolbar/dock logic unification for future tools
-
-### Planned Features
-
-- 🚧 Layer asset uploads (drag/drop) with dimension normalization
-- 🚧 Implement mask editing tools (brushes, noise, etc.)
-- 🚧 Implement heightmap editing tools (point files, falloff, rivers, etc.)
+See [`DEVELOPMENT-ROADMAP.md`[./DEVELOPMENT_ROADMAP.md] for the current list of completed and planned channges. Use Github Issues if you'd like to raise a feature suggestion, or find a bug. 
