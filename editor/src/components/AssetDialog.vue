@@ -1,10 +1,15 @@
 <template>
-  <div class="asset-dialog">
-    <div class="asset-dialog__backdrop" @click="$emit('close')" />
+  <div class="asset-dialog" :class="{ 'asset-dialog--embedded': embedded }">
+    <div v-if="!embedded" class="asset-dialog__backdrop" @click="$emit('close')" />
     <section class="asset-dialog__panel">
       <header class="asset-dialog__header">
         <h2><Icon icon="image">Asset library</Icon></h2>
-        <button type="button" class="pill-button pill-button--ghost" @click="$emit('close')">
+        <button
+          v-if="showClose"
+          type="button"
+          class="pill-button pill-button--ghost"
+          @click="$emit('close')"
+        >
           <Icon icon="xmark" />
         </button>
       </header>
@@ -20,17 +25,22 @@
       <div class="asset-dialog__grid">
         <article v-for="asset in filteredAssets" :key="asset.path" class="asset-dialog__item">
           <div
-            class="asset-dialog__thumb button"
+            class="asset-dialog__thumb"
+            :class="{ button: showSelect }"
             :style="{ backgroundImage: getPreview(asset.path) ? `url('${getPreview(asset.path)}')` : undefined }"
-             @click="$emit('select', asset.path)"
+            @click="handleSelect(asset.path)"
           />
           <div class="asset-dialog__meta">
             <strong>{{ asset.sourceFileName ?? asset.path }}</strong>
             <span>{{ asset.type ?? 'binary' }}</span>
           </div>
           <div class="asset-dialog__actions">
-            <button class="pill-button pill-button--ghost" @click="$emit('select', asset.path)">
-              <Icon icon="check">Use asset</Icon>
+            <button
+              v-if="showSelect"
+              class="pill-button pill-button--ghost"
+              @click="$emit('select', asset.path)"
+            >
+              <Icon icon="check">{{ selectLabel }}</Icon>
             </button>
             <button class="pill-button pill-button--ghost" @click="$emit('replace', asset)">
               <Icon icon="upload">Replace asset</Icon>
@@ -58,6 +68,10 @@ const props = defineProps<{
   assets: TerrainProjectFileEntry[]
   getPreview: (path: string) => string
   filterText?: string
+  embedded?: boolean
+  showSelect?: boolean
+  selectLabel?: string
+  showClose?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -73,6 +87,16 @@ const filterModel = computed({
   get: () => props.filterText ?? '',
   set: (value: string) => emit('update:filterText', value)
 })
+
+const embedded = computed(() => Boolean(props.embedded))
+const showSelect = computed(() => props.showSelect !== false)
+const selectLabel = computed(() => props.selectLabel ?? 'Use asset')
+const showClose = computed(() => props.showClose !== false)
+
+function handleSelect(path: string) {
+  if (!showSelect.value) return
+  emit('select', path)
+}
 
 const filteredAssets = computed(() => {
   const list = props.assets ?? []
@@ -90,6 +114,13 @@ const filteredAssets = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 200;
+}
+
+.asset-dialog--embedded {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  height: 100%;
 }
 
 .asset-dialog__backdrop {
@@ -111,6 +142,14 @@ const filteredAssets = computed(() => {
   flex-direction: column;
   gap: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.asset-dialog--embedded .asset-dialog__panel {
+  position: static;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 16px;
 }
 
 .asset-dialog__header {

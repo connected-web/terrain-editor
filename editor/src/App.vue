@@ -50,10 +50,14 @@
         <WorkspacePanel
           v-if="activeDockPanel === 'workspace'"
           :has-active-archive="hasActiveArchive"
+          :thumbnail-url="thumbnailPreviewUrl"
+          :has-thumbnail="hasThumbnailAsset"
           @load-sample="loadSample"
           @load-map="triggerFileSelect"
           @start-new="startNewMap()"
           @export-archive="exportArchive"
+          @select-thumbnail="openAssetsPanelForThumbnail"
+          @capture-thumbnail="captureThumbnailFromView"
         />
 
         <template v-else-if="activeDockPanel === 'layers'">
@@ -115,12 +119,15 @@
           @reset-stem="resetStemState"
         />
 
-        <AssetsPanel
+        <AssetDialog
           v-else-if="activeDockPanel === 'assets'"
+          embedded
           :assets="projectAssets"
           :get-preview="getIconPreview"
           :filter-text="assetDialogFilter"
-          :mode="assetsPanelMode"
+          :show-close="false"
+          :show-select="assetsPanelMode !== 'default'"
+          :select-label="assetsPanelSelectLabel"
           @update:filter-text="setAssetDialogFilter"
           @select="handleAssetPanelSelect"
           @replace="beginAssetReplacement"
@@ -157,6 +164,7 @@
         :assets="projectAssets"
         :get-preview="getIconPreview"
         :filter-text="assetDialogFilter"
+        :select-label="'Use icon'"
         @update:filter-text="setAssetDialogFilter"
         @select="selectIconFromLibrary"
         @replace="beginAssetReplacement"
@@ -241,7 +249,6 @@ import LayersPanel from './components/panels/LayersPanel.vue'
 import ThemePanel from './components/panels/ThemePanel.vue'
 import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
-import AssetsPanel from './components/panels/AssetsPanel.vue'
 import Icon from './components/Icon.vue'
 import { useUiActions } from './composables/useUiActions'
 import { useLayersModel, type LayerEntry } from './composables/useLayersModel'
@@ -600,16 +607,31 @@ const {
   closeIconPicker,
 } = useIconPicker(setAssetDialogFilter)
 
-const assetsPanelMode = ref<'default' | 'icon' | 'layer'>('default')
+const assetsPanelMode = ref<'default' | 'icon' | 'layer' | 'thumbnail'>('default')
 const assetsPanelLayerTargetId = ref<string | null>(null)
+const thumbnailAssetPath = 'thumbnails/thumbnail.png'
 
-function openAssetsPanel(mode: 'default' | 'icon' | 'layer' = 'default', layerId?: string | null) {
+const hasThumbnailAsset = computed(() =>
+  projectAssets.value.some((asset) => asset.path === thumbnailAssetPath)
+)
+const thumbnailPreviewUrl = computed(() => getIconPreview(thumbnailAssetPath))
+
+const assetsPanelSelectLabel = computed(() => {
+  if (assetsPanelMode.value === 'icon') return 'Use icon'
+  if (assetsPanelMode.value === 'layer') return 'Replace layer'
+  if (assetsPanelMode.value === 'thumbnail') return 'Use thumbnail'
+  return 'Use asset'
+})
+
+function openAssetsPanel(mode: 'default' | 'icon' | 'layer' | 'thumbnail' = 'default', layerId?: string | null) {
   assetsPanelMode.value = mode
   assetsPanelLayerTargetId.value = layerId ?? null
   if (mode === 'icon') {
     setAssetDialogFilter('icon')
   } else if (mode === 'layer') {
     setAssetDialogFilter('layers/')
+  } else if (mode === 'thumbnail') {
+    setAssetDialogFilter('thumbnails/')
   } else {
     setAssetDialogFilter('')
   }
@@ -619,6 +641,10 @@ function openAssetsPanel(mode: 'default' | 'icon' | 'layer' = 'default', layerId
 
 function openAssetsPanelForLayer(payload: { id: string }) {
   openAssetsPanel('layer', payload.id)
+}
+
+function openAssetsPanelForThumbnail() {
+  openAssetsPanel('thumbnail')
 }
 
 const {
@@ -1204,6 +1230,27 @@ async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
   })
 }
 
+async function replaceThumbnailFromFile(file: File) {
+  await replaceAssetWithFileHelper(thumbnailAssetPath, file)
+  await persistCurrentProject()
+}
+
+async function captureThumbnailFromView() {
+  const viewerElement = viewerShell.value?.getViewerElement()
+  const canvas = viewerElement?.querySelector('canvas') as HTMLCanvasElement | null
+  if (!canvas) {
+    updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+    return
+  }
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (!blob) {
+    updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+    return
+  }
+  const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+  await replaceThumbnailFromFile(file)
+}
+
 function handleLayerFileReplace(payload: { id: string; file: File }) {
   const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
   if (!entry || !entry.mask) return
@@ -1217,22 +1264,32 @@ function handleLayerFileReplace(payload: { id: string; file: File }) {
 }
 
 function handleAssetPanelSelect(path: string) {
-  if (assetsPanelMode.value !== 'layer') {
+  const asset = projectAssets.value.find((item) => item.path === path)
+  if (!asset?.data) return
+  const file = new File([asset.data], asset.sourceFileName ?? asset.path, { type: asset.type ?? 'image/png' })
+  if (assetsPanelMode.value === 'layer') {
+    const targetId = assetsPanelLayerTargetId.value
+    if (!targetId) return
+    const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
+    if (!entry || !entry.mask) return
+    requestConfirm(
+      `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
+      () => {
+        void replaceLayerAssetFromFile(entry, file)
+      },
+      { confirmLabel: 'Replace layer' }
+    )
     return
   }
-  const targetId = assetsPanelLayerTargetId.value
-  if (!targetId) return
-  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
-  const asset = projectAssets.value.find((item) => item.path === path)
-  if (!entry || !entry.mask || !asset?.data) return
-  const file = new File([asset.data], asset.sourceFileName ?? asset.path, { type: asset.type ?? 'image/png' })
-  requestConfirm(
-    `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
-    () => {
-      void replaceLayerAssetFromFile(entry, file)
-    },
-    { confirmLabel: 'Replace layer' }
-  )
+  if (assetsPanelMode.value === 'thumbnail') {
+    requestConfirm(
+      `Replace the thumbnail with ${asset.sourceFileName ?? asset.path}?`,
+      () => {
+        void replaceThumbnailFromFile(file)
+      },
+      { confirmLabel: 'Replace thumbnail' }
+    )
+  }
 }
 
 const handleLayerAssetReplace = layerEditorHelpers.replaceLayerAsset
