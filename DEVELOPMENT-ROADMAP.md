@@ -72,9 +72,9 @@
 - 🏗️ Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
 - 🏗️ Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
 - ✅ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
-- 🏗️ Layer reorder via drag/drop (needs between-item drop + better z-indexing)
+- ✅ Layer reorder via drag/drop
 - 🏗️ Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
-- 🏗️ Create/delete layer flows (with confirmation)
+- ✅ Create/delete layer flows (with confirmation)
 - 🏗️ Fill tool (paint bucket)
 - 🏗️ Brush type menu (basic, spray, Perlin noise)
 - 🏗️ Save/load custom brushes (name + icon)
@@ -104,8 +104,8 @@
 - 🏗️ Zoom/pan calibration and cursor-to-world accuracy
 
 ### Feature Backlog
-- 🏗️ Make embed mode the default output
-- 🏗️ Full pop-out and fullscreen controls via host helper
+- ✅ Make embed mode the default output
+- ✅ Full pop-out and fullscreen controls via host helper
 - 🏗️ Configuration hooks for host apps (theme overrides, UI toggles, analytics)
 - 💡 FontAwesome icon support for the viewer location markers
 
