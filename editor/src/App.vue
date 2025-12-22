@@ -161,19 +161,19 @@
         ref="iconLibraryInputRef"
         @change="handleLibraryUpload"
       />
-      <AssetDialog
-        v-if="iconPickerTarget"
-        :assets="projectAssets"
-        :get-preview="getIconPreview"
-        :filter-text="assetDialogFilter"
-        :select-label="'Use icon'"
-        @update:filter-text="setAssetDialogFilter"
-        @select="selectIconFromLibrary"
-        @replace="beginAssetReplacement"
-        @upload="() => triggerLibraryUpload()"
-        @remove="removeAsset"
-        @close="closeIconPicker"
-      />
+        <AssetDialog
+          v-if="iconPickerTarget"
+          :assets="projectAssets"
+          :get-preview="getIconPreview"
+          :filter-text="assetDialogFilter"
+          :select-label="'Use icon'"
+          @update:filter-text="setAssetDialogFilter"
+          @select="selectIconFromLibrary"
+          @replace="beginAssetReplacement"
+          @upload="() => triggerLibraryUpload()"
+          @remove="removeAsset"
+          @close="closeIconPicker"
+        />
       <AssetDialog
         v-if="modalAssetPicker"
         :assets="projectAssets"
@@ -183,7 +183,7 @@
         @update:filter-text="setAssetDialogFilter"
         @select="handleAssetPanelSelect"
         @replace="beginAssetReplacement"
-        @upload="() => triggerLibraryUpload()"
+        @upload="handleModalAssetUpload"
         @remove="removeAsset"
         @close="closeModalAssetPicker"
       />
@@ -631,7 +631,8 @@ const hasThumbnailAsset = computed(() =>
 const thumbnailPreviewUrl = computed(() => getIconPreview(thumbnailAssetPath))
 
 const assetsPanelSelectLabel = computed(() => {
-  if (modalAssetPicker.value?.mode === 'layer') return 'Replace layer'
+  if (iconPickerTarget.value) return 'Use icon'
+  if (modalAssetPicker.value?.mode === 'layer') return 'Use asset'
   if (modalAssetPicker.value?.mode === 'thumbnail') return 'Use thumbnail'
   return 'Use asset'
 })
@@ -1257,11 +1258,42 @@ async function captureThumbnailFromView() {
   }
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) {
-    updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+    const fallbackDataUrl = canvas.toDataURL('image/png')
+    const fallbackBlob = await fetch(fallbackDataUrl).then((res) => res.blob()).catch(() => null)
+    if (!fallbackBlob) {
+      updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+      return
+    }
+    const fallbackFile = new File([fallbackBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+    await replaceThumbnailFromFile(fallbackFile)
     return
   }
   const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
   await replaceThumbnailFromFile(file)
+}
+
+function handleModalAssetUpload() {
+  const picker = modalAssetPicker.value
+  if (!picker) {
+    triggerLibraryUpload()
+    return
+  }
+  if (picker.mode === 'layer') {
+    const entry = picker.layerId
+      ? layerEntriesWithOnion.value.find((layer) => layer.id === picker.layerId)
+      : null
+    if (!entry?.mask) {
+      triggerLibraryUpload()
+      return
+    }
+    triggerLibraryUpload({ replacePath: entry.mask, originalName: entry.mask })
+    return
+  }
+  if (picker.mode === 'thumbnail') {
+    triggerLibraryUpload({ replacePath: thumbnailAssetPath, originalName: thumbnailAssetPath })
+    return
+  }
+  triggerLibraryUpload()
 }
 
 function handleLayerFileReplace(payload: { id: string; file: File }) {

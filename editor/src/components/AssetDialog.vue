@@ -10,7 +10,8 @@
           class="pill-button pill-button--ghost"
           @click="$emit('close')"
         >
-          <Icon :icon="closeIcon">{{ closeLabel }}</Icon>
+          <Icon :icon="closeIcon" />
+          <span v-if="closeLabel">{{ closeLabel }}</span>
         </button>
       </header>
       <label class="asset-dialog__search">
@@ -160,6 +161,12 @@ const filteredAssets = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.asset-dialog__header .pill-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .asset-dialog__header h2 {
