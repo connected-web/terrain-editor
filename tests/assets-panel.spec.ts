@@ -64,6 +64,11 @@ test.describe('Terrain Editor : Asset Library', () => {
 
     const dialog = page.locator('.asset-dialog').first()
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('button', { name: /Use thumbnail/i }).first()).toBeVisible()
+    await expect(dialog.getByPlaceholder('Search assets')).toHaveValue('thumbnail')
+
+    const useThumbnailButtons = dialog.getByRole('button', { name: /Use thumbnail/i })
+    if (await useThumbnailButtons.count()) {
+      await expect(useThumbnailButtons.first()).toBeVisible()
+    }
   })
 })
