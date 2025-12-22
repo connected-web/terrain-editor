@@ -32,7 +32,10 @@
             @click="handleSelect(asset.path)"
           />
           <div class="asset-dialog__meta">
-            <strong>{{ asset.sourceFileName ?? asset.path }}</strong>
+            <strong>{{ asset.path }}</strong>
+            <span v-if="asset.sourceFileName && asset.sourceFileName !== asset.path">
+              {{ asset.sourceFileName }}
+            </span>
             <span>{{ asset.type ?? 'binary' }}</span>
           </div>
           <div class="asset-dialog__actions">

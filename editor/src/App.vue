@@ -1256,6 +1256,8 @@ async function captureThumbnailFromView() {
     updateStatus('Unable to capture thumbnail from the viewer.', 2000)
     return
   }
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) {
     const fallbackDataUrl = canvas.toDataURL('image/png')
