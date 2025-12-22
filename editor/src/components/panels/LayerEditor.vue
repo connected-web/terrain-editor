@@ -186,9 +186,17 @@
               @ready="handleMaskReady"
               @view-change="handleMaskViewChange"
             />
-            <p v-else class="layer-editor__placeholder">
-              No mask image found for this layer.
-            </p>
+            <div v-else class="layer-editor__placeholder">
+              <p>No mask image found for this layer.</p>
+              <button
+                v-if="props.activeLayer?.mask"
+                type="button"
+                class="pill-button pill-button--ghost"
+                @click="emit('create-empty-mask', { id: props.activeLayer.id })"
+              >
+                <Icon icon="plus">Create empty mask</Icon>
+              </button>
+            </div>
           </div>
 
           <aside class="layer-editor__properties">
@@ -436,6 +444,7 @@ const emit = defineEmits<{
   (ev: 'delete-layer', id: string): void
   (ev: 'replace-layer-file', payload: { id: string; file: File }): void
   (ev: 'open-assets', payload: { id: string }): void
+  (ev: 'create-empty-mask', payload: { id: string }): void
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
@@ -880,6 +889,21 @@ function handleMaskReady() {
   const pendingState = props.pendingViewState ?? null
   maskEditorRef.value.suspendViewTracking()
   if (pendingState) {
+    const shouldAutoFit =
+      pendingState.zoom <= 1 &&
+      pendingState.centerX <= 0.05 &&
+      pendingState.centerY <= 0.05
+    if (shouldAutoFit) {
+      fitCanvasView()
+      if (currentId) {
+        const viewState = maskEditorRef.value.getViewState()
+        viewStateCache.set(currentId, viewState)
+        emit('view-state-change', { id: currentId, state: viewState })
+      }
+      emit('consume-pending-view-state')
+      maskEditorRef.value.resumeViewTracking()
+      return
+    }
     maskEditorRef.value.restoreViewState(pendingState, { emit: false })
     if (currentId) {
       viewStateCache.set(currentId, pendingState)
@@ -1611,6 +1635,10 @@ function clamp(value: number, min: number, max: number) {
   padding: 1rem;
   text-align: center;
   opacity: 0.75;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 @media (max-width: 1100px) {

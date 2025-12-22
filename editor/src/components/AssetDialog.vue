@@ -46,8 +46,17 @@
             >
               <Icon icon="check">{{ selectLabel }}</Icon>
             </button>
-            <button class="pill-button pill-button--ghost" @click="$emit('replace', asset)">
-              <Icon icon="upload">Replace asset</Icon>
+            <button
+              class="pill-button pill-button--ghost"
+              :class="{ 'asset-dialog__action-icon': compactReplace }"
+              :title="compactReplace ? 'Replace asset' : undefined"
+              :aria-label="compactReplace ? 'Replace asset' : undefined"
+              @click="$emit('replace', asset)"
+            >
+              <Icon icon="upload">
+                <span v-if="!compactReplace">Replace asset</span>
+              </Icon>
+              <span v-if="compactReplace" class="sr-only">Replace asset</span>
             </button>
             <button class="pill-button pill-button--danger" @click="$emit('remove', asset.path)">
               <Icon icon="trash">Remove</Icon>
@@ -78,6 +87,7 @@ const props = defineProps<{
   showClose?: boolean
   closeLabel?: string
   closeIcon?: string
+  compactReplace?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -100,6 +110,7 @@ const selectLabel = computed(() => props.selectLabel ?? 'Use asset')
 const showClose = computed(() => props.showClose !== false)
 const closeLabel = computed(() => props.closeLabel ?? 'Close')
 const closeIcon = computed(() => props.closeIcon ?? 'xmark')
+const compactReplace = computed(() => props.compactReplace !== false)
 
 function handleSelect(path: string) {
   if (!showSelect.value) return
@@ -111,7 +122,7 @@ const filteredAssets = computed(() => {
   const query = filterModel.value.trim().toLowerCase()
   if (!query) return list
   return list.filter((asset) => {
-    const haystack = `${asset.sourceFileName ?? asset.path} ${asset.type ?? ''}`.toLowerCase()
+    const haystack = `${asset.path} ${asset.sourceFileName ?? ''} ${asset.type ?? ''}`.toLowerCase()
     return haystack.includes(query)
   })
 })
@@ -266,6 +277,11 @@ const filteredAssets = computed(() => {
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+.asset-dialog__action-icon {
+  padding: 0.4rem 0.6rem;
+  gap: 0;
 }
 
 .asset-dialog__footer {

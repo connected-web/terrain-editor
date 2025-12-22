@@ -102,17 +102,26 @@
         <div class="workspace-form__thumbnail-preview">
           <div
             class="workspace-form__thumbnail-image"
-            :class="{ 'workspace-form__thumbnail-image--empty': !thumbnailUrl }"
+            :class="{
+              'workspace-form__thumbnail-image--empty': !thumbnailUrl,
+              'workspace-form__thumbnail-image--busy': isCreatingThumbnail
+            }"
             :style="thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined"
           >
-            <span v-if="!thumbnailUrl">No thumbnail</span>
+            <span v-if="isCreatingThumbnail">Creating thumbnail...</span>
+            <span v-else-if="!thumbnailUrl">No thumbnail</span>
           </div>
         </div>
         <div class="workspace-form__thumbnail-actions">
           <button class="pill-button pill-button--ghost" type="button" @click="$emit('select-thumbnail')">
             <Icon icon="image">Select thumbnail</Icon>
           </button>
-          <button class="pill-button" type="button" @click="$emit('capture-thumbnail')">
+          <button
+            class="pill-button"
+            type="button"
+            :disabled="isCreatingThumbnail"
+            @click="$emit('capture-thumbnail')"
+          >
             <Icon icon="camera">Create from view</Icon>
           </button>
         </div>
@@ -134,6 +143,7 @@ defineProps<{
   hasActiveArchive: boolean
   thumbnailUrl?: string
   hasThumbnail?: boolean
+  isCreatingThumbnail?: boolean
 }>()
 
 const { workspaceForm, actions: workspaceActions } = useWorkspaceModel()
@@ -210,8 +220,9 @@ defineEmits<{
   aspect-ratio: 16 / 9;
   border-radius: 10px;
   background-color: rgba(255, 255, 255, 0.04);
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
   border: 1px dashed rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
@@ -222,6 +233,10 @@ defineEmits<{
 
 .workspace-form__thumbnail-image--empty {
   background-image: none;
+}
+
+.workspace-form__thumbnail-image--busy {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .workspace-form__thumbnail-actions {

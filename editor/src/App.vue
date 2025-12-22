@@ -52,6 +52,7 @@
           :has-active-archive="hasActiveArchive"
           :thumbnail-url="thumbnailPreviewUrl"
           :has-thumbnail="hasThumbnailAsset"
+          :is-creating-thumbnail="isCreatingThumbnail"
           @load-sample="loadSample"
           @load-map="triggerFileSelect"
           @start-new="startNewMap()"
@@ -91,6 +92,7 @@
             @mask-view-change="handleMaskViewChange"
             @replace-layer-file="handleLayerFileReplace"
             @open-assets="openAssetsModalForLayer"
+            @create-empty-mask="handleCreateEmptyMask"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -167,6 +169,7 @@
           :get-preview="getIconPreview"
           :filter-text="assetDialogFilter"
           :select-label="'Use icon'"
+          :show-select="true"
           @update:filter-text="setAssetDialogFilter"
           @select="selectIconFromLibrary"
           @replace="beginAssetReplacement"
@@ -180,6 +183,7 @@
         :get-preview="getIconPreview"
         :filter-text="assetDialogFilter"
         :select-label="assetsPanelSelectLabel"
+        :show-select="true"
         @update:filter-text="setAssetDialogFilter"
         @select="handleAssetPanelSelect"
         @replace="beginAssetReplacement"
@@ -377,6 +381,10 @@ watch(
 watch(
   () => layersApi.layerEditorOpen.value,
   (open) => {
+    if (handle.value) {
+      handle.value.setMaxPixelRatio(open ? 1 : 1.5)
+      handle.value.setRenderPaused(open)
+    }
     if (!open) {
       pendingLayerSwitchViewState.value = null
     } else {
@@ -624,6 +632,7 @@ const {
 
 const assetsPanelMode = ref<'default'>('default')
 const thumbnailAssetPath = 'thumbnails/thumbnail.png'
+const isCreatingThumbnail = ref(false)
 
 const hasThumbnailAsset = computed(() =>
   projectAssets.value.some((asset) => asset.path === thumbnailAssetPath)
@@ -744,7 +753,7 @@ async function persistCurrentProject(options: { base64?: string; label?: string 
 }
 
 function archiveUrl() {
-  return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+  return new URL('../../maps/wynnal-terrain.wyn', import.meta.url).toString()
 }
 
 function cleanupDataset() {
@@ -767,7 +776,6 @@ function closeActiveArchive() {
   locationsApi.setActiveLocation(null)
   confirmState.value = null
   iconPickerTarget.value = null
-  assetsPanelLayerTargetId.value = null
   assetsPanelMode.value = 'default'
   locationsApi.locationsDragActive.value = false
   handle.value = null
@@ -1244,34 +1252,56 @@ async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
   })
 }
 
+async function handleCreateEmptyMask(payload: { id: string }) {
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
+  const legend = projectSnapshot.value?.legend
+  if (!entry?.mask || !legend?.size) return
+  const [width, height] = legend.size
+  const image = createSolidImageData(width, height, 0)
+  const file = new File([image.buffer], entry.mask, { type: 'image/png' })
+  await replaceLayerAssetFromFile(entry, file)
+  await persistCurrentProject()
+}
+
 async function replaceThumbnailFromFile(file: File) {
-  await replaceAssetWithFileHelper(thumbnailAssetPath, file)
+  const normalized =
+    file.name === 'thumbnail.png'
+      ? file
+      : new File([file], 'thumbnail.png', { type: file.type, lastModified: file.lastModified })
+  await replaceAssetWithFileHelper(thumbnailAssetPath, normalized)
   await persistCurrentProject()
 }
 
 async function captureThumbnailFromView() {
+  if (isCreatingThumbnail.value) return
+  isCreatingThumbnail.value = true
   const viewerElement = viewerShell.value?.getViewerElement()
   const canvas = viewerElement?.querySelector('canvas') as HTMLCanvasElement | null
   if (!canvas) {
     updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+    isCreatingThumbnail.value = false
     return
   }
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-  if (!blob) {
-    const fallbackDataUrl = canvas.toDataURL('image/png')
-    const fallbackBlob = await fetch(fallbackDataUrl).then((res) => res.blob()).catch(() => null)
-    if (!fallbackBlob) {
-      updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) {
+      const fallbackDataUrl = canvas.toDataURL('image/png')
+      const fallbackBlob = await fetch(fallbackDataUrl).then((res) => res.blob()).catch(() => null)
+      if (!fallbackBlob) {
+        updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+        return
+      }
+      const fallbackFile = new File([fallbackBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+      await replaceThumbnailFromFile(fallbackFile)
       return
     }
-    const fallbackFile = new File([fallbackBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
-    await replaceThumbnailFromFile(fallbackFile)
-    return
+    const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+    await replaceThumbnailFromFile(file)
+  } finally {
+    isCreatingThumbnail.value = false
   }
-  const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
-  await replaceThumbnailFromFile(file)
 }
 
 function handleModalAssetUpload() {
