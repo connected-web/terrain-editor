@@ -1,0 +1,53 @@
+import { test, expect, Page } from '@playwright/test'
+
+function addDebugParam(url: string): string {
+  const urlObj = new URL(url, 'http://localhost')
+  urlObj.searchParams.set('debug', 'PLAYWRIGHT')
+  return urlObj.pathname + urlObj.search
+}
+
+function editorUrl(params: string): string {
+  const trimmed = params ? (params.startsWith('&') ? params : `&${params}`) : ''
+  return `/editor/?autoload=sample${trimmed}`
+}
+
+async function waitForMapReady(page: Page) {
+  await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({ timeout: 60_000 })
+}
+
+async function openLayerEditorForLayer(page: Page, label: string) {
+  const pill = page.getByRole('button', { name: new RegExp(label, 'i') }).first()
+  await expect(pill).toBeVisible({ timeout: 30_000 })
+  await pill.click()
+
+  const editor = page.locator('.layer-editor').first()
+  await expect(editor).toBeVisible({ timeout: 30_000 })
+  return editor
+}
+
+test.describe('Terrain Editor : Asset Library', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  test('🟩 asset dialog shows Use asset for layer selection', async ({ page }) => {
+    await page.goto(addDebugParam(editorUrl('panel=layers')))
+    await waitForMapReady(page)
+
+    const editor = await openLayerEditorForLayer(page, 'Forest')
+    await editor.getByRole('button', { name: 'Assets' }).click()
+
+    const dialog = page.locator('.asset-dialog').first()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Use asset/i })).toBeVisible()
+  })
+
+  test('🟩 asset dialog shows Use thumbnail for workspace selection', async ({ page }) => {
+    await page.goto(addDebugParam(editorUrl('panel=workspace')))
+    await waitForMapReady(page)
+
+    await page.getByRole('button', { name: 'Select thumbnail' }).click()
+
+    const dialog = page.locator('.asset-dialog').first()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Use thumbnail/i })).toBeVisible()
+  })
+})
