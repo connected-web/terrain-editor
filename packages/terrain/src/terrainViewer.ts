@@ -800,6 +800,8 @@ export async function initTerrainViewer(
       destroy: noop,
       updateLayers: async () => {},
       setInteractiveMode: noop,
+      setMaxPixelRatio: noop,
+      setRenderPaused: noop,
       updateLocations: noop,
       setFocusedLocation: noop,
       navigateTo: noop,
