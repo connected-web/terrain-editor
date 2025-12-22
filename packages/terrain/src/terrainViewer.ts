@@ -110,6 +110,7 @@ type TerrainInitOptions = {
   locations?: TerrainLocation[]
   theme?: TerrainThemeOverrides
   cameraView?: LocationViewState
+  preserveDrawingBuffer?: boolean
 }
 
 export type TerrainHandle = {
@@ -948,7 +949,11 @@ export async function initTerrainViewer(
     return Math.max(1, Math.min(window.devicePixelRatio || 1, maxPixelRatio))
   }
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    preserveDrawingBuffer: options.preserveDrawingBuffer ?? false
+  })
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.08
   currentPixelRatio = resolvePixelRatio()
