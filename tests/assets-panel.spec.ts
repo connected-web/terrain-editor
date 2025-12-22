@@ -15,9 +15,21 @@ async function waitForMapReady(page: Page) {
   await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({ timeout: 60_000 })
 }
 
+async function disableMotion(page: Page) {
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+    `
+  })
+}
+
 async function openLayerEditorForLayer(page: Page, label: string) {
   const pill = page.getByRole('button', { name: new RegExp(label, 'i') }).first()
   await expect(pill).toBeVisible({ timeout: 30_000 })
+  await pill.scrollIntoViewIfNeeded()
   await pill.click()
 
   const editor = page.locator('.layer-editor').first()
@@ -31,9 +43,12 @@ test.describe('Terrain Editor : Asset Library', () => {
   test('🟩 asset dialog shows Use asset for layer selection', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=layers')))
     await waitForMapReady(page)
+    await disableMotion(page)
 
     const editor = await openLayerEditorForLayer(page, 'Forest')
-    await editor.getByRole('button', { name: 'Assets' }).click()
+    const assetsButton = editor.getByRole('button', { name: 'Assets' })
+    await assetsButton.scrollIntoViewIfNeeded()
+    await assetsButton.click({ force: true })
 
     const dialog = page.locator('.asset-dialog').first()
     await expect(dialog).toBeVisible()
@@ -43,6 +58,7 @@ test.describe('Terrain Editor : Asset Library', () => {
   test('🟩 asset dialog shows Use thumbnail for workspace selection', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=workspace')))
     await waitForMapReady(page)
+    await disableMotion(page)
 
     await page.getByRole('button', { name: 'Select thumbnail' }).click()
 
