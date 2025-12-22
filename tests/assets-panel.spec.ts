@@ -12,7 +12,7 @@ function editorUrl(params: string): string {
 }
 
 async function waitForMapReady(page: Page) {
-  await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await page.waitForFunction(() => window.__terrainViewer !== undefined, null, { timeout: 60_000 })
 }
 
 async function disableMotion(page: Page) {
