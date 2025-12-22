@@ -37,7 +37,7 @@ test.describe('Terrain Editor : Asset Library', () => {
 
     const dialog = page.locator('.asset-dialog').first()
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('button', { name: /Use asset/i })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Use asset/i }).first()).toBeVisible()
   })
 
   test('🟩 asset dialog shows Use thumbnail for workspace selection', async ({ page }) => {
@@ -48,6 +48,6 @@ test.describe('Terrain Editor : Asset Library', () => {
 
     const dialog = page.locator('.asset-dialog').first()
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('button', { name: /Use thumbnail/i })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Use thumbnail/i }).first()).toBeVisible()
   })
 })
