@@ -33,6 +33,10 @@
               <span>{{ item.label }}</span>
             </button>
             <div class="panel-dock__nav-divider"></div>
+            <button type="button" class="panel-dock__nav-button" @click="openAssetsPanel()">
+              <Icon icon="image" aria-hidden="true" />
+              <span>Assets</span>
+            </button>
             <button type="button" class="panel-dock__nav-button" @click="exportArchive">
               <Icon icon="file-export" aria-hidden="true" />
               <span>Export WYN</span>
@@ -46,10 +50,15 @@
         <WorkspacePanel
           v-if="activeDockPanel === 'workspace'"
           :has-active-archive="hasActiveArchive"
+          :thumbnail-url="thumbnailPreviewUrl"
+          :has-thumbnail="hasThumbnailAsset"
+          :is-creating-thumbnail="isCreatingThumbnail"
           @load-sample="loadSample"
           @load-map="triggerFileSelect"
           @start-new="startNewMap()"
           @export-archive="exportArchive"
+          @select-thumbnail="openAssetsModalForThumbnail"
+          @capture-thumbnail="captureThumbnailFromView"
         />
 
         <template v-else-if="activeDockPanel === 'layers'">
@@ -81,6 +90,9 @@
             @view-state-change="handleLayerViewStateChange"
             @consume-pending-view-state="consumePendingLayerViewState"
             @mask-view-change="handleMaskViewChange"
+            @replace-layer-file="handleLayerFileReplace"
+            @open-assets="openAssetsModalForLayer"
+            @create-empty-mask="handleCreateEmptyMask"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -109,6 +121,25 @@
           @reset-stem="resetStemState"
         />
 
+        <AssetDialog
+          v-else-if="activeDockPanel === 'assets'"
+          embedded
+          :assets="projectAssets"
+          :get-preview="getIconPreview"
+          :filter-text="assetDialogFilter"
+          :show-close="true"
+          :close-label="'Back'"
+          :close-icon="'arrow-left'"
+          :show-select="false"
+          :select-label="assetsPanelSelectLabel"
+          @update:filter-text="setAssetDialogFilter"
+          @select="handleAssetPanelSelect"
+          @replace="beginAssetReplacement"
+          @upload="() => triggerLibraryUpload()"
+          @remove="removeAsset"
+          @close="setActivePanel('workspace')"
+        />
+
         <SettingsPanel v-else-if="activeDockPanel === 'settings'" :local-settings="localSettings" />
 
         <LocationsPanel
@@ -132,17 +163,33 @@
         ref="iconLibraryInputRef"
         @change="handleLibraryUpload"
       />
+        <AssetDialog
+          v-if="iconPickerTarget"
+          :assets="projectAssets"
+          :get-preview="getIconPreview"
+          :filter-text="assetDialogFilter"
+          :select-label="'Use icon'"
+          :show-select="true"
+          @update:filter-text="setAssetDialogFilter"
+          @select="selectIconFromLibrary"
+          @replace="beginAssetReplacement"
+          @upload="() => triggerLibraryUpload()"
+          @remove="removeAsset"
+          @close="closeIconPicker"
+        />
       <AssetDialog
-        v-if="iconPickerTarget"
+        v-if="modalAssetPicker"
         :assets="projectAssets"
         :get-preview="getIconPreview"
         :filter-text="assetDialogFilter"
+        :select-label="assetsPanelSelectLabel"
+        :show-select="true"
         @update:filter-text="setAssetDialogFilter"
-        @select="selectIconFromLibrary"
+        @select="handleAssetPanelSelect"
         @replace="beginAssetReplacement"
-        @upload="() => triggerLibraryUpload()"
+        @upload="handleModalAssetUpload"
         @remove="removeAsset"
-        @close="closeIconPicker"
+        @close="closeModalAssetPicker"
       />
       <LocationPickerDialog
         v-if="locationsApi.locationPickerOpen.value"
@@ -223,7 +270,7 @@ import SettingsPanel from './components/panels/SettingsPanel.vue'
 import LocationsPanel from './components/panels/LocationsPanel.vue'
 import Icon from './components/Icon.vue'
 import { useUiActions } from './composables/useUiActions'
-import { useLayersModel } from './composables/useLayersModel'
+import { useLayersModel, type LayerEntry } from './composables/useLayersModel'
 import { useViewer } from './composables/useViewer'
 import { useArchiveLoader } from './composables/useArchiveLoader'
 import { useIconPicker } from './composables/useIconPicker'
@@ -248,6 +295,7 @@ const dockNavItems: Array<{ id: DockPanel; label: string; icon: string }> = [
   { id: 'layers', label: 'Layers', icon: 'layer-group' },
   { id: 'locations', label: 'Locations', icon: 'location-dot' },
   { id: 'theme', label: 'Theme', icon: 'palette' },
+  { id: 'assets', label: 'Assets', icon: 'image' },
   { id: 'settings', label: 'Settings', icon: 'sliders' }
 ]
 const triggerFileSelect = () => viewerShell.value?.triggerFileSelect?.()
@@ -333,6 +381,10 @@ watch(
 watch(
   () => layersApi.layerEditorOpen.value,
   (open) => {
+    if (handle.value) {
+      handle.value.setMaxPixelRatio(open ? 1 : 1.5)
+      handle.value.setRenderPaused(open)
+    }
     if (!open) {
       pendingLayerSwitchViewState.value = null
     } else {
@@ -578,6 +630,46 @@ const {
   closeIconPicker,
 } = useIconPicker(setAssetDialogFilter)
 
+const assetsPanelMode = ref<'default'>('default')
+const thumbnailAssetPath = 'thumbnails/thumbnail.png'
+const isCreatingThumbnail = ref(false)
+
+const hasThumbnailAsset = computed(() =>
+  projectAssets.value.some((asset) => asset.path === thumbnailAssetPath)
+)
+const thumbnailPreviewUrl = computed(() => getIconPreview(thumbnailAssetPath))
+
+const assetsPanelSelectLabel = computed(() => {
+  if (iconPickerTarget.value) return 'Use icon'
+  if (modalAssetPicker.value?.mode === 'layer') return 'Use asset'
+  if (modalAssetPicker.value?.mode === 'thumbnail') return 'Use thumbnail'
+  return 'Use asset'
+})
+
+const modalAssetPicker = ref<{ mode: 'layer' | 'thumbnail'; layerId?: string } | null>(null)
+
+function openAssetsPanel() {
+  assetsPanelMode.value = 'default'
+  setAssetDialogFilter('')
+  iconPickerTarget.value = null
+  setActivePanel('assets')
+}
+
+function openAssetsModalForLayer(payload: { id: string }) {
+  modalAssetPicker.value = { mode: 'layer', layerId: payload.id }
+  setAssetDialogFilter('')
+}
+
+function openAssetsModalForThumbnail() {
+  modalAssetPicker.value = { mode: 'thumbnail' }
+  setAssetDialogFilter('thumbnail')
+}
+
+function closeModalAssetPicker() {
+  modalAssetPicker.value = null
+  setAssetDialogFilter('')
+}
+
 const {
   loadArchiveFromBytes,
   loadArchiveFromFile: loadArchiveFromFileInternal,
@@ -661,7 +753,7 @@ async function persistCurrentProject(options: { base64?: string; label?: string 
 }
 
 function archiveUrl() {
-  return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
+  return new URL('../../maps/wynnal-terrain.wyn', import.meta.url).toString()
 }
 
 function cleanupDataset() {
@@ -684,6 +776,7 @@ function closeActiveArchive() {
   locationsApi.setActiveLocation(null)
   confirmState.value = null
   iconPickerTarget.value = null
+  assetsPanelMode.value = 'default'
   locationsApi.locationsDragActive.value = false
   handle.value = null
   baseThemeRef.value = undefined
@@ -1144,6 +1237,139 @@ function getViewerMountContext(): ViewerMountContext | null {
     onLocationPick: locationsApi.handleLocationPick,
     onLocationClick: (locationId: string) => locationsApi.setActiveLocation(locationId),
     initialCameraView: locationsApi.cameraViewState.value
+  }
+}
+
+async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
+  if (!entry.mask) return
+  const data = await file.arrayBuffer()
+  await layerEditorHelpers.replaceLayerAsset({
+    path: entry.mask,
+    data,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+}
+
+async function handleCreateEmptyMask(payload: { id: string }) {
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
+  const legend = projectSnapshot.value?.legend
+  if (!entry?.mask || !legend?.size) return
+  const [width, height] = legend.size
+  const image = createSolidImageData(width, height, 0)
+  const file = new File([image.buffer], entry.mask, { type: 'image/png' })
+  await replaceLayerAssetFromFile(entry, file)
+  await persistCurrentProject()
+}
+
+async function replaceThumbnailFromFile(file: File) {
+  const normalized =
+    file.name === 'thumbnail.png'
+      ? file
+      : new File([file], 'thumbnail.png', { type: file.type, lastModified: file.lastModified })
+  await replaceAssetWithFileHelper(thumbnailAssetPath, normalized)
+  await persistCurrentProject()
+}
+
+async function captureThumbnailFromView() {
+  if (isCreatingThumbnail.value) return
+  isCreatingThumbnail.value = true
+  const viewerElement = viewerShell.value?.getViewerElement()
+  const canvas = viewerElement?.querySelector('canvas') as HTMLCanvasElement | null
+  if (!canvas) {
+    updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+    isCreatingThumbnail.value = false
+    return
+  }
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) {
+      const fallbackDataUrl = canvas.toDataURL('image/png')
+      const fallbackBlob = await fetch(fallbackDataUrl).then((res) => res.blob()).catch(() => null)
+      if (!fallbackBlob) {
+        updateStatus('Unable to capture thumbnail from the viewer.', 2000)
+        return
+      }
+      const fallbackFile = new File([fallbackBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+      await replaceThumbnailFromFile(fallbackFile)
+      return
+    }
+    const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+    await replaceThumbnailFromFile(file)
+  } finally {
+    isCreatingThumbnail.value = false
+  }
+}
+
+function handleModalAssetUpload() {
+  const picker = modalAssetPicker.value
+  if (!picker) {
+    triggerLibraryUpload()
+    return
+  }
+  if (picker.mode === 'layer') {
+    const entry = picker.layerId
+      ? layerEntriesWithOnion.value.find((layer) => layer.id === picker.layerId)
+      : null
+    if (!entry?.mask) {
+      triggerLibraryUpload()
+      return
+    }
+    triggerLibraryUpload({ replacePath: entry.mask, originalName: entry.mask })
+    return
+  }
+  if (picker.mode === 'thumbnail') {
+    triggerLibraryUpload({ replacePath: thumbnailAssetPath, originalName: thumbnailAssetPath })
+    return
+  }
+  triggerLibraryUpload()
+}
+
+function handleLayerFileReplace(payload: { id: string; file: File }) {
+  const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
+  if (!entry || !entry.mask) return
+  requestConfirm(
+    `Replace "${entry.label ?? entry.id}" with ${payload.file.name}?`,
+    () => {
+      void replaceLayerAssetFromFile(entry, payload.file)
+    },
+    { confirmLabel: 'Replace layer' }
+  )
+}
+
+function handleAssetPanelSelect(path: string) {
+  const picker = modalAssetPicker.value
+  if (!picker) return
+  const asset = projectAssets.value.find((item) => item.path === path)
+  if (!asset?.data) return
+  const file = new File([asset.data], asset.sourceFileName ?? asset.path, { type: asset.type ?? 'image/png' })
+  if (picker.mode === 'layer') {
+    const targetId = picker.layerId
+    if (!targetId) return
+    const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
+    if (!entry || !entry.mask) return
+    requestConfirm(
+      `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
+      () => {
+        void replaceLayerAssetFromFile(entry, file)
+        closeModalAssetPicker()
+      },
+      { confirmLabel: 'Replace layer' }
+    )
+    return
+  }
+  if (picker.mode === 'thumbnail') {
+    requestConfirm(
+      `Replace the thumbnail with ${asset.sourceFileName ?? asset.path}?`,
+      () => {
+        void replaceThumbnailFromFile(file)
+        closeModalAssetPicker()
+      },
+      { confirmLabel: 'Replace thumbnail' }
+    )
   }
 }
 

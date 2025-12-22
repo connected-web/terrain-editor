@@ -110,12 +110,15 @@ type TerrainInitOptions = {
   locations?: TerrainLocation[]
   theme?: TerrainThemeOverrides
   cameraView?: LocationViewState
+  preserveDrawingBuffer?: boolean
 }
 
 export type TerrainHandle = {
   destroy: () => void
   updateLayers: (state: LayerToggleState) => Promise<void>
   setInteractiveMode: (enabled: boolean) => void
+  setMaxPixelRatio: (value: number) => void
+  setRenderPaused: (paused: boolean) => void
   updateLocations: (locations: TerrainLocation[], focusedId?: string) => void
   setFocusedLocation: (locationId?: string | null) => void
   navigateTo: (payload: {
@@ -797,6 +800,8 @@ export async function initTerrainViewer(
       destroy: noop,
       updateLayers: async () => {},
       setInteractiveMode: noop,
+      setMaxPixelRatio: noop,
+      setRenderPaused: noop,
       updateLocations: noop,
       setFocusedLocation: noop,
       navigateTo: noop,
@@ -942,13 +947,17 @@ export async function initTerrainViewer(
   let viewportHeight = height
   let viewOffsetPixels = 0
 
-  const maxPixelRatio = Math.max(1, options.maxPixelRatio ?? 1.5)
+  let maxPixelRatio = Math.max(1, options.maxPixelRatio ?? 1.5)
   let currentPixelRatio = 1
   function resolvePixelRatio() {
     return Math.max(1, Math.min(window.devicePixelRatio || 1, maxPixelRatio))
   }
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    preserveDrawingBuffer: options.preserveDrawingBuffer ?? false
+  })
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.08
   currentPixelRatio = resolvePixelRatio()
@@ -1472,6 +1481,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   }
 
   let animationFrame = 0
+  let renderPaused = false
   let frameCount = 0
   let firstRenderComplete = false
   const frameTimings: number[] = []
@@ -1551,7 +1561,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       }
     }
 
-    if (!frameCaptureMode) {
+    if (!frameCaptureMode && !renderPaused) {
       animationFrame = window.requestAnimationFrame(animate)
     }
   }
@@ -1559,7 +1569,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   options.onReady?.()
 
-  const resizeObserver = new ResizeObserver(() => {
+  function handleResize() {
     const { clientWidth, clientHeight } = container
     if (!clientWidth || !clientHeight) return
     viewportWidth = clientWidth
@@ -1575,6 +1585,10 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     }
     renderer.setSize(clientWidth, clientHeight, false)
     applyViewOffset()
+  }
+
+  const resizeObserver = new ResizeObserver(() => {
+    handleResize()
   })
   resizeObserver.observe(container)
 
@@ -1773,6 +1787,18 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     updateLayers,
     setInteractiveMode,
+    setMaxPixelRatio: (value: number) => {
+      maxPixelRatio = Math.max(1, value)
+      handleResize()
+    },
+    setRenderPaused: (paused: boolean) => {
+      renderPaused = paused
+      if (paused) {
+        window.cancelAnimationFrame(animationFrame)
+      } else if (!frameCaptureMode) {
+        animationFrame = window.requestAnimationFrame(animate)
+      }
+    },
     updateLocations: (locations: TerrainLocation[], focusedId?: string) => {
       setLocationMarkers(locations, focusedId)
     },
@@ -1862,7 +1888,9 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     disableFrameCaptureMode: () => {
       frameCaptureMode = false
-      animationFrame = window.requestAnimationFrame(animate)
+      if (!renderPaused) {
+        animationFrame = window.requestAnimationFrame(animate)
+      }
     },
     captureFrame: (frameNumber: number, fps: number = 30) => {
       if (!frameCaptureMode) {

@@ -84,6 +84,8 @@ export function useViewer(options: {
       interactive: nextContext.interactive,
       theme: nextContext.theme,
       cameraView: nextContext.initialCameraView,
+      preserveDrawingBuffer: true,
+      maxPixelRatio: 1.5,
       onLocationPick: nextContext.onLocationPick,
       onLocationClick: nextContext.onLocationClick,
       onLifecycleChange: handleLifecycleChange

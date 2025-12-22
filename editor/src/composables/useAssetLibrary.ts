@@ -67,8 +67,8 @@ export function useAssetLibrary(options: {
     const resolved = resolveAssetReference(icon)
     if (!resolved) return ''
     if (missingIconWarnings.has(resolved)) return ''
-    if (assetOverrides.has(resolved)) return assetOverrides.get(resolved)!
     if (iconPreviewCache[resolved]) return iconPreviewCache[resolved]
+    if (assetOverrides.has(resolved)) return assetOverrides.get(resolved)!
     preloadIconPreview(resolved)
     return ''
   }
@@ -171,6 +171,7 @@ export function useAssetLibrary(options: {
       assetOverrides.delete(path)
     }
     delete iconPreviewCache[path]
+    missingIconWarnings.add(path)
     options.locationsList.value = options.locationsList.value.map((location) =>
       location.icon === path ? { ...location, icon: undefined } : location
     )

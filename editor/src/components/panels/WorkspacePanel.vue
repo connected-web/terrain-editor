@@ -98,6 +98,34 @@
       <p class="workspace-form__hint">
         Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
       </p>
+      <div class="workspace-form__thumbnail">
+        <div class="workspace-form__thumbnail-preview">
+          <div
+            class="workspace-form__thumbnail-image"
+            :class="{
+              'workspace-form__thumbnail-image--empty': !thumbnailUrl,
+              'workspace-form__thumbnail-image--busy': isCreatingThumbnail
+            }"
+            :style="thumbnailUrl ? { backgroundImage: `url('${thumbnailUrl}')` } : undefined"
+          >
+            <span v-if="isCreatingThumbnail">Creating thumbnail...</span>
+            <span v-else-if="!thumbnailUrl">No thumbnail</span>
+          </div>
+        </div>
+        <div class="workspace-form__thumbnail-actions">
+          <button class="pill-button pill-button--ghost" type="button" @click="$emit('select-thumbnail')">
+            <Icon icon="image">Select thumbnail</Icon>
+          </button>
+          <button
+            class="pill-button"
+            type="button"
+            :disabled="isCreatingThumbnail"
+            @click="$emit('capture-thumbnail')"
+          >
+            <Icon icon="camera">Create from view</Icon>
+          </button>
+        </div>
+      </div>
       <div class="workspace-form__actions" v-if="hasActiveArchive">
         <button class="pill-button pill-button--ghost" type="button" @click="$emit('export-archive')">
           <Icon icon="file-export">Export WYN</Icon>
@@ -113,6 +141,9 @@ import { useWorkspaceModel } from '../../models/workspace'
 
 defineProps<{
   hasActiveArchive: boolean
+  thumbnailUrl?: string
+  hasThumbnail?: boolean
+  isCreatingThumbnail?: boolean
 }>()
 
 const { workspaceForm, actions: workspaceActions } = useWorkspaceModel()
@@ -122,6 +153,8 @@ defineEmits<{
   'load-map': []
   'start-new': []
   'export-archive': []
+  'select-thumbnail': []
+  'capture-thumbnail': []
 }>()
 </script>
 
@@ -163,6 +196,53 @@ defineEmits<{
   display: flex;
   flex-direction: row;
   gap: 1rem;
+}
+
+.workspace-form__thumbnail {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.workspace-form__thumbnail-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-form__thumbnail-image {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.04);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+}
+
+.workspace-form__thumbnail-image--empty {
+  background-image: none;
+}
+
+.workspace-form__thumbnail-image--busy {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.workspace-form__thumbnail-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pill-button--primary {

@@ -1,11 +1,17 @@
 <template>
-  <div class="asset-dialog">
-    <div class="asset-dialog__backdrop" @click="$emit('close')" />
+  <div class="asset-dialog" :class="{ 'asset-dialog--embedded': embedded }">
+    <div v-if="!embedded" class="asset-dialog__backdrop" @click="$emit('close')" />
     <section class="asset-dialog__panel">
       <header class="asset-dialog__header">
         <h2><Icon icon="image">Asset library</Icon></h2>
-        <button type="button" class="pill-button pill-button--ghost" @click="$emit('close')">
-          <Icon icon="xmark" />
+        <button
+          v-if="showClose"
+          type="button"
+          class="pill-button pill-button--ghost"
+          @click="$emit('close')"
+        >
+          <Icon :icon="closeIcon" />
+          <span v-if="closeLabel">{{ closeLabel }}</span>
         </button>
       </header>
       <label class="asset-dialog__search">
@@ -20,20 +26,37 @@
       <div class="asset-dialog__grid">
         <article v-for="asset in filteredAssets" :key="asset.path" class="asset-dialog__item">
           <div
-            class="asset-dialog__thumb button"
+            class="asset-dialog__thumb"
+            :class="{ button: showSelect }"
             :style="{ backgroundImage: getPreview(asset.path) ? `url('${getPreview(asset.path)}')` : undefined }"
-             @click="$emit('select', asset.path)"
+            @click="handleSelect(asset.path)"
           />
           <div class="asset-dialog__meta">
-            <strong>{{ asset.sourceFileName ?? asset.path }}</strong>
+            <strong>{{ asset.path }}</strong>
+            <span v-if="asset.sourceFileName && asset.sourceFileName !== asset.path">
+              {{ asset.sourceFileName }}
+            </span>
             <span>{{ asset.type ?? 'binary' }}</span>
           </div>
           <div class="asset-dialog__actions">
-            <button class="pill-button pill-button--ghost" @click="$emit('select', asset.path)">
-              <Icon icon="check">Use asset</Icon>
+            <button
+              v-if="showSelect"
+              class="pill-button pill-button--ghost"
+              @click="$emit('select', asset.path)"
+            >
+              <Icon icon="check">{{ selectLabel }}</Icon>
             </button>
-            <button class="pill-button pill-button--ghost" @click="$emit('replace', asset)">
-              <Icon icon="upload">Replace asset</Icon>
+            <button
+              class="pill-button pill-button--ghost"
+              :class="{ 'asset-dialog__action-icon': compactReplace }"
+              :title="compactReplace ? 'Replace asset' : undefined"
+              :aria-label="compactReplace ? 'Replace asset' : undefined"
+              @click="$emit('replace', asset)"
+            >
+              <Icon icon="upload">
+                <span v-if="!compactReplace">Replace asset</span>
+              </Icon>
+              <span v-if="compactReplace" class="sr-only">Replace asset</span>
             </button>
             <button class="pill-button pill-button--danger" @click="$emit('remove', asset.path)">
               <Icon icon="trash">Remove</Icon>
@@ -58,6 +81,13 @@ const props = defineProps<{
   assets: TerrainProjectFileEntry[]
   getPreview: (path: string) => string
   filterText?: string
+  embedded?: boolean
+  showSelect?: boolean
+  selectLabel?: string
+  showClose?: boolean
+  closeLabel?: string
+  closeIcon?: string
+  compactReplace?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -74,12 +104,25 @@ const filterModel = computed({
   set: (value: string) => emit('update:filterText', value)
 })
 
+const embedded = computed(() => Boolean(props.embedded))
+const showSelect = computed(() => props.showSelect !== false)
+const selectLabel = computed(() => props.selectLabel ?? 'Use asset')
+const showClose = computed(() => props.showClose !== false)
+const closeLabel = computed(() => props.closeLabel ?? 'Close')
+const closeIcon = computed(() => props.closeIcon ?? 'xmark')
+const compactReplace = computed(() => props.compactReplace !== false)
+
+function handleSelect(path: string) {
+  if (!showSelect.value) return
+  emit('select', path)
+}
+
 const filteredAssets = computed(() => {
   const list = props.assets ?? []
   const query = filterModel.value.trim().toLowerCase()
   if (!query) return list
   return list.filter((asset) => {
-    const haystack = `${asset.sourceFileName ?? asset.path} ${asset.type ?? ''}`.toLowerCase()
+    const haystack = `${asset.path} ${asset.sourceFileName ?? ''} ${asset.type ?? ''}`.toLowerCase()
     return haystack.includes(query)
   })
 })
@@ -90,6 +133,13 @@ const filteredAssets = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 200;
+}
+
+.asset-dialog--embedded {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  height: 100%;
 }
 
 .asset-dialog__backdrop {
@@ -113,10 +163,24 @@ const filteredAssets = computed(() => {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.asset-dialog--embedded .asset-dialog__panel {
+  position: static;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+}
+
 .asset-dialog__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.asset-dialog__header .pill-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .asset-dialog__header h2 {
@@ -213,6 +277,11 @@ const filteredAssets = computed(() => {
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+.asset-dialog__action-icon {
+  padding: 0.4rem 0.6rem;
+  gap: 0;
 }
 
 .asset-dialog__footer {

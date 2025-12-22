@@ -40,6 +40,14 @@
           >
             <Icon icon="file-export">Export</Icon>
           </button>
+          <button
+            v-if="activeLayer"
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="emit('open-assets', { id: activeLayer.id })"
+          >
+            <Icon icon="image">Assets</Icon>
+          </button>
           <div v-if="activeLayer" class="layer-editor__overflow">
             <button
               type="button"
@@ -148,7 +156,13 @@
             </button>
           </aside>
 
-          <div class="layer-editor__canvas">
+        <div
+          class="layer-editor__canvas"
+          @dragenter.prevent="handleLayerDragEnter"
+          @dragover.prevent="handleLayerDragOver"
+          @dragleave.prevent="handleLayerDragLeave"
+          @drop.prevent="handleLayerDrop"
+        >
             <LayerMaskEditor
               v-if="maskUrl"
               ref="maskEditorRef"
@@ -172,9 +186,17 @@
               @ready="handleMaskReady"
               @view-change="handleMaskViewChange"
             />
-            <p v-else class="layer-editor__placeholder">
-              No mask image found for this layer.
-            </p>
+            <div v-else class="layer-editor__placeholder">
+              <p>No mask image found for this layer.</p>
+              <button
+                v-if="props.activeLayer?.mask"
+                type="button"
+                class="pill-button pill-button--ghost"
+                @click="emit('create-empty-mask', { id: props.activeLayer.id })"
+              >
+                <Icon icon="plus">Create empty mask</Icon>
+              </button>
+            </div>
           </div>
 
           <aside class="layer-editor__properties">
@@ -420,6 +442,9 @@ const emit = defineEmits<{
   (ev: 'reorder-layer', payload: { sourceId: string; targetId: string | null }): void
   (ev: 'toggle-onion', id: string): void
   (ev: 'delete-layer', id: string): void
+  (ev: 'replace-layer-file', payload: { id: string; file: File }): void
+  (ev: 'open-assets', payload: { id: string }): void
+  (ev: 'create-empty-mask', payload: { id: string }): void
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
@@ -439,6 +464,7 @@ const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
 const pendingMaskViewOverride = ref<'grayscale' | 'color' | null>(null)
+const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
 watch(
   () => props.maskViewMode,
   (next) => {
@@ -551,7 +577,6 @@ const onionLayerSources = ref<OnionLayerSource[]>([])
 const onionCache = new Map<string, { path: string | null; url: string | null; owned: boolean }>()
 let onionLoadToken = 0
 
-const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
 watch(isHeightmap, (isH) => {
   if (!isH && activeTool.value === 'flat') {
     activeTool.value = 'brush'
@@ -864,6 +889,21 @@ function handleMaskReady() {
   const pendingState = props.pendingViewState ?? null
   maskEditorRef.value.suspendViewTracking()
   if (pendingState) {
+    const shouldAutoFit =
+      pendingState.zoom <= 1 &&
+      pendingState.centerX <= 0.05 &&
+      pendingState.centerY <= 0.05
+    if (shouldAutoFit) {
+      fitCanvasView()
+      if (currentId) {
+        const viewState = maskEditorRef.value.getViewState()
+        viewStateCache.set(currentId, viewState)
+        emit('view-state-change', { id: currentId, state: viewState })
+      }
+      emit('consume-pending-view-state')
+      maskEditorRef.value.resumeViewTracking()
+      return
+    }
     maskEditorRef.value.restoreViewState(pendingState, { emit: false })
     if (currentId) {
       viewStateCache.set(currentId, pendingState)
@@ -970,6 +1010,33 @@ function handleLayerAdd() {
 function handleCloseEditor() {
   cacheActiveLayerViewState()
   emit('close')
+}
+
+function hasFilePayload(event: DragEvent) {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+function handleLayerDragEnter(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+}
+
+function handleLayerDragOver(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+function handleLayerDragLeave(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+}
+
+function handleLayerDrop(event: DragEvent) {
+  if (!hasFilePayload(event)) return
+  const file = event.dataTransfer?.files?.[0]
+  if (!file || !props.activeLayer) return
+  if (!file.type.startsWith('image/')) return
+  emit('replace-layer-file', { id: props.activeLayer.id, file })
 }
 
 
@@ -1568,6 +1635,10 @@ function clamp(value: number, min: number, max: number) {
   padding: 1rem;
   text-align: center;
   opacity: 0.75;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 @media (max-width: 1100px) {
