@@ -30,7 +30,7 @@ Each editable layer is backed by a grayscale mask (heightmap or biome) that the 
 
 ### Layer Editor
 - Inline editor brings a full mask canvas, tool palette, brush controls, layer list, and utilities (export, reset, onion-skin pickers) into a single view.
-- Brush/erase/flatten/hand tools expose size, opacity, softness, spacing, and flow sliders—heightmap layers unlock flatten tooling while biomes respect tint colours. Brush presets set a shared baseline, and size/opacity pins keep values synced across tools. The flatten tool adds an ink sampler to pick the target height directly from the canvas. Each button surfaces its keyboard shortcut for quick swapping (details below).
+- Brush/erase/fill/flatten/hand tools expose size, opacity, softness, spacing, and flow sliders—heightmap layers unlock flatten tooling while biomes respect tint colours. Brush presets set a shared baseline, and size/opacity pins keep values synced across tools. The flatten tool adds an ink sampler to pick the target height directly from the canvas. Each button surfaces its keyboard shortcut for quick swapping (details below).
 - Canvas utilities: checkerboard or solid background, **Mask view toggle (B/W or Colour)** that syncs to the URL, undo/redo history, onion-skin overlays, export with optional alpha, fit/zoom shortcuts, and persistent view state (`leo`) so deep links reopen exactly where you left off.
 
 **Height Map tooling example**
@@ -81,7 +81,7 @@ Quality-of-life toggles for the local machine. Settings are stored in browser st
 
 - Tool palette includes shortcut hints (B/E/F/G/S/H/T). Mask editor supports pointer pan (hand tool or hold space in future) and holds view state until user interacts.
 - Confirm dialogs protect destructive operations (e.g., delete layer, close map).
-- Quick reference: `B` brush, `E` erase, `F` flatten (heightmap), `G` fill (reserved), `S` select (reserved), `H` hand, `T` transform (reserved). Escape closes dialogs, Enter confirms common prompts.
+- Quick reference: `B` brush, `E` erase, `F` flatten (heightmap), `G` fill (contiguous paint bucket), `S` select (reserved), `H` hand, `T` transform (reserved). Escape closes dialogs, Enter confirms common prompts.
 
 ## Mask View Toggle (New)
 

@@ -1,11 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
 
-declare global {
-  interface Window {
-    __terrainViewer?: unknown
-  }
-}
-
 function addDebugParam(url: string): string {
   const urlObj = new URL(url, 'http://localhost')
   urlObj.searchParams.set('debug', 'PLAYWRIGHT')
