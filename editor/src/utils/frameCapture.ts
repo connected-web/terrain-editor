@@ -43,11 +43,7 @@ export async function captureCompositeFrame(): Promise<string> {
  * Expose frame capture API to window for Playwright access
  */
 export function exposeFrameCaptureAPI() {
-  console.log('[frameCapture] exposeFrameCaptureAPI called, isPlaywrightDebugEnabled:', isPlaywrightDebugEnabled())
   if (typeof window !== 'undefined' && isPlaywrightDebugEnabled()) {
-    (window as any).__captureCompositeFrame = captureCompositeFrame
-    console.log('[frameCapture] ✓ Exposed composite frame capture API to window.__captureCompositeFrame')
-  } else {
-    console.log('[frameCapture] ✗ NOT exposing API - debug mode not enabled')
+    ;(window as any).__captureCompositeFrame = captureCompositeFrame
   }
 }

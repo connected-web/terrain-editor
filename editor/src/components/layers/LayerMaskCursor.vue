@@ -12,6 +12,7 @@
     <span v-if="showSwatch" class="layer-mask-cursor__swatch" :style="swatchStyle">
       <span class="layer-mask-cursor__swatch-label">{{ swatchLabel }}</span>
     </span>
+    <span v-if="showTargetDot" class="layer-mask-cursor__target-dot"></span>
   </div>
 </template>
 
@@ -31,13 +32,15 @@ const props = withDefaults(defineProps<{
   showBrushRing?: boolean
   anchor?: 'center' | 'bottom-left'
   sampleValue?: number | null
+  showTargetDot?: boolean
 }>(), {
   mode: 'paint',
   icon: 'paint-brush',
   opacity: 1,
   showBrushRing: true,
   anchor: 'center',
-  sampleValue: null
+  sampleValue: null,
+  showTargetDot: false
 })
 
 const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
@@ -60,7 +63,7 @@ const iconStyle = computed(() => {
     return {
       left: '0',
       top: '0',
-      transform: 'translate(0, -100%)'
+      transform: 'translate(0.2rem, -0.2rem)'
     }
   }
   const radius = diameter.value / 2
@@ -103,6 +106,10 @@ const swatchStyle = computed(() => {
     0 0 4px rgba(0, 0, 0, 0.75);
 }
 
+.layer-mask-cursor__icon :deep(svg) {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.7));
+}
+
 .layer-mask-cursor__brush {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -133,5 +140,19 @@ const swatchStyle = computed(() => {
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.9),
     0 0 4px rgba(0, 0, 0, 0.75);
+}
+
+.layer-mask-cursor__target-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.85),
+    0 0 0 4px rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
 }
 </style>

@@ -19,9 +19,10 @@ export type BrushSettings = {
     brush: { size: number; opacity: number; softness: number; spacing: number; flow: number }
     erase: { size: number; opacity: number; softness: number; spacing: number; flow: number }
     flat: { size: number; opacity: number; softness: number; spacing: number; flow: number; level: number }
+    fill: { level: number; tolerance: number }
   }
-  pins: { size: boolean; opacity: boolean }
-  pinnedValues: { size: number; opacity: number }
+  pins: { size: boolean; opacity: boolean; level: boolean }
+  pinnedValues: { size: number; opacity: number; level: number }
 }
 
 export type LocalSettings = {

@@ -68,10 +68,19 @@
       :mode="cursorMode"
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
-      :show-brush-ring="!flatSampleActive"
-      :anchor="flatSampleActive ? 'bottom-left' : 'center'"
-      :sample-value="flatSampleActive ? cursorSampleValue : null"
+      :show-brush-ring="!flatSampleActive && toolMode !== 'fill'"
+      :anchor="flatSampleActive && toolMode !== 'fill' ? 'bottom-left' : 'center'"
+      :sample-value="cursorSampleValue"
+      :show-target-dot="toolMode === 'fill'"
     />
+    <div
+      v-if="fillPreviewPending || fillPreviewLoading"
+      class="layer-mask-editor__fill-spinner"
+      :class="{ 'layer-mask-editor__fill-spinner--loading': fillPreviewLoading }"
+      :style="fillSpinnerStyle"
+    >
+      <div class="layer-mask-editor__spinner"></div>
+    </div>
   </div>
 </template>
 
@@ -93,6 +102,8 @@ const props = defineProps<{
   brushFlow?: number
   brushSpacing?: number
   flatLevel?: number
+  fillLevel?: number
+  fillTolerance?: number
   flatSampleMode?: boolean
   viewMode?: 'grayscale' | 'color'
   maskColor?: [number, number, number] | null
@@ -135,11 +146,17 @@ const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness
 const brushFlow = computed(() => Math.min(1, Math.max(0.05, props.brushFlow ?? 1)))
 const brushSpacing = computed(() => Math.min(2, Math.max(0.2, props.brushSpacing ?? 1)))
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
+const fillLevel = computed(() => Math.min(1, Math.max(0, props.fillLevel ?? flatLevel.value)))
+const fillTolerance = computed(() => Math.min(1, Math.max(0, props.fillTolerance ?? 0.1)))
 const toolMode = computed(() => props.tool ?? 'brush')
 const panModeActive = computed(() => toolMode.value === 'hand' || toolMode.value === 'pan')
-const flatSampleActive = computed(
-  () => Boolean(props.flatSampleMode && toolMode.value === 'flat' && props.valueMode === 'heightmap')
-)
+const flatSampleActive = computed(() => {
+  if (!props.flatSampleMode) return false
+  if (toolMode.value === 'flat') {
+    return props.valueMode === 'heightmap'
+  }
+  return toolMode.value === 'fill'
+})
 const currentStrokeMode = computed<'paint' | 'erase' | 'flat'>(() => {
   if (toolMode.value === 'erase') return 'erase'
   if (toolMode.value === 'flat' && props.valueMode === 'heightmap') return 'flat'
@@ -234,6 +251,8 @@ const activeCursorIcon = computed(() => {
     return 'eye-dropper'
   }
   switch (toolMode.value) {
+    case 'fill':
+      return 'fill-drip'
     case 'erase':
       return 'minus'
     case 'flat':
@@ -585,6 +604,11 @@ function handlePointerDown(event: MouseEvent) {
     }
     return
   }
+  if (toolMode.value === 'fill') {
+    clearFillPreview()
+    fillAtPoint(x, y)
+    return
+  }
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
@@ -645,6 +669,148 @@ function sampleMaskValue(x: number, y: number) {
   const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
   const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
   return values[iy * width + ix] ?? null
+}
+
+function scheduleFillPreview(x: number, y: number) {
+  fillPreviewCoords.value = { x, y }
+  if (fillPreviewActive.value) {
+    fillPreviewActive.value = false
+    clearOverlay()
+  }
+  fillPreviewLoading.value = false
+  fillPreviewPending.value = true
+  if (fillPreviewTimer !== null) {
+    window.clearTimeout(fillPreviewTimer)
+  }
+  fillPreviewTimer = window.setTimeout(() => {
+    fillPreviewTimer = null
+    startFillPreview()
+  }, 750)
+}
+
+function clearFillPreview() {
+  if (fillPreviewTimer !== null) {
+    window.clearTimeout(fillPreviewTimer)
+    fillPreviewTimer = null
+  }
+  if (fillPreviewActive.value || fillPreviewLoading.value) {
+    fillPreviewActive.value = false
+    fillPreviewLoading.value = false
+    clearOverlay()
+  }
+  fillPreviewPending.value = false
+}
+
+function startFillPreview() {
+  if (toolMode.value !== 'fill') return
+  const coords = fillPreviewCoords.value
+  if (!coords) return
+  fillPreviewPending.value = false
+  fillPreviewLoading.value = true
+  requestAnimationFrame(() => {
+    renderFillPreview(coords.x, coords.y)
+    fillPreviewLoading.value = false
+    fillPreviewActive.value = true
+  })
+}
+
+function renderFillPreview(x: number, y: number) {
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  const overlay = overlayCanvasRef.value
+  const ctx = getContext('overlay')
+  if (!values || !width || !height || !overlay || !ctx) return
+  const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
+  const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
+  const startIndex = iy * width + ix
+  const startValue = values[startIndex]
+  const tolerance = fillTolerance.value
+  const low = Math.min(startValue, tolerance)
+  const high = Math.min(1 - startValue, tolerance)
+  const visited = new Uint8Array(width * height)
+  const stack: number[] = [startIndex]
+  while (stack.length) {
+    const index = stack.pop()
+    if (index === undefined) continue
+    if (visited[index]) continue
+    visited[index] = 1
+    const value = values[index]
+    if (value < startValue - low || value > startValue + high) continue
+    const col = index % width
+    if (col > 0) stack.push(index - 1)
+    if (col < width - 1) stack.push(index + 1)
+    if (index >= width) stack.push(index - width)
+    if (index < width * (height - 1)) stack.push(index + width)
+  }
+  const imageData = ctx.createImageData(width, height)
+  const data = imageData.data
+  for (let i = 0; i < visited.length; i += 1) {
+    if (!visited[i]) continue
+    const idx = i * 4
+    data[idx] = 255
+    data[idx + 1] = 215
+    data[idx + 2] = 80
+    data[idx + 3] = 110
+  }
+  ctx.clearRect(0, 0, overlay.width, overlay.height)
+  ctx.putImageData(imageData, 0, 0)
+}
+
+function fillAtPoint(x: number, y: number) {
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!values || !width || !height) return
+  const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
+  const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
+  const startIndex = iy * width + ix
+  const startValue = values[startIndex]
+  const fillValue = fillLevel.value
+  const tolerance = fillTolerance.value
+  const low = Math.min(startValue, tolerance)
+  const high = Math.min(1 - startValue, tolerance)
+  if (startValue === fillValue && low === 0 && high === 0) return
+  const visited = new Uint8Array(width * height)
+  const stack: number[] = [startIndex]
+  while (stack.length) {
+    const index = stack.pop()
+    if (index === undefined) continue
+    if (visited[index]) continue
+    visited[index] = 1
+    const value = values[index]
+    if (value < startValue - low || value > startValue + high) continue
+    values[index] = fillValue
+    const col = index % width
+    if (col > 0) stack.push(index - 1)
+    if (col < width - 1) stack.push(index + 1)
+    if (index >= width) stack.push(index - width)
+    if (index < width * (height - 1)) stack.push(index + width)
+  }
+  flashFillOverlay(visited)
+  renderMaskCanvas()
+  renderPreviewCanvas()
+  pushHistorySnapshot()
+}
+
+function flashFillOverlay(visited: Uint8Array) {
+  const { width, height } = canvasDimensions.value
+  const overlay = overlayCanvasRef.value
+  const ctx = getContext('overlay')
+  if (!overlay || !ctx || !width || !height) return
+  const imageData = ctx.createImageData(width, height)
+  const data = imageData.data
+  for (let i = 0; i < visited.length; i += 1) {
+    if (!visited[i]) continue
+    const idx = i * 4
+    data[idx] = 255
+    data[idx + 1] = 210
+    data[idx + 2] = 120
+    data[idx + 3] = 140
+  }
+  ctx.clearRect(0, 0, overlay.width, overlay.height)
+  ctx.putImageData(imageData, 0, 0)
+  window.setTimeout(() => {
+    clearOverlay()
+  }, 260)
 }
 const viewportRef = ref<HTMLDivElement | null>(null)
 const isPanning = ref(false)
@@ -993,6 +1159,15 @@ const cursorState = ref({
 })
 const cursorInside = ref(false)
 const cursorSampleValue = ref<number | null>(null)
+const fillPreviewLoading = ref(false)
+const fillPreviewPending = ref(false)
+const fillPreviewActive = ref(false)
+const fillPreviewCoords = ref<{ x: number; y: number } | null>(null)
+let fillPreviewTimer: number | null = null
+const fillSpinnerStyle = computed(() => ({
+  left: `${cursorState.value.position.x}px`,
+  top: `${cursorState.value.position.y}px`
+}))
 
 function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const root = editorRootRef.value
@@ -1006,10 +1181,15 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const canvas = canvasRef.value
   if (!canvas) return
   const coords = canvasCoordsFromEvent(event as MouseEvent)
-  if (flatSampleActive.value) {
+  if (flatSampleActive.value || toolMode.value === 'fill') {
     cursorSampleValue.value = sampleMaskValue(coords.x, coords.y)
   } else if (cursorSampleValue.value !== null) {
     cursorSampleValue.value = null
+  }
+  if (toolMode.value === 'fill') {
+    scheduleFillPreview(coords.x, coords.y)
+  } else {
+    clearFillPreview()
   }
   emit('cursor-move', {
     x: Math.round(coords.x),
@@ -1026,6 +1206,7 @@ function handleViewportPointerLeave(event: PointerEvent) {
   cursorInside.value = false
   cursorState.value.visible = false
   cursorSampleValue.value = null
+  clearFillPreview()
   handleViewportPointerUp(event)
 }
 
@@ -1033,10 +1214,17 @@ watch(showCustomCursor, (canShow) => {
   cursorState.value.visible = canShow && cursorInside.value
 })
 
+watch(toolMode, (next) => {
+  if (next !== 'fill') {
+    clearFillPreview()
+  }
+})
+
 onBeforeUnmount(() => {
   if (image.value?.src) {
     URL.revokeObjectURL(image.value.src)
   }
+  clearFillPreview()
 })
 
 function colorToRgba(color: [number, number, number], alpha = 1) {
@@ -1096,6 +1284,39 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   cursor: grabbing;
 }
 
+.layer-mask-editor__fill-spinner {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.layer-mask-editor__spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 235, 140, 0.8);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8);
+  animation: layer-mask-editor-pulse 0.9s ease-in-out infinite;
+}
+
+.layer-mask-editor__fill-spinner--loading .layer-mask-editor__spinner {
+  border-color: rgba(255, 235, 140, 0.98);
+}
+
+@keyframes layer-mask-editor-pulse {
+  0% {
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    border-color: rgba(255, 235, 140, 0.95);
+  }
+  100% {
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+}
+
+
 .layer-mask-editor__canvas-wrapper {
   position: relative;
   margin: 0 auto;
@@ -1122,6 +1343,10 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 
 .layer-mask-editor__canvas--base {
   opacity: 0;
+}
+
+.layer-mask-editor__canvas--overlay {
+  pointer-events: none;
 }
 
 .layer-mask-editor__canvas--luminance {

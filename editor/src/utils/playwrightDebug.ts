@@ -19,10 +19,6 @@ declare global {
 if (typeof window !== 'undefined') {
   const params = new URLSearchParams(window.location.search)
   isPlaywrightDebug = params.get('debug') === 'PLAYWRIGHT'
-
-  // Always log the initialization so we can verify it's working
-  console.log('[playwrightDebug] Module initialized, debug mode:', isPlaywrightDebug)
-  console.log('[playwrightDebug] URL search params:', window.location.search)
 }
 
 /**

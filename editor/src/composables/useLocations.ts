@@ -73,13 +73,11 @@ export function useLocations() {
     const normalized = search.toLowerCase().trim()
 
     playwrightLog('[useLocations][findLocationByNameOrId] search:', search, 'normalized:', normalized)
-    console.log('[useLocations][findLocationByNameOrId] search:', search, 'normalized:', normalized)
 
     // First try exact ID match (case-insensitive)
     const byId = locationsList.value.find(loc => ensureLocationId(loc).id?.toLowerCase() === normalized)
     if (byId) {
       playwrightLog('[useLocations][findLocationByNameOrId] Matched by ID:', byId)
-      console.log('[useLocations][findLocationByNameOrId] Matched by ID:', byId)
       return byId
     }
 
@@ -89,7 +87,6 @@ export function useLocations() {
     )
     if (byExactName) {
       playwrightLog('[useLocations][findLocationByNameOrId] Matched by exact name:', byExactName)
-      console.log('[useLocations][findLocationByNameOrId] Matched by exact name:', byExactName)
       return byExactName
     }
 
@@ -99,11 +96,9 @@ export function useLocations() {
     )
     if (byPartialName) {
       playwrightLog('[useLocations][findLocationByNameOrId] Matched by partial name:', byPartialName)
-      console.log('[useLocations][findLocationByNameOrId] Matched by partial name:', byPartialName)
       return byPartialName
     }
     playwrightLog('[useLocations][findLocationByNameOrId] No match found for:', search)
-    console.log('[useLocations][findLocationByNameOrId] No match found for:', search)
     return null
   }
 
@@ -208,13 +203,13 @@ export function useLocations() {
 
   function isCameraFocusedOnLocation(location: TerrainLocation): boolean {
     if (!location) {
-      console.log('No active location to compare to')
+      playwrightLog('No active location to compare to')
       return false
     }
     const viewState = cameraViewState.value
     const locationView = location?.view
     if (!locationView) {
-      console.log('Active location has no view to compare to')
+      playwrightLog('Active location has no view to compare to')
       return false
     }
     const epsilon = 0.05
@@ -325,23 +320,33 @@ export function useLocations() {
       // Always try to resolve pending location search if present
       if (pendingLocationSearch.value && locationsList.value.length > 0) {
         playwrightLog('[useLocations] Attempting to resolve pending search:', pendingLocationSearch.value)
-        console.log('[useLocations] Attempting to resolve pending search:', pendingLocationSearch.value)
+        playwrightLog('[useLocations] Attempting to resolve pending search:', pendingLocationSearch.value)
         const location = findLocationByNameOrId(pendingLocationSearch.value)
         if (location) {
           const id = ensureLocationId(location).id!
           playwrightLog('[useLocations] Resolved pending search to location:', location.name, 'ID:', id)
-          console.log('[useLocations] Resolved pending search to location:', location.name, 'ID:', id)
+          playwrightLog('[useLocations] Resolved pending search to location:', location.name, 'ID:', id)
           pendingLocationSearch.value = null // Clear before setActiveLocation
           setActiveLocation(id)
         } else {
           playwrightLog('[useLocations] Could not resolve pending search:', pendingLocationSearch.value, 'Available:', locationsList.value.map(l => l.name))
-          console.log('[useLocations] Could not resolve pending search:', pendingLocationSearch.value, 'Available:', locationsList.value.map(l => l.name))
+          playwrightLog(
+            '[useLocations] Could not resolve pending search:',
+            pendingLocationSearch.value,
+            'Available:',
+            locationsList.value.map((l) => l.name)
+          )
         }
       } else {
         playwrightLog('[useLocations] Running ensureActiveLocationSelection (no pending search)')
         playwrightLog('[useLocations] Reason: pendingLocationSearch=', pendingLocationSearch.value, 'locationsList.length=', locationsList.value.length)
-        console.log('[useLocations] Running ensureActiveLocationSelection (no pending search)')
-        console.log('[useLocations] Reason: pendingLocationSearch=', pendingLocationSearch.value, 'locationsList.length=', locationsList.value.length)
+        playwrightLog('[useLocations] Running ensureActiveLocationSelection (no pending search)')
+        playwrightLog(
+          '[useLocations] Reason: pendingLocationSearch=',
+          pendingLocationSearch.value,
+          'locationsList.length=',
+          locationsList.value.length
+        )
         // Only run auto-selection if there's no pending search
         ensureActiveLocationSelection()
       }
@@ -480,7 +485,7 @@ export function useLocations() {
 
   function focusCameraOnActiveLocation() {
     if (!workspace.handle.value || !activeLocation.value) {
-      console.log('No active location to focus on')
+      playwrightLog('No active location to focus on')
       return
     }
     const location = activeLocation.value

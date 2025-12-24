@@ -178,6 +178,8 @@
               :brush-flow="strokeSettings.flow"
               :brush-spacing="strokeSettings.spacing"
               :flat-level="toolSettings.flat.level"
+              :fill-level="toolSettings.fill.level"
+              :fill-tolerance="toolSettings.fill.tolerance"
               :flat-sample-mode="flatSampleMode"
               :onion-layers="onionLayerSources"
               @update-mask="handleUpdateMask"
@@ -204,11 +206,24 @@
           <aside class="layer-editor__properties">
             <div class="layer-editor__properties-header">
               <div>
-                <h3>{{ currentTool.label }}</h3>
+                <h3 class="layer-editor__tool-heading">
+                  <Icon :icon="currentTool.icon" />
+                  <span>{{ currentTool.label }} ({{ currentTool.shortcut }})</span>
+                </h3>
                 <p class="layer-editor__properties-hint">{{ currentTool.description }}</p>
               </div>
             </div>
             <div class="layer-editor__properties-body">
+              <div class="layer-editor__section">
+                <button
+                  type="button"
+                  class="layer-editor__section-toggle"
+                  @click="toolSettingsOpen = !toolSettingsOpen"
+                >
+                  <span>Tool settings</span>
+                  <Icon :icon="toolSettingsOpen ? 'chevron-up' : 'chevron-down'" />
+                </button>
+                <div v-if="toolSettingsOpen" class="layer-editor__section-body">
               <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
                 <label class="layer-editor__field">
                   <div class="layer-editor__field-header">
@@ -311,11 +326,20 @@
                     >
                   </div>
                 </label>
-                <label
-                  v-if="isHeightmap && activeTool === 'flat'"
-                  class="layer-editor__slider-field"
-                >
-                  <span>Flat level (%)</span>
+              </div>
+                  <div v-if="inkControlsVisible" class="layer-editor__control-stack">
+                <label class="layer-editor__slider-field">
+                  <div class="layer-editor__slider-label">
+                    <span>Ink level (%)</span>
+                    <button
+                      type="button"
+                      class="layer-editor__pin-button"
+                      :class="{ 'layer-editor__pin-button--active': pinState.level }"
+                      @click="togglePin('level')"
+                    >
+                      <Icon icon="thumbtack">{{ pinState.level ? 'Pinned' : 'Pin' }}</Icon>
+                    </button>
+                  </div>
                   <div class="layer-editor__slider-input">
                     <input
                       type="range"
@@ -331,11 +355,11 @@
                     >
                   </div>
                 </label>
-                <div v-if="isHeightmap && activeTool === 'flat'" class="layer-editor__flat-preview">
+                <div class="layer-editor__flat-preview">
                   <span class="layer-editor__flat-swatch" :style="flatSwatchStyle"></span>
                   <span class="layer-editor__flat-label">{{ flatPercent }}%</span>
                 </div>
-                <div v-if="isHeightmap && activeTool === 'flat'" class="layer-editor__inline-actions">
+                <div v-if="activeTool === 'flat' || activeTool === 'fill'" class="layer-editor__inline-actions">
                   <button
                     type="button"
                     class="pill-button pill-button--ghost"
@@ -349,7 +373,16 @@
                   </p>
                 </div>
               </div>
-              <div class="layer-editor__control-stack layer-editor__control-stack--advanced">
+                  <div v-if="activeTool === 'fill'" class="layer-editor__control-stack">
+                    <label class="layer-editor__slider-field">
+                      <span>Tolerance (%)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
+                        <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
+                      </div>
+                    </label>
+                  </div>
+              <div v-if="supportsBrushProperties" class="layer-editor__control-stack layer-editor__control-stack--advanced">
                 <label class="layer-editor__slider-field">
                   <span>Spacing (%)</span>
                   <div class="layer-editor__slider-input">
@@ -365,8 +398,18 @@
                   </div>
                 </label>
               </div>
+                </div>
+              </div>
               <div class="layer-editor__section">
-                <h4>Layer settings</h4>
+                <button
+                  type="button"
+                  class="layer-editor__section-toggle"
+                  @click="layerSettingsOpen = !layerSettingsOpen"
+                >
+                  <span>Layer settings</span>
+                  <Icon :icon="layerSettingsOpen ? 'chevron-up' : 'chevron-down'" />
+                </button>
+                <div v-if="layerSettingsOpen" class="layer-editor__section-body">
                 <label class="layer-editor__field">
                   <span>Background</span>
                   <select v-model="previewBackground">
@@ -408,16 +451,26 @@
                     @change="handleColourChange"
                   >
                 </label>
+                </div>
               </div>
               <div class="layer-editor__section">
-                <h4>Layer utilities</h4>
-                <div class="layer-editor__properties-actions">
-                  <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
-                    <Icon icon="arrow-rotate-left" /> Reset mask
-                  </button>
-                  <button type="button" class="pill-button" @click="applyCanvas">
-                    <Icon icon="floppy-disk" /> Apply changes
-                  </button>
+                <button
+                  type="button"
+                  class="layer-editor__section-toggle"
+                  @click="layerUtilitiesOpen = !layerUtilitiesOpen"
+                >
+                  <span>Layer utilities</span>
+                  <Icon :icon="layerUtilitiesOpen ? 'chevron-up' : 'chevron-down'" />
+                </button>
+                <div v-if="layerUtilitiesOpen" class="layer-editor__section-body">
+                  <div class="layer-editor__properties-actions">
+                    <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
+                      <Icon icon="arrow-rotate-left" /> Reset mask
+                    </button>
+                    <button type="button" class="pill-button" @click="applyCanvas">
+                      <Icon icon="floppy-disk" /> Apply changes
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -474,7 +527,7 @@ const TOOL_PALETTE = [
   { id: 'brush', label: 'Brush', icon: 'paintbrush', shortcut: 'B', description: 'Paint layer values.', onlyHeightmap: false, disabled: false },
   { id: 'erase', label: 'Erase', icon: 'eraser', shortcut: 'E', description: 'Remove layer values.', onlyHeightmap: false, disabled: false },
   { id: 'flat', label: 'Flatten', icon: 'equals', shortcut: 'F', description: 'Set the heightmap to a flat value.', onlyHeightmap: true, disabled: false },
-  { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: true },
+  { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: false },
   { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: true },
   { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.', onlyHeightmap: false, disabled: false },
   { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true }
@@ -545,6 +598,9 @@ watch(
 
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
+const toolSettingsOpen = ref(true)
+const layerSettingsOpen = ref(true)
+const layerUtilitiesOpen = ref(true)
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
 const pendingMaskViewOverride = ref<'grayscale' | 'color' | null>(null)
 const isHeightmap = computed(() => props.activeLayer?.kind === 'heightmap')
@@ -634,12 +690,14 @@ const activePresetId = ref(basePresets[0]?.id ?? DEFAULT_PRESET_ID)
 const toolSettings = reactive({
   brush: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
   erase: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
-  flat: { size: 64, opacity: 1, softness: 0.25, spacing: 1, flow: 1, level: 0.5 }
+  flat: { size: 64, opacity: 1, softness: 0.25, spacing: 1, flow: 1, level: 0.5 },
+  fill: { level: 1, tolerance: 0.1 }
 })
-const pinState = reactive({ size: false, opacity: false })
+const pinState = reactive({ size: false, opacity: false, level: false })
 const pinnedValues = reactive({
   size: toolSettings.brush.size,
-  opacity: toolSettings.brush.opacity
+  opacity: toolSettings.brush.opacity,
+  level: toolSettings.flat.level
 })
 const lastBrushSettingsSignature = ref('')
 const customPresets = ref<StoredBrushPreset[]>([])
@@ -697,10 +755,28 @@ const flowPercent = computed({
     strokeSettings.value.flow = clamp(value / 100, 0.05, 1)
   }
 })
-const flatPercent = computed({
-  get: () => Math.round(toolSettings.flat.level * 100),
+const levelValue = computed({
+  get: () => (pinState.level ? pinnedValues.level : toolSettings.flat.level),
   set: (value: number) => {
-    toolSettings.flat.level = clamp(value / 100, 0, 1)
+    const next = clamp(value, 0, 1)
+    if (pinState.level) {
+      applyPinnedValue('level', next)
+    } else {
+      toolSettings.flat.level = next
+      toolSettings.fill.level = next
+    }
+  }
+})
+const flatPercent = computed({
+  get: () => Math.round(levelValue.value * 100),
+  set: (value: number) => {
+    levelValue.value = clamp(value / 100, 0, 1)
+  }
+})
+const fillTolerancePercent = computed({
+  get: () => Math.round(toolSettings.fill.tolerance * 100),
+  set: (value: number) => {
+    toolSettings.fill.tolerance = clamp(value / 100, 0, 1)
   }
 })
 const flatSampleMode = ref(false)
@@ -730,12 +806,12 @@ watch(isHeightmap, (isH) => {
   if (!isH && pendingMaskViewOverride.value && pendingMaskViewOverride.value !== maskViewMode.value) {
     maskViewMode.value = pendingMaskViewOverride.value
   }
-  if (!isH) {
+  if (!isH && activeTool.value !== 'fill') {
     flatSampleMode.value = false
   }
 })
 watch(activeTool, (next) => {
-  if (next !== 'flat') {
+  if (next !== 'flat' && next !== 'fill') {
     flatSampleMode.value = false
   }
 })
@@ -784,6 +860,10 @@ const layerColourHex = computed(() => {
 const supportsBrushProperties = computed(() =>
   ['brush', 'erase', 'flat'].includes(activeTool.value)
 )
+const flatOrFillActive = computed(() => ['flat', 'fill'].includes(activeTool.value))
+const inkControlsVisible = computed(
+  () => activeTool.value === 'fill' || (activeTool.value === 'flat' && isHeightmap.value)
+)
 const zoomLabel = computed(() => `${Math.round(currentZoom.value * 100)}%`)
 const coordLabel = computed(() => `${Math.round(cursorCoords.value.x)}, ${Math.round(cursorCoords.value.y)}`)
 const presetOptions = computed(() => {
@@ -806,7 +886,7 @@ const presetOptions = computed(() => {
 const canSavePreset = computed(() => activePresetId.value === CUSTOM_PRESET_ID)
 const canDeletePreset = computed(() => customPresets.value.some((preset) => preset.id === activePresetId.value))
 const flatSwatchStyle = computed(() => {
-  const channel = Math.round(toolSettings.flat.level * 255)
+  const channel = Math.round(levelValue.value * 255)
   return {
     backgroundColor: `rgb(${channel}, ${channel}, ${channel})`
   }
@@ -840,17 +920,22 @@ function shouldSwitchToCustom() {
   )
 }
 
-function applyPinnedValue(key: 'size' | 'opacity', value: number) {
+function applyPinnedValue(key: 'size' | 'opacity' | 'level', value: number) {
   pinnedValues[key] = value
-  toolSettings.brush[key] = value
-  toolSettings.erase[key] = value
-  toolSettings.flat[key] = value
+  if (key === 'level') {
+    toolSettings.flat.level = value
+    toolSettings.fill.level = value
+  } else {
+    toolSettings.brush[key] = value
+    toolSettings.erase[key] = value
+    toolSettings.flat[key] = value
+  }
 }
 
-function togglePin(key: 'size' | 'opacity') {
+function togglePin(key: 'size' | 'opacity' | 'level') {
   pinState[key] = !pinState[key]
   if (pinState[key]) {
-    const current = strokeSettings.value[key]
+    const current = key === 'level' ? toolSettings.flat.level : strokeSettings.value[key]
     applyPinnedValue(key, current)
   }
 }
@@ -859,12 +944,16 @@ function applyPreset(preset: BrushPreset) {
   toolSettings.brush = { ...toolSettings.brush, ...preset.settings }
   toolSettings.erase = { ...toolSettings.erase, ...preset.settings }
   toolSettings.flat = { ...toolSettings.flat, ...preset.settings }
+  toolSettings.fill.level = toolSettings.flat.level
   activePresetId.value = preset.id
   if (pinState.size) {
     applyPinnedValue('size', pinnedValues.size)
   }
   if (pinState.opacity) {
     applyPinnedValue('opacity', pinnedValues.opacity)
+  }
+  if (pinState.level) {
+    applyPinnedValue('level', pinnedValues.level)
   }
 }
 
@@ -874,10 +963,11 @@ function getBrushSettingsSnapshot(): BrushSettings {
     toolSettings: {
       brush: { ...toolSettings.brush },
       erase: { ...toolSettings.erase },
-      flat: { ...toolSettings.flat }
+      flat: { ...toolSettings.flat },
+      fill: { ...toolSettings.fill }
     },
-    pins: { ...pinState },
-    pinnedValues: { ...pinnedValues }
+    pins: { size: pinState.size, opacity: pinState.opacity, level: pinState.level },
+    pinnedValues: { size: pinnedValues.size, opacity: pinnedValues.opacity, level: pinnedValues.level }
   }
 }
 
@@ -891,15 +981,29 @@ function applyBrushSettings(settings: BrushSettings) {
   toolSettings.brush = { ...toolSettings.brush, ...settings.toolSettings.brush }
   toolSettings.erase = { ...toolSettings.erase, ...settings.toolSettings.erase }
   toolSettings.flat = { ...toolSettings.flat, ...settings.toolSettings.flat }
-  pinState.size = settings.pins.size
-  pinState.opacity = settings.pins.opacity
-  pinnedValues.size = settings.pinnedValues.size
-  pinnedValues.opacity = settings.pinnedValues.opacity
+  const legacyFill = settings.toolSettings.fill as { toleranceLow?: number; toleranceHigh?: number } | undefined
+  const resolvedTolerance =
+    settings.toolSettings.fill?.tolerance ??
+    Math.max(legacyFill?.toleranceLow ?? 0, legacyFill?.toleranceHigh ?? 0)
+  toolSettings.fill = {
+    ...toolSettings.fill,
+    ...settings.toolSettings.fill,
+    tolerance: resolvedTolerance
+  }
+  pinState.size = settings.pins?.size ?? false
+  pinState.opacity = settings.pins?.opacity ?? false
+  pinState.level = settings.pins?.level ?? false
+  pinnedValues.size = settings.pinnedValues?.size ?? pinnedValues.size
+  pinnedValues.opacity = settings.pinnedValues?.opacity ?? pinnedValues.opacity
+  pinnedValues.level = settings.pinnedValues?.level ?? pinnedValues.level
   if (pinState.size) {
     applyPinnedValue('size', pinnedValues.size)
   }
   if (pinState.opacity) {
     applyPinnedValue('opacity', pinnedValues.opacity)
+  }
+  if (pinState.level) {
+    applyPinnedValue('level', pinnedValues.level)
   }
 }
 
@@ -936,7 +1040,13 @@ function deleteActivePreset() {
 }
 
 function handleFlatSample(value: number) {
-  toolSettings.flat.level = clamp(value, 0, 1)
+  const next = clamp(value, 0, 1)
+  if (pinState.level) {
+    applyPinnedValue('level', next)
+  } else {
+    toolSettings.flat.level = next
+    toolSettings.fill.level = next
+  }
   flatSampleMode.value = false
 }
 
@@ -1792,10 +1902,10 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__properties {
   border-left: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0.75rem;
+  padding: 0.55rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   overflow-y: auto;
   min-height: 0;
 }
@@ -1808,6 +1918,13 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__properties-header h3 {
   margin: 0;
+}
+
+.layer-editor__tool-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
 }
 
 .layer-editor__properties-hint {
@@ -1843,19 +1960,19 @@ function clamp(value: number, min: number, max: number) {
 .layer-editor__control-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .layer-editor__control-stack--advanced {
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
+  margin-top: 0.35rem;
+  padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .layer-editor__slider-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .layer-editor__slider-field span {
@@ -1983,18 +2100,40 @@ function clamp(value: number, min: number, max: number) {
   color: inherit;
 }
 
+
 .layer-editor__section {
-  margin-top: 1rem;
+  margin-top: 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.4rem 0.5rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.layer-editor__section h4 {
-  margin: 0;
+.layer-editor__section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 8px;
+  padding: 0.2rem 0;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.layer-editor__section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.25rem;
 }
 
 .layer-editor__field {
