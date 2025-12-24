@@ -33,6 +33,7 @@ const props = withDefaults(defineProps<{
   anchor?: 'center' | 'bottom-left'
   sampleValue?: number | null
   showTargetDot?: boolean
+  fixedIconOffset?: boolean
 }>(), {
   mode: 'paint',
   icon: 'paint-brush',
@@ -40,7 +41,8 @@ const props = withDefaults(defineProps<{
   showBrushRing: true,
   anchor: 'center',
   sampleValue: null,
-  showTargetDot: false
+  showTargetDot: false,
+  fixedIconOffset: false
 })
 
 const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
@@ -58,6 +60,7 @@ const brushStyle = computed(() => ({
 }))
 
 const ICON_PADDING = 6
+const FIXED_ICON_OFFSET = 26
 const iconStyle = computed(() => {
   if (props.anchor === 'bottom-left') {
     return {
@@ -67,7 +70,7 @@ const iconStyle = computed(() => {
     }
   }
   const radius = diameter.value / 2
-  const offset = radius + ICON_PADDING
+  const offset = props.fixedIconOffset ? FIXED_ICON_OFFSET : radius + ICON_PADDING
   return {
     left: '50%',
     top: '50%',

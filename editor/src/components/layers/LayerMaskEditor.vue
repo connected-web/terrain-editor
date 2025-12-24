@@ -72,6 +72,7 @@
       :anchor="flatSampleActive && toolMode !== 'fill' ? 'bottom-left' : 'center'"
       :sample-value="cursorSampleValue"
       :show-target-dot="toolMode === 'fill'"
+      :fixed-icon-offset="toolMode === 'fill' || flatSampleActive"
     />
     <div
       v-if="fillPreviewPending || fillPreviewLoading"
@@ -254,7 +255,7 @@ const activeCursorIcon = computed(() => {
     case 'fill':
       return 'fill-drip'
     case 'erase':
-      return 'minus'
+      return 'eraser'
     case 'flat':
       return 'equals'
     case 'hand':
