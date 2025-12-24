@@ -113,4 +113,5 @@
 
 ### Assets & Pipelines
 - ✅ Sample `.wyn` packaging via `npm run packmap`
+- ✅ Sample `.wyn` unpacking via `npm run unpackmap`
 - 💡 Additional curated sample terrains for testing editor flows

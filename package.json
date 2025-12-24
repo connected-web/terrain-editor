@@ -15,6 +15,7 @@
     "dev:website": "npm --prefix website run dev",
     "dev:all": "node ./scripts/dev-all.mjs",
     "packmap": "cd maps/wynnal && zip -r ../wynnal-terrain.wyn legend.json locations.json theme.json metadata.json icons/ layers/ thumbnails/",
+    "unpackmap": "mkdir -p maps/wynnal && unzip -o maps/wynnal-terrain.wyn -d maps/wynnal",
     "preview:dist": "npm run build && node ./scripts/serve-dist.mjs",
     "test": "npm run test:smoke",
     "test:e2e": "playwright test",
