@@ -10,6 +10,7 @@ import type {
   ViewerLifecycleState
 } from '@connected-web/terrain-editor'
 import { clampNumber } from '../utils/locations'
+import type { LocalSettings } from '../composables/useLocalSettings'
 
 export type WorkspaceForm = {
   label: string
@@ -38,11 +39,6 @@ type ProjectSnapshot = {
 export type WorkspaceSnapshot = ProjectSnapshot
 
 export type DockPanel = 'workspace' | 'layers' | 'theme' | 'locations' | 'settings' | 'assets'
-
-type LocalSettings = {
-  cameraTracking: boolean
-  openLocationsOnSelect: boolean
-}
 
 type WorkspaceDependencies = {
   projectStore: {

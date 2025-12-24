@@ -68,6 +68,9 @@
       :mode="cursorMode"
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
+      :show-brush-ring="!flatSampleActive"
+      :anchor="flatSampleActive ? 'bottom-left' : 'center'"
+      :sample-value="flatSampleActive ? cursorSampleValue : null"
     />
   </div>
 </template>
@@ -90,6 +93,7 @@ const props = defineProps<{
   brushFlow?: number
   brushSpacing?: number
   flatLevel?: number
+  flatSampleMode?: boolean
   viewMode?: 'grayscale' | 'color'
   maskColor?: [number, number, number] | null
 }>()
@@ -101,6 +105,7 @@ const emit = defineEmits<{
   (ev: 'history-change', payload: { canUndo: boolean; canRedo: boolean; undoSteps: number; redoSteps: number }): void
   (ev: 'ready'): void
   (ev: 'view-change', payload: ViewState): void
+  (ev: 'flat-sample', value: number): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -132,6 +137,9 @@ const brushSpacing = computed(() => Math.min(2, Math.max(0.2, props.brushSpacing
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const toolMode = computed(() => props.tool ?? 'brush')
 const panModeActive = computed(() => toolMode.value === 'hand' || toolMode.value === 'pan')
+const flatSampleActive = computed(
+  () => Boolean(props.flatSampleMode && toolMode.value === 'flat' && props.valueMode === 'heightmap')
+)
 const currentStrokeMode = computed<'paint' | 'erase' | 'flat'>(() => {
   if (toolMode.value === 'erase') return 'erase'
   if (toolMode.value === 'flat' && props.valueMode === 'heightmap') return 'flat'
@@ -222,6 +230,9 @@ function redo() {
 }
 
 const activeCursorIcon = computed(() => {
+  if (flatSampleActive.value) {
+    return 'eye-dropper'
+  }
   switch (toolMode.value) {
     case 'erase':
       return 'minus'
@@ -567,6 +578,13 @@ function handlePointerDown(event: MouseEvent) {
   if (panModeActive.value || event.button !== 0) return
   markUserViewportInteraction()
   const { x, y } = canvasCoordsFromEvent(event)
+  if (flatSampleActive.value) {
+    const sampled = sampleMaskValue(x, y)
+    if (sampled !== null) {
+      emit('flat-sample', sampled)
+    }
+    return
+  }
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
@@ -618,6 +636,15 @@ function commitOverlay() {
   renderPreviewCanvas()
   clearOverlay()
   pushHistorySnapshot()
+}
+
+function sampleMaskValue(x: number, y: number) {
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!values || !width || !height) return null
+  const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
+  const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
+  return values[iy * width + ix] ?? null
 }
 const viewportRef = ref<HTMLDivElement | null>(null)
 const isPanning = ref(false)
@@ -965,6 +992,7 @@ const cursorState = ref({
   visible: false
 })
 const cursorInside = ref(false)
+const cursorSampleValue = ref<number | null>(null)
 
 function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const root = editorRootRef.value
@@ -978,6 +1006,11 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const canvas = canvasRef.value
   if (!canvas) return
   const coords = canvasCoordsFromEvent(event as MouseEvent)
+  if (flatSampleActive.value) {
+    cursorSampleValue.value = sampleMaskValue(coords.x, coords.y)
+  } else if (cursorSampleValue.value !== null) {
+    cursorSampleValue.value = null
+  }
   emit('cursor-move', {
     x: Math.round(coords.x),
     y: Math.round(coords.y)
@@ -992,6 +1025,7 @@ function handleViewportPointerEnter(event: PointerEvent) {
 function handleViewportPointerLeave(event: PointerEvent) {
   cursorInside.value = false
   cursorState.value.visible = false
+  cursorSampleValue.value = null
   handleViewportPointerUp(event)
 }
 

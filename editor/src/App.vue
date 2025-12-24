@@ -75,6 +75,8 @@
             :color-to-css="rgb"
             :pending-view-state="pendingViewStateForEditor"
             :mask-view-mode="maskViewMode"
+            :brush-settings="localSettings.brushSettings"
+            :brush-presets="localSettings.brushPresets"
             @update:filter-text="setAssetDialogFilter"
             @export-layer="layersApi.exportActiveLayerImage"
             @replace="handleLayerAssetReplace"
@@ -93,6 +95,8 @@
             @replace-layer-file="handleLayerFileReplace"
             @open-assets="openAssetsModalForLayer"
             @create-empty-mask="handleCreateEmptyMask"
+            @update-brush-settings="(next) => { localSettings.brushSettings = next }"
+            @update-brush-presets="(next) => { localSettings.brushPresets = next }"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
@@ -379,11 +383,11 @@ watch(
   }
 )
 watch(
-  () => layersApi.layerEditorOpen.value,
-  (open) => {
-    if (handle.value) {
-      handle.value.setMaxPixelRatio(open ? 1 : 1.5)
-      handle.value.setRenderPaused(open)
+  [() => handle.value, () => layersApi.layerEditorOpen.value],
+  ([viewerHandle, open]) => {
+    if (viewerHandle) {
+      viewerHandle.setMaxPixelRatio(open ? 1 : 1.5)
+      viewerHandle.setRenderPaused(open)
     }
     if (!open) {
       pendingLayerSwitchViewState.value = null
@@ -396,7 +400,8 @@ watch(
         }
       }
     }
-  }
+  },
+  { immediate: true }
 )
 const resolvedLayerViewStateForUrl = computed(() => {
   if (pendingLayerViewStateRoute.value.id && pendingLayerViewStateRoute.value.state) {

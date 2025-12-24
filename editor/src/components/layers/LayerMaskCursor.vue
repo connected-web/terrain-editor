@@ -8,7 +8,10 @@
     <span class="layer-mask-cursor__icon" :style="iconStyle">
       <Icon :icon="icon" aria-hidden="true" />
     </span>
-    <span class="layer-mask-cursor__brush" :style="brushStyle" />
+    <span v-if="showBrushRing" class="layer-mask-cursor__brush" :style="brushStyle" />
+    <span v-if="showSwatch" class="layer-mask-cursor__swatch" :style="swatchStyle">
+      <span class="layer-mask-cursor__swatch-label">{{ swatchLabel }}</span>
+    </span>
   </div>
 </template>
 
@@ -25,16 +28,23 @@ const props = withDefaults(defineProps<{
   mode?: 'paint' | 'erase' | 'pan'
   icon?: string
   opacity?: number
+  showBrushRing?: boolean
+  anchor?: 'center' | 'bottom-left'
+  sampleValue?: number | null
 }>(), {
   mode: 'paint',
   icon: 'paint-brush',
-  opacity: 1
+  opacity: 1,
+  showBrushRing: true,
+  anchor: 'center',
+  sampleValue: null
 })
 
 const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
 const style = computed(() => ({
   left: `${props.x}px`,
-  top: `${props.y}px`
+  top: `${props.y}px`,
+  transform: props.anchor === 'bottom-left' ? 'translate(0, 0)' : 'translate(-50%, -50%)'
 }))
 
 const brushStyle = computed(() => ({
@@ -46,12 +56,33 @@ const brushStyle = computed(() => ({
 
 const ICON_PADDING = 6
 const iconStyle = computed(() => {
+  if (props.anchor === 'bottom-left') {
+    return {
+      left: '0',
+      top: '0',
+      transform: 'translate(0, -100%)'
+    }
+  }
   const radius = diameter.value / 2
   const offset = radius + ICON_PADDING
   return {
     left: '50%',
     top: '50%',
     transform: `translate(-75%, -75%) translate(${offset}px, ${offset}px)`
+  }
+})
+
+const showSwatch = computed(() => props.sampleValue !== null && props.sampleValue !== undefined)
+const swatchLabel = computed(() =>
+  props.sampleValue === null || props.sampleValue === undefined
+    ? ''
+    : `${Math.round(props.sampleValue * 100)}%`
+)
+const swatchStyle = computed(() => {
+  const value = props.sampleValue ?? 0
+  const channel = Math.round(value * 255)
+  return {
+    backgroundColor: `rgb(${channel}, ${channel}, ${channel})`
   }
 })
 </script>
@@ -61,7 +92,6 @@ const iconStyle = computed(() => {
   position: absolute;
   pointer-events: none;
   color: #fff;
-  transform: translate(-50%, -50%);
   z-index: 5;
 }
 
@@ -83,5 +113,25 @@ const iconStyle = computed(() => {
 
 .layer-mask-cursor--erase .layer-mask-cursor__brush {
   border-style: dashed;
+}
+
+.layer-mask-cursor__swatch {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.85);
+  transform: translate(0.3rem, -2.4rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.75);
 }
 </style>

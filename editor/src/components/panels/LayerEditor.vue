@@ -178,6 +178,7 @@
               :brush-flow="strokeSettings.flow"
               :brush-spacing="strokeSettings.spacing"
               :flat-level="toolSettings.flat.level"
+              :flat-sample-mode="flatSampleMode"
               :onion-layers="onionLayerSources"
               @update-mask="handleUpdateMask"
               @zoom-change="handleZoomChange"
@@ -185,6 +186,7 @@
               @history-change="handleHistoryChange"
               @ready="handleMaskReady"
               @view-change="handleMaskViewChange"
+              @flat-sample="handleFlatSample"
             />
             <div v-else class="layer-editor__placeholder">
               <p>No mask image found for this layer.</p>
@@ -208,25 +210,75 @@
             </div>
             <div class="layer-editor__properties-body">
               <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
+                <label class="layer-editor__field">
+                  <div class="layer-editor__field-header">
+                    <span>Preset</span>
+                    <div class="layer-editor__preset-icons">
+                      <button
+                        type="button"
+                        class="layer-editor__icon-button"
+                        :disabled="!canSavePreset"
+                        aria-label="Save preset"
+                        @click="saveCustomPreset"
+                      >
+                        <Icon icon="bookmark" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        class="layer-editor__icon-button layer-editor__icon-button--danger"
+                        :disabled="!canDeletePreset"
+                        aria-label="Delete preset"
+                        @click="deleteActivePreset"
+                      >
+                        <Icon icon="trash" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  <select v-model="activePresetId">
+                    <option v-for="preset in presetOptions" :key="preset.id" :value="preset.id">
+                      {{ preset.label }}
+                    </option>
+                  </select>
+                </label>
                 <label class="layer-editor__slider-field">
-                  <span>Size (px)</span>
+                  <div class="layer-editor__slider-label">
+                    <span>Size (px)</span>
+                    <button
+                      type="button"
+                      class="layer-editor__pin-button"
+                      :class="{ 'layer-editor__pin-button--active': pinState.size }"
+                      @click="togglePin('size')"
+                    >
+                      <Icon icon="thumbtack">{{ pinState.size ? 'Pinned' : 'Pin' }}</Icon>
+                    </button>
+                  </div>
                   <div class="layer-editor__slider-input">
                     <input
                       type="range"
                       min="1"
                       max="256"
-                      v-model.number="strokeSettings.size"
+                      v-model.number="sizeValue"
                     >
                     <input
                       type="number"
                       min="1"
                       max="512"
-                      v-model.number="strokeSettings.size"
+                      v-model.number="sizeValue"
                     >
                   </div>
                 </label>
                 <label class="layer-editor__slider-field">
-                  <span>Opacity (%)</span>
+                  <div class="layer-editor__slider-label">
+                    <span>Opacity (%)</span>
+                    <button
+                      type="button"
+                      class="layer-editor__pin-button"
+                      :class="{ 'layer-editor__pin-button--active': pinState.opacity }"
+                      @click="togglePin('opacity')"
+                    >
+                      <Icon icon="thumbtack">{{ pinState.opacity ? 'Pinned' : 'Pin' }}</Icon>
+                    </button>
+                  </div>
                   <div class="layer-editor__slider-input">
                     <input
                       type="range"
@@ -279,10 +331,24 @@
                     >
                   </div>
                 </label>
+                <div v-if="isHeightmap && activeTool === 'flat'" class="layer-editor__flat-preview">
+                  <span class="layer-editor__flat-swatch" :style="flatSwatchStyle"></span>
+                  <span class="layer-editor__flat-label">{{ flatPercent }}%</span>
+                </div>
+                <div v-if="isHeightmap && activeTool === 'flat'" class="layer-editor__inline-actions">
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost"
+                    :class="{ 'pill-button--active': flatSampleMode }"
+                    @click="toggleFlatSampleMode"
+                  >
+                    <Icon icon="eye-dropper">Ink from canvas</Icon>
+                  </button>
+                  <p class="layer-editor__inline-hint">
+                    Click the canvas to sample a height value.
+                  </p>
+                </div>
               </div>
-              <p v-else class="layer-editor__placeholder-text">
-                Tool options coming soon.
-              </p>
               <div class="layer-editor__control-stack layer-editor__control-stack--advanced">
                 <label class="layer-editor__slider-field">
                   <span>Spacing (%)</span>
@@ -397,6 +463,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { TerrainDataset, TerrainProjectFileEntry } from '@connected-web/terrain-editor'
 import type { LayerEntry } from '../../composables/useLayersModel'
+import type { BrushPreset as StoredBrushPreset, BrushSettings } from '../../composables/useLocalSettings'
 import Icon from '../Icon.vue'
 import ConfirmDialog from '../ConfirmDialog.vue'
 import LayerMaskEditor from '../layers/LayerMaskEditor.vue'
@@ -413,6 +480,18 @@ const TOOL_PALETTE = [
   { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true }
 ] as const
 
+type BrushPreset = {
+  id: string
+  label: string
+  settings: {
+    size: number
+    opacity: number
+    softness: number
+    spacing: number
+    flow: number
+  }
+}
+
 const props = defineProps<{
   assets: TerrainProjectFileEntry[]
   getPreview?: (path: string) => string
@@ -425,6 +504,8 @@ const props = defineProps<{
   inline?: boolean
   pendingViewState?: LayerViewState | null
   maskViewMode?: 'grayscale' | 'color'
+  brushSettings?: BrushSettings | null
+  brushPresets?: StoredBrushPreset[]
 }>()
 
 const emit = defineEmits<{
@@ -448,6 +529,8 @@ const emit = defineEmits<{
   (ev: 'view-state-change', payload: { id: string; state: LayerViewState }): void
   (ev: 'consume-pending-view-state'): void
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
+  (ev: 'update-brush-settings', payload: BrushSettings): void
+  (ev: 'update-brush-presets', payload: StoredBrushPreset[]): void
 }>()
 
 const layerName = ref('')
@@ -518,11 +601,48 @@ const overlaysFullyVisible = computed(() => {
   return section.entries.every((entry) => entry.visible)
 })
 const activeTool = ref<typeof TOOL_PALETTE[number]['id']>('brush')
+const DEFAULT_PRESET_ID = 'default-48-100'
+const CUSTOM_PRESET_ID = 'custom'
+const basePresets = [
+  {
+    id: 'default-48-100',
+    label: 'Default 48px / 100%',
+    settings: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 }
+  },
+  {
+    id: 'soft-64-85',
+    label: 'Soft 64px / 85%',
+    settings: { size: 64, opacity: 0.85, softness: 0.35, spacing: 1, flow: 0.8 }
+  },
+  {
+    id: 'hard-32-100',
+    label: 'Hard 32px / 100%',
+    settings: { size: 32, opacity: 1, softness: 0.05, spacing: 0.8, flow: 1 }
+  },
+  {
+    id: 'wide-96-70',
+    label: 'Wide 96px / 70%',
+    settings: { size: 96, opacity: 0.7, softness: 0.2, spacing: 1.2, flow: 0.75 }
+  },
+  {
+    id: 'detail-20-90',
+    label: 'Detail 20px / 90%',
+    settings: { size: 20, opacity: 0.9, softness: 0.1, spacing: 0.7, flow: 1 }
+  }
+] satisfies BrushPreset[]
+const activePresetId = ref(basePresets[0]?.id ?? DEFAULT_PRESET_ID)
 const toolSettings = reactive({
   brush: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
   erase: { size: 48, opacity: 1, softness: 0.15, spacing: 1, flow: 1 },
   flat: { size: 64, opacity: 1, softness: 0.25, spacing: 1, flow: 1, level: 0.5 }
 })
+const pinState = reactive({ size: false, opacity: false })
+const pinnedValues = reactive({
+  size: toolSettings.brush.size,
+  opacity: toolSettings.brush.opacity
+})
+const lastBrushSettingsSignature = ref('')
+const customPresets = ref<StoredBrushPreset[]>([])
 
 const strokeToolTarget = computed<'brush' | 'erase' | 'flat'>(() => {
   if (activeTool.value === 'erase') return 'erase'
@@ -530,10 +650,32 @@ const strokeToolTarget = computed<'brush' | 'erase' | 'flat'>(() => {
   return 'brush'
 })
 const strokeSettings = computed(() => toolSettings[strokeToolTarget.value])
-const opacityPercent = computed({
-  get: () => Math.round(strokeSettings.value.opacity * 100),
+const sizeValue = computed({
+  get: () => (pinState.size ? pinnedValues.size : strokeSettings.value.size),
   set: (value: number) => {
-    strokeSettings.value.opacity = clamp(value / 100, 0.05, 1)
+    const next = clamp(value, 1, 512)
+    if (pinState.size) {
+      applyPinnedValue('size', next)
+    } else {
+      strokeSettings.value.size = next
+    }
+  }
+})
+const opacityValue = computed({
+  get: () => (pinState.opacity ? pinnedValues.opacity : strokeSettings.value.opacity),
+  set: (value: number) => {
+    const next = clamp(value, 0.05, 1)
+    if (pinState.opacity) {
+      applyPinnedValue('opacity', next)
+    } else {
+      strokeSettings.value.opacity = next
+    }
+  }
+})
+const opacityPercent = computed({
+  get: () => Math.round(opacityValue.value * 100),
+  set: (value: number) => {
+    opacityValue.value = clamp(value / 100, 0.05, 1)
   }
 })
 const softnessPercent = computed({
@@ -561,6 +703,7 @@ const flatPercent = computed({
     toolSettings.flat.level = clamp(value / 100, 0, 1)
   }
 })
+const flatSampleMode = ref(false)
 
 const activeMaskAsset = computed(() => {
   if (!props.activeLayer?.mask) return null
@@ -586,6 +729,14 @@ watch(isHeightmap, (isH) => {
   }
   if (!isH && pendingMaskViewOverride.value && pendingMaskViewOverride.value !== maskViewMode.value) {
     maskViewMode.value = pendingMaskViewOverride.value
+  }
+  if (!isH) {
+    flatSampleMode.value = false
+  }
+})
+watch(activeTool, (next) => {
+  if (next !== 'flat') {
+    flatSampleMode.value = false
   }
 })
 
@@ -635,6 +786,159 @@ const supportsBrushProperties = computed(() =>
 )
 const zoomLabel = computed(() => `${Math.round(currentZoom.value * 100)}%`)
 const coordLabel = computed(() => `${Math.round(cursorCoords.value.x)}, ${Math.round(cursorCoords.value.y)}`)
+const presetOptions = computed(() => {
+  const options = [...basePresets, ...customPresets.value]
+  if (activePresetId.value === CUSTOM_PRESET_ID || shouldSwitchToCustom()) {
+    options.push({
+      id: CUSTOM_PRESET_ID,
+      label: formatCustomLabel(sizeValue.value, opacityValue.value),
+      settings: {
+        size: sizeValue.value,
+        opacity: opacityValue.value,
+        softness: strokeSettings.value.softness,
+        spacing: strokeSettings.value.spacing,
+        flow: strokeSettings.value.flow
+      }
+    })
+  }
+  return options
+})
+const canSavePreset = computed(() => activePresetId.value === CUSTOM_PRESET_ID)
+const canDeletePreset = computed(() => customPresets.value.some((preset) => preset.id === activePresetId.value))
+const flatSwatchStyle = computed(() => {
+  const channel = Math.round(toolSettings.flat.level * 255)
+  return {
+    backgroundColor: `rgb(${channel}, ${channel}, ${channel})`
+  }
+})
+
+function getPresetById(id: string) {
+  return (
+    basePresets.find((preset) => preset.id === id) ??
+    customPresets.value.find((preset) => preset.id === id) ??
+    null
+  )
+}
+
+function formatCustomLabel(size: number, opacity: number) {
+  const roundedSize = Math.round(size)
+  const opacityPercent = Math.round(opacity * 100)
+  return `Custom (${roundedSize}px / ${opacityPercent}%)`
+}
+
+function shouldSwitchToCustom() {
+  if (activePresetId.value === CUSTOM_PRESET_ID) return false
+  const preset = getPresetById(activePresetId.value)
+  if (!preset) return false
+  const current = toolSettings.brush
+  return (
+    current.size !== preset.settings.size ||
+    current.opacity !== preset.settings.opacity ||
+    current.softness !== preset.settings.softness ||
+    current.spacing !== preset.settings.spacing ||
+    current.flow !== preset.settings.flow
+  )
+}
+
+function applyPinnedValue(key: 'size' | 'opacity', value: number) {
+  pinnedValues[key] = value
+  toolSettings.brush[key] = value
+  toolSettings.erase[key] = value
+  toolSettings.flat[key] = value
+}
+
+function togglePin(key: 'size' | 'opacity') {
+  pinState[key] = !pinState[key]
+  if (pinState[key]) {
+    const current = strokeSettings.value[key]
+    applyPinnedValue(key, current)
+  }
+}
+
+function applyPreset(preset: BrushPreset) {
+  toolSettings.brush = { ...toolSettings.brush, ...preset.settings }
+  toolSettings.erase = { ...toolSettings.erase, ...preset.settings }
+  toolSettings.flat = { ...toolSettings.flat, ...preset.settings }
+  activePresetId.value = preset.id
+  if (pinState.size) {
+    applyPinnedValue('size', pinnedValues.size)
+  }
+  if (pinState.opacity) {
+    applyPinnedValue('opacity', pinnedValues.opacity)
+  }
+}
+
+function getBrushSettingsSnapshot(): BrushSettings {
+  return {
+    presetId: activePresetId.value,
+    toolSettings: {
+      brush: { ...toolSettings.brush },
+      erase: { ...toolSettings.erase },
+      flat: { ...toolSettings.flat }
+    },
+    pins: { ...pinState },
+    pinnedValues: { ...pinnedValues }
+  }
+}
+
+function serializeBrushSettings(settings: BrushSettings) {
+  return JSON.stringify(settings)
+}
+
+function applyBrushSettings(settings: BrushSettings) {
+  const presetExists = Boolean(getPresetById(settings.presetId))
+  activePresetId.value = presetExists ? settings.presetId : basePresets[0]?.id ?? DEFAULT_PRESET_ID
+  toolSettings.brush = { ...toolSettings.brush, ...settings.toolSettings.brush }
+  toolSettings.erase = { ...toolSettings.erase, ...settings.toolSettings.erase }
+  toolSettings.flat = { ...toolSettings.flat, ...settings.toolSettings.flat }
+  pinState.size = settings.pins.size
+  pinState.opacity = settings.pins.opacity
+  pinnedValues.size = settings.pinnedValues.size
+  pinnedValues.opacity = settings.pinnedValues.opacity
+  if (pinState.size) {
+    applyPinnedValue('size', pinnedValues.size)
+  }
+  if (pinState.opacity) {
+    applyPinnedValue('opacity', pinnedValues.opacity)
+  }
+}
+
+function toggleFlatSampleMode() {
+  flatSampleMode.value = !flatSampleMode.value
+}
+
+function saveCustomPreset() {
+  if (activePresetId.value !== CUSTOM_PRESET_ID) return
+  const preset: StoredBrushPreset = {
+    id: `custom-${Date.now()}`,
+    label: formatCustomLabel(sizeValue.value, opacityValue.value),
+    settings: {
+      size: toolSettings.brush.size,
+      opacity: toolSettings.brush.opacity,
+      softness: toolSettings.brush.softness,
+      spacing: toolSettings.brush.spacing,
+      flow: toolSettings.brush.flow
+    }
+  }
+  const nextPresets = [...customPresets.value, preset]
+  customPresets.value = nextPresets
+  activePresetId.value = preset.id
+  emit('update-brush-presets', nextPresets)
+}
+
+function deleteActivePreset() {
+  const targetId = activePresetId.value
+  if (!customPresets.value.some((preset) => preset.id === targetId)) return
+  const nextPresets = customPresets.value.filter((preset) => preset.id !== targetId)
+  customPresets.value = nextPresets
+  activePresetId.value = basePresets[0]?.id ?? DEFAULT_PRESET_ID
+  emit('update-brush-presets', nextPresets)
+}
+
+function handleFlatSample(value: number) {
+  toolSettings.flat.level = clamp(value, 0, 1)
+  flatSampleMode.value = false
+}
 
 watch(
   () => props.activeLayer?.label,
@@ -651,6 +955,44 @@ watch(
       activeTool.value = 'brush'
     }
   }
+)
+watch(activePresetId, (next) => {
+  if (next === CUSTOM_PRESET_ID) return
+  const preset = getPresetById(next)
+  if (!preset) return
+  applyPreset(preset)
+})
+watch(
+  () => props.brushSettings,
+  (next) => {
+    if (!next) return
+    const signature = serializeBrushSettings(next)
+    if (signature === lastBrushSettingsSignature.value) return
+    applyBrushSettings(next)
+    lastBrushSettingsSignature.value = signature
+  },
+  { immediate: true }
+)
+watch(
+  () => props.brushPresets,
+  (next) => {
+    customPresets.value = next ? [...next] : []
+  },
+  { immediate: true }
+)
+watch(
+  [toolSettings, pinState, pinnedValues, activePresetId],
+  () => {
+    if (shouldSwitchToCustom()) {
+      activePresetId.value = CUSTOM_PRESET_ID
+    }
+    const snapshot = getBrushSettingsSnapshot()
+    const signature = serializeBrushSettings(snapshot)
+    if (signature === lastBrushSettingsSignature.value) return
+    lastBrushSettingsSignature.value = signature
+    emit('update-brush-settings', snapshot)
+  },
+  { deep: true }
 )
 
 watch(
@@ -1464,6 +1806,10 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.5rem;
 }
 
+.layer-editor__properties-header h3 {
+  margin: 0;
+}
+
 .layer-editor__properties-hint {
   margin: 0.2rem 0 0;
   font-size: 0.75rem;
@@ -1517,6 +1863,105 @@ function clamp(value: number, min: number, max: number) {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.8;
+}
+
+.layer-editor__flat-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.layer-editor__flat-swatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.85);
+}
+
+.layer-editor__flat-label {
+  font-weight: 600;
+}
+
+.layer-editor__slider-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.layer-editor__pin-button {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.layer-editor__pin-button--active {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.layer-editor__inline-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.layer-editor__inline-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.pill-button--active {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.layer-editor__field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.layer-editor__preset-icons {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.layer-editor__icon-button {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  color: inherit;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.layer-editor__icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.layer-editor__icon-button:not(:disabled):hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.layer-editor__icon-button--danger:not(:disabled):hover {
+  border-color: rgba(255, 90, 90, 0.7);
+  background: rgba(255, 90, 90, 0.2);
 }
 
 .layer-editor__slider-input {

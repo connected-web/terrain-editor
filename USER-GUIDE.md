@@ -30,7 +30,7 @@ Each editable layer is backed by a grayscale mask (heightmap or biome) that the 
 
 ### Layer Editor
 - Inline editor brings a full mask canvas, tool palette, brush controls, layer list, and utilities (export, reset, onion-skin pickers) into a single view.
-- Brush/erase/flatten/hand tools expose size, opacity, softness, spacing, and flow sliders—heightmap layers unlock flatten tooling while biomes respect tint colours. Each button surfaces its keyboard shortcut for quick swapping (details below).
+- Brush/erase/flatten/hand tools expose size, opacity, softness, spacing, and flow sliders—heightmap layers unlock flatten tooling while biomes respect tint colours. Brush presets set a shared baseline, and size/opacity pins keep values synced across tools. The flatten tool adds an ink sampler to pick the target height directly from the canvas. Each button surfaces its keyboard shortcut for quick swapping (details below).
 - Canvas utilities: checkerboard or solid background, **Mask view toggle (B/W or Colour)** that syncs to the URL, undo/redo history, onion-skin overlays, export with optional alpha, fit/zoom shortcuts, and persistent view state (`leo`) so deep links reopen exactly where you left off.
 
 **Height Map tooling example**
@@ -106,4 +106,3 @@ The editor supports several URL parameters to allow direct navigation to specifi
 This will open the editor with the Locations panel active, select the location with ID `capital`, and set the camera to the specified state.
 
 These parameters are useful for Playwright tests, documentation screenshots, and sharing reproducible scenes.
-

@@ -69,7 +69,9 @@
 - ✅ Layer editor viewport state persists via URL reloads & layer switches
 - ✅ Undo/redo history for mask tooling
 - ✅ Brush spacing/flow controls + advanced panel menu for mask tooling
-- 🏗️ Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
+- ✅ Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
+- 🏗️ Brush presets + pinned overrides (size/opacity) for mask tooling
+- 🏗️ Flat tool ink sampling from existing heightmap values
 - 🏗️ Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
 - 🏗️ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
 - 🏗️ Layer reorder via drag/drop (needs between-item drop + better z-indexing)
