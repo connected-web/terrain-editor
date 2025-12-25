@@ -109,13 +109,18 @@ const shapeInset = 1.5
 const shapeSize = 100 - shapeInset * 2
 const lineTop = 50 - lineThicknessView / 2
 const trianglePoints = computed(() => {
+  const maxHeight = 100 - shapeInset * 2
   const width = shapeSize
   const height = (width * Math.sqrt(3)) / 2
-  const apexY = shapeInset + (shapeSize - height) / 2
-  const baseY = apexY + height
-  const leftX = shapeInset
-  const rightX = shapeInset + shapeSize
-  const centerX = shapeInset + shapeSize / 2
+  const scale = height > maxHeight ? maxHeight / height : 1
+  const scaledWidth = width * scale
+  const scaledHeight = height * scale
+  const centerX = 50
+  const centerY = 50
+  const apexY = centerY - (2 * scaledHeight) / 3
+  const baseY = centerY + scaledHeight / 3
+  const leftX = centerX - scaledWidth / 2
+  const rightX = centerX + scaledWidth / 2
   return `${centerX},${apexY} ${leftX},${baseY} ${rightX},${baseY}`
 })
 
