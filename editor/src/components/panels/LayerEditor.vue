@@ -188,6 +188,8 @@
               :fill-level="toolSettings.fill.level"
               :fill-tolerance="toolSettings.fill.tolerance"
               :flat-sample-mode="flatSampleMode"
+              :selection="selectionState"
+              :selection-mode="selectionMode"
               :onion-layers="onionLayerSources"
               @update-mask="handleUpdateMask"
               @zoom-change="handleZoomChange"
@@ -196,6 +198,7 @@
               @ready="handleMaskReady"
               @view-change="handleMaskViewChange"
               @flat-sample="handleFlatSample"
+              @selection-change="handleSelectionChange"
             />
             <div v-else class="layer-editor__placeholder">
               <p>No mask image found for this layer.</p>
@@ -440,6 +443,35 @@
                   </p>
                 </div>
               </div>
+                  <div v-if="activeTool === 'select'" class="layer-editor__control-stack">
+                    <label class="layer-editor__field">
+                      <span>Selection mode</span>
+                      <select v-model="selectionMode">
+                        <option value="rect">Rectangle</option>
+                        <option value="fill">Fill (tolerance)</option>
+                      </select>
+                    </label>
+                    <label v-if="selectionMode === 'fill'" class="layer-editor__slider-field">
+                      <span>Tolerance (%)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
+                        <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
+                      </div>
+                    </label>
+                    <div class="layer-editor__inline-actions">
+                      <button
+                        type="button"
+                        class="pill-button pill-button--ghost"
+                        :disabled="!selectionState"
+                        @click="clearSelection"
+                      >
+                        <Icon icon="xmark">Clear selection</Icon>
+                      </button>
+                    </div>
+                    <p class="layer-editor__inline-hint">
+                      Shift adds to selection. Alt/Ctrl subtracts.
+                    </p>
+                  </div>
                   <div v-if="activeTool === 'fill'" class="layer-editor__control-stack">
                     <label class="layer-editor__slider-field">
                       <span>Tolerance (%)</span>
@@ -595,7 +627,7 @@ const TOOL_PALETTE = [
   { id: 'erase', label: 'Erase', icon: 'eraser', shortcut: 'E', description: 'Remove layer values.', onlyHeightmap: false, disabled: false },
   { id: 'flat', label: 'Flatten', icon: 'equals', shortcut: 'F', description: 'Set the heightmap to a flat value.', onlyHeightmap: true, disabled: false },
   { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: false },
-  { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: true },
+  { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: false },
   { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.', onlyHeightmap: false, disabled: false },
   { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true }
 ] as const
@@ -854,6 +886,8 @@ const perlinScale = ref(12)
 const perlinDensity = ref(0.7)
 const perlinRotation = ref(0)
 const perlinSoftness = ref(0.6)
+const selectionMode = ref<'rect' | 'fill'>('rect')
+const selectionState = ref<SelectionData | null>(null)
 const perlinDensityPercent = computed({
   get: () => Math.round(perlinDensity.value * 100),
   set: (value: number) => {
@@ -914,6 +948,23 @@ type LayerViewState = {
   centerX: number
   centerY: number
 }
+
+type SelectionRect = {
+  type: 'rect'
+  x: number
+  y: number
+  width: number
+  height: number
+  canvasWidth: number
+  canvasHeight: number
+}
+type SelectionMask = {
+  type: 'mask'
+  width: number
+  height: number
+  mask: Uint8Array
+}
+type SelectionData = SelectionRect | SelectionMask
 const viewStateCache = new Map<string, LayerViewState>()
 const layerSwitchPrompt = ref<{ targetId: string } | null>(null)
 const pendingApplySwitchId = ref<string | null>(null)
@@ -1109,6 +1160,14 @@ function applyBrushSettings(settings: BrushSettings) {
 
 function toggleFlatSampleMode() {
   flatSampleMode.value = !flatSampleMode.value
+}
+
+function handleSelectionChange(selection: SelectionData | null) {
+  selectionState.value = selection
+}
+
+function clearSelection() {
+  selectionState.value = null
 }
 
 function saveCustomPreset() {
@@ -1449,6 +1508,18 @@ function applyCanvas() {
 
 function handleMaskReady() {
   if (!maskEditorRef.value) return
+  const selection = selectionState.value
+  if (selection) {
+    const size = maskEditorRef.value.getCanvasSize()
+    if (
+      size &&
+      ((selection.type === 'rect' &&
+        (selection.canvasWidth !== size.width || selection.canvasHeight !== size.height)) ||
+        (selection.type === 'mask' && (selection.width !== size.width || selection.height !== size.height)))
+    ) {
+      selectionState.value = null
+    }
+  }
   const currentId = props.activeLayer?.id ?? null
   const pendingState = props.pendingViewState ?? null
   maskEditorRef.value.suspendViewTracking()

@@ -68,6 +68,7 @@ const props = withDefaults(defineProps<{
   sampleValue?: number | null
   showTargetDot?: boolean
   fixedIconOffset?: boolean
+  iconAnchor?: 'offset' | 'center' | 'bottom-left'
   brushShape?: 'round' | 'square' | 'triangle' | 'line'
   brushAngle?: number
 }>(), {
@@ -79,6 +80,7 @@ const props = withDefaults(defineProps<{
   sampleValue: null,
   showTargetDot: false,
   fixedIconOffset: false,
+  iconAnchor: 'offset',
   brushShape: 'round',
   brushAngle: 0
 })
@@ -127,11 +129,18 @@ const trianglePoints = computed(() => {
 const ICON_PADDING = 6
 const FIXED_ICON_OFFSET = 26
 const iconStyle = computed(() => {
-  if (props.anchor === 'bottom-left') {
+  if (props.iconAnchor === 'bottom-left' || props.anchor === 'bottom-left') {
     return {
       left: '0',
       top: '0',
       transform: 'translate(0.2rem, -0.2rem)'
+    }
+  }
+  if (props.iconAnchor === 'center') {
+    return {
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)'
     }
   }
   const radius = diameter.value / 2

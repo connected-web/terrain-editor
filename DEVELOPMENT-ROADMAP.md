@@ -86,6 +86,7 @@
 - ✅ More advanced brush modes (spray, Perlin, texture-based)
 - ✅ Brush preset manager
   - 💡 Save/load brushes with custom icons
+- 💡 Selection tool (rect + fill, persistent across layers)
 - 💡 Additional mask visualization modes
 - ✅ Advanced onion-skin controls
 - 💡 Grid snap + measurement settings for mask tools

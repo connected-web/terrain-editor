@@ -53,6 +53,12 @@
             draggable="false"
             @dragstart.prevent
           />
+          <canvas
+            ref="selectionCanvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--selection"
+            draggable="false"
+            aria-hidden="true"
+          />
         </div>
       </div>
       <div v-if="!hasValidImage" class="layer-mask-editor__placeholder">
@@ -68,7 +74,8 @@
       :mode="cursorMode"
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
-      :show-brush-ring="!flatSampleActive && toolMode !== 'fill'"
+      :show-brush-ring="!flatSampleActive && ['brush', 'erase', 'flat'].includes(toolMode)"
+      :icon-anchor="toolMode === 'select' ? 'center' : 'offset'"
       :anchor="flatSampleActive && toolMode !== 'fill' ? 'bottom-left' : 'center'"
       :sample-value="cursorSampleValue"
       :show-target-dot="toolMode === 'fill'"
@@ -89,6 +96,10 @@
     >
       <div class="layer-mask-editor__spinner"></div>
     </div>
+    <div v-if="selectionApplyBusy" class="layer-mask-editor__selection-working">
+      <div class="layer-mask-editor__spinner"></div>
+      <span>Applying selection…</span>
+    </div>
   </div>
 </template>
 
@@ -97,6 +108,22 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import LayerMaskCursor from './LayerMaskCursor.vue'
 
 type OnionLayerOverlay = { id: string; src: string | null; color: [number, number, number] }
+type SelectionRect = {
+  type: 'rect'
+  x: number
+  y: number
+  width: number
+  height: number
+  canvasWidth: number
+  canvasHeight: number
+}
+type SelectionMask = {
+  type: 'mask'
+  width: number
+  height: number
+  mask: Uint8Array
+}
+type SelectionData = SelectionRect | SelectionMask
 
 const props = defineProps<{
   src: string | null
@@ -122,6 +149,8 @@ const props = defineProps<{
   flatSampleMode?: boolean
   viewMode?: 'grayscale' | 'color'
   maskColor?: [number, number, number] | null
+  selection?: SelectionData | null
+  selectionMode?: 'rect' | 'fill'
 }>()
 
 const emit = defineEmits<{
@@ -132,12 +161,14 @@ const emit = defineEmits<{
   (ev: 'ready'): void
   (ev: 'view-change', payload: ViewState): void
   (ev: 'flat-sample', value: number): void
+  (ev: 'selection-change', selection: SelectionData | null): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
 const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
+const selectionCanvasRef = ref<HTMLCanvasElement | null>(null)
 const colorCanvasRef = ref<HTMLCanvasElement | null>(null)
 const image = ref<HTMLImageElement | null>(null)
 const maskValues = ref<Float32Array | null>(null)
@@ -169,6 +200,8 @@ const perlinScale = computed(() => Math.max(2, props.perlinScale ?? 12))
 const perlinDensity = computed(() => Math.min(1, Math.max(0, props.perlinDensity ?? 0.7)))
 const perlinRotation = computed(() => props.perlinRotation ?? 0)
 const perlinSoftness = computed(() => Math.min(1, Math.max(0, props.perlinSoftness ?? 0.6)))
+const selectionMode = computed(() => props.selectionMode ?? 'rect')
+const selectionData = computed(() => props.selection ?? null)
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const fillLevel = computed(() => Math.min(1, Math.max(0, props.fillLevel ?? flatLevel.value)))
 const fillTolerance = computed(() => Math.min(1, Math.max(0, props.fillTolerance ?? 0.1)))
@@ -275,6 +308,8 @@ const activeCursorIcon = computed(() => {
     return 'eye-dropper'
   }
   switch (toolMode.value) {
+    case 'select':
+      return 'crosshairs'
     case 'fill':
       return 'fill-drip'
     case 'erase':
@@ -442,6 +477,11 @@ function loadImage () {
       preview.height = height
       getContext('preview')?.clearRect(0, 0, width, height)
     }
+    if (selectionCanvasRef.value) {
+      selectionCanvasRef.value.width = width
+      selectionCanvasRef.value.height = height
+      selectionCanvasRef.value.getContext('2d')?.clearRect(0, 0, width, height)
+    }
   }
 
   if (!props.src) {
@@ -552,6 +592,76 @@ function renderColorPreviewCanvas() {
     imageData.data[offset + 3] = Math.round(v * 255)
   }
   ctx.putImageData(imageData, 0, 0)
+}
+
+function clearSelectionOverlay() {
+  const canvas = selectionCanvasRef.value
+  const ctx = canvas?.getContext('2d')
+  if (!canvas || !ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
+
+function renderSelectionOverlay(
+  selection: SelectionData | null,
+  draft?: SelectionRect | null,
+  draftMode?: 'replace' | 'add' | 'subtract'
+) {
+  const canvas = selectionCanvasRef.value
+  const { width, height } = canvasDimensions.value
+  const ctx = canvas?.getContext('2d')
+  if (!canvas || !ctx || !width || !height) return
+  if (canvas.width !== width) canvas.width = width
+  if (canvas.height !== height) canvas.height = height
+  ctx.clearRect(0, 0, width, height)
+  if (!selection && !draft) return
+
+  if (selection?.type === 'rect') {
+    if (selection.canvasWidth !== width || selection.canvasHeight !== height) return
+    const x = Math.max(0, Math.min(width, selection.x))
+    const y = Math.max(0, Math.min(height, selection.y))
+    const w = Math.max(1, Math.min(width - x, selection.width))
+    const h = Math.max(1, Math.min(height - y, selection.height))
+    ctx.fillStyle = 'rgba(255, 215, 80, 0.12)'
+    ctx.fillRect(x, y, w, h)
+    ctx.strokeStyle = 'rgba(255, 215, 80, 0.9)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([6, 4])
+    ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2))
+    ctx.setLineDash([])
+  } else if (selection) {
+    if (selection.width !== width || selection.height !== height) return
+    if (!selectionOverlayCache.value || selectionOverlayCache.value.width !== width || selectionOverlayCache.value.height !== height) {
+      const imageData = ctx.createImageData(width, height)
+      const data = imageData.data
+      for (let i = 0; i < selection.mask.length; i += 1) {
+        if (!selection.mask[i]) continue
+        const idx = i * 4
+        data[idx] = 255
+        data[idx + 1] = 215
+        data[idx + 2] = 80
+        data[idx + 3] = 90
+      }
+      selectionOverlayCache.value = { width, height, image: imageData }
+    }
+    ctx.putImageData(selectionOverlayCache.value.image, 0, 0)
+  }
+
+  if (!draft) return
+  const x = Math.max(0, Math.min(width, draft.x))
+  const y = Math.max(0, Math.min(height, draft.y))
+  const w = Math.max(1, Math.min(width - x, draft.width))
+  const h = Math.max(1, Math.min(height - y, draft.height))
+  const stroke =
+    draftMode === 'subtract'
+      ? 'rgba(255, 120, 120, 0.9)'
+      : draftMode === 'add'
+        ? 'rgba(120, 220, 255, 0.9)'
+        : 'rgba(255, 215, 80, 0.9)'
+  ctx.strokeStyle = stroke
+  ctx.lineWidth = 2
+  ctx.setLineDash([6, 4])
+  ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2))
+  ctx.setLineDash([])
 }
 
 function canvasCoordsFromEvent(event: MouseEvent) {
@@ -710,6 +820,93 @@ function isInsideShape(dx: number, dy: number, radius: number, angle: number) {
   return pointInTriangle(rx, ry, radius)
 }
 
+function isSelectionCompatible(selection: SelectionData | null, width: number, height: number) {
+  if (!selection) return false
+  if (selection.type === 'rect') {
+    return selection.canvasWidth === width && selection.canvasHeight === height
+  }
+  return selection.width === width && selection.height === height
+}
+
+function isSelectedIndex(index: number, width: number, height: number) {
+  const selection = selectionData.value
+  if (!selection) return true
+  if (!isSelectionCompatible(selection, width, height)) return true
+  if (selection.type === 'rect') {
+    const x = index % width
+    const y = Math.floor(index / width)
+    return (
+      x >= selection.x &&
+      y >= selection.y &&
+      x <= selection.x + selection.width &&
+      y <= selection.y + selection.height
+    )
+  }
+  return selection.mask[index] === 1
+}
+
+function isSelectedPoint(x: number, y: number, width: number, height: number) {
+  const selection = selectionData.value
+  if (!selection) return true
+  if (!isSelectionCompatible(selection, width, height)) return true
+  if (selection.type === 'rect') {
+    return (
+      x >= selection.x &&
+      y >= selection.y &&
+      x <= selection.x + selection.width &&
+      y <= selection.y + selection.height
+    )
+  }
+  const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
+  const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
+  return selection.mask[iy * width + ix] === 1
+}
+
+function selectionToMask(selection: SelectionData | null, width: number, height: number) {
+  if (!selection) return null
+  if (!isSelectionCompatible(selection, width, height)) return null
+  if (selection.type === 'mask') {
+    return new Uint8Array(selection.mask)
+  }
+  const mask = new Uint8Array(width * height)
+  const x0 = Math.max(0, Math.floor(selection.x))
+  const y0 = Math.max(0, Math.floor(selection.y))
+  const x1 = Math.min(width, Math.floor(selection.x + selection.width))
+  const y1 = Math.min(height, Math.floor(selection.y + selection.height))
+  for (let y = y0; y < y1; y += 1) {
+    const rowStart = y * width
+    for (let x = x0; x < x1; x += 1) {
+      mask[rowStart + x] = 1
+    }
+  }
+  return mask
+}
+
+function combineSelection(
+  base: SelectionData | null,
+  incoming: SelectionData | null,
+  mode: 'replace' | 'add' | 'subtract'
+) {
+  if (!incoming) return base
+  if (mode === 'replace' || !base) return incoming
+  const { width, height } = canvasDimensions.value
+  if (!width || !height) return incoming
+  const baseMask = selectionToMask(base, width, height)
+  const nextMask = selectionToMask(incoming, width, height)
+  if (!baseMask || !nextMask) return incoming
+  const combined = new Uint8Array(width * height)
+  if (mode === 'add') {
+    for (let i = 0; i < combined.length; i += 1) {
+      combined[i] = baseMask[i] || nextMask[i] ? 1 : 0
+    }
+  } else {
+    for (let i = 0; i < combined.length; i += 1) {
+      combined[i] = baseMask[i] && !nextMask[i] ? 1 : 0
+    }
+  }
+  return { type: 'mask' as const, width, height, mask: combined }
+}
+
 function drawShape(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, angle: number) {
   ctx.save()
   ctx.translate(x, y)
@@ -798,6 +995,24 @@ function handlePointerDown(event: MouseEvent) {
   if (panModeActive.value || event.button !== 0) return
   markUserViewportInteraction()
   const { x, y } = canvasCoordsFromEvent(event)
+  if (toolMode.value === 'select') {
+    const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
+    selectionDraftMode.value = modifier
+    if (selectionMode.value === 'fill') {
+      const selection = combineSelection(selectionData.value, buildFillSelection(x, y), modifier)
+      selectionDraft.value = null
+      renderSelectionOverlay(selectionData.value ?? null, null, modifier)
+      emit('selection-change', selection)
+      return
+    }
+    selectionStart.value = { x, y }
+    const draft = buildRectSelection(selectionStart.value, selectionStart.value)
+    selectionDraft.value = draft
+    requestAnimationFrame(() => {
+      renderSelectionOverlay(selectionData.value ?? null, draft, modifier)
+    })
+    return
+  }
   if (flatSampleActive.value) {
     const sampled = sampleMaskValue(x, y)
     if (sampled !== null) {
@@ -833,6 +1048,17 @@ function handlePointerDown(event: MouseEvent) {
 
 function handlePointerMove(event: MouseEvent) {
   if (panModeActive.value) return
+  if (toolMode.value === 'select' && selectionStart.value) {
+    const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
+    selectionDraftMode.value = modifier
+    const { x, y } = canvasCoordsFromEvent(event)
+    const draft = buildRectSelection(selectionStart.value, { x, y })
+    selectionDraft.value = draft
+    requestAnimationFrame(() => {
+      renderSelectionOverlay(selectionData.value ?? null, draft, modifier)
+    })
+    return
+  }
   if (!isDrawing.value) return
   const { x, y } = canvasCoordsFromEvent(event)
   drawStroke(lastX.value, lastY.value, x, y)
@@ -841,8 +1067,28 @@ function handlePointerMove(event: MouseEvent) {
 }
 
 function handlePointerUp() {
+  if (toolMode.value === 'select' && selectionStart.value) {
+    const selection = combineSelection(selectionData.value, selectionDraft.value, selectionDraftMode.value)
+    selectionStart.value = null
+    selectionDraft.value = null
+    requestAnimationFrame(() => {
+      renderSelectionOverlay(selectionData.value ?? null)
+    })
+    if (selection) {
+      emit('selection-change', selection)
+    }
+    return
+  }
   if (!isDrawing.value) return
   isDrawing.value = false
+  if (selectionData.value) {
+    selectionApplyBusy.value = true
+    requestAnimationFrame(() => {
+      commitOverlay()
+      selectionApplyBusy.value = false
+    })
+    return
+  }
   commitOverlay()
 }
 
@@ -858,6 +1104,7 @@ function commitOverlay() {
   const data = overlayData.data
   const mode = currentStrokeMode.value
   for (let i = 0; i < data.length; i += 4) {
+    if (!isSelectedIndex(i / 4, width, height)) continue
     const alpha = (data[i + 3] / 255) * opacity
     if (alpha <= 0) continue
     const idx = i / 4
@@ -939,6 +1186,10 @@ function renderFillPreview(x: number, y: number) {
   const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
   const startIndex = iy * width + ix
   const startValue = values[startIndex]
+  if (!isSelectedIndex(startIndex, width, height)) {
+    clearOverlay()
+    return
+  }
   const tolerance = fillTolerance.value
   const low = Math.min(startValue, tolerance)
   const high = Math.min(1 - startValue, tolerance)
@@ -949,6 +1200,7 @@ function renderFillPreview(x: number, y: number) {
     if (index === undefined) continue
     if (visited[index]) continue
     visited[index] = 1
+    if (!isSelectedIndex(index, width, height)) continue
     const value = values[index]
     if (value < startValue - low || value > startValue + high) continue
     const col = index % width
@@ -971,6 +1223,55 @@ function renderFillPreview(x: number, y: number) {
   ctx.putImageData(imageData, 0, 0)
 }
 
+function buildRectSelection(start: { x: number; y: number }, end: { x: number; y: number }) {
+  const { width, height } = canvasDimensions.value
+  if (!width || !height) return null
+  const x = Math.max(0, Math.min(start.x, end.x))
+  const y = Math.max(0, Math.min(start.y, end.y))
+  const w = Math.max(1, Math.min(width - x, Math.abs(end.x - start.x)))
+  const h = Math.max(1, Math.min(height - y, Math.abs(end.y - start.y)))
+  return {
+    type: 'rect' as const,
+    x,
+    y,
+    width: w,
+    height: h,
+    canvasWidth: width,
+    canvasHeight: height
+  }
+}
+
+function buildFillSelection(x: number, y: number) {
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!values || !width || !height) return null
+  const ix = Math.min(width - 1, Math.max(0, Math.floor(x)))
+  const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
+  const startIndex = iy * width + ix
+  const startValue = values[startIndex]
+  const tolerance = fillTolerance.value
+  const low = Math.min(startValue, tolerance)
+  const high = Math.min(1 - startValue, tolerance)
+  const visited = new Uint8Array(width * height)
+  const selected = new Uint8Array(width * height)
+  const stack: number[] = [startIndex]
+  while (stack.length) {
+    const index = stack.pop()
+    if (index === undefined) continue
+    if (visited[index]) continue
+    visited[index] = 1
+    const value = values[index]
+    if (value < startValue - low || value > startValue + high) continue
+    selected[index] = 1
+    const col = index % width
+    if (col > 0) stack.push(index - 1)
+    if (col < width - 1) stack.push(index + 1)
+    if (index >= width) stack.push(index - width)
+    if (index < width * (height - 1)) stack.push(index + width)
+  }
+  return { type: 'mask' as const, width, height, mask: selected }
+}
+
 function fillAtPoint(x: number, y: number) {
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
@@ -979,6 +1280,7 @@ function fillAtPoint(x: number, y: number) {
   const iy = Math.min(height - 1, Math.max(0, Math.floor(y)))
   const startIndex = iy * width + ix
   const startValue = values[startIndex]
+  if (!isSelectedIndex(startIndex, width, height)) return
   const fillValue = fillLevel.value
   const tolerance = fillTolerance.value
   const low = Math.min(startValue, tolerance)
@@ -991,6 +1293,7 @@ function fillAtPoint(x: number, y: number) {
     if (index === undefined) continue
     if (visited[index]) continue
     visited[index] = 1
+    if (!isSelectedIndex(index, width, height)) continue
     const value = values[index]
     if (value < startValue - low || value > startValue + high) continue
     values[index] = fillValue
@@ -1339,6 +1642,10 @@ function markUserViewportInteraction() {
   userViewportActivated = true
 }
 
+function getCanvasSize() {
+  return { ...canvasDimensions.value }
+}
+
 defineExpose({
   fitView,
   setZoom,
@@ -1349,6 +1656,7 @@ defineExpose({
   redo,
   getViewState,
   restoreViewState,
+  getCanvasSize,
   seedHistory,
   suspendViewTracking,
   resumeViewTracking
@@ -1358,6 +1666,28 @@ watch(
   () => [props.src, canvasRef.value] as const,
   () => loadImage(),
   { immediate: true }
+)
+
+const selectionDraft = ref<SelectionRect | null>(null)
+const selectionStart = ref<{ x: number; y: number } | null>(null)
+const selectionDraftMode = ref<'replace' | 'add' | 'subtract'>('replace')
+const selectionOverlayCache = ref<{ width: number; height: number; image: ImageData } | null>(null)
+const selectionApplyBusy = ref(false)
+
+watch(
+  [selectionData, selectionDraft, selectionDraftMode, () => canvasDimensions.value.width, () => canvasDimensions.value.height],
+  () => {
+    renderSelectionOverlay(selectionData.value ?? null, selectionDraft.value ?? null, selectionDraftMode.value)
+  },
+  { deep: true }
+)
+
+watch(
+  selectionData,
+  () => {
+    selectionOverlayCache.value = null
+  },
+  { deep: true }
 )
 
 const showCustomCursor = computed(() => hasValidImage.value && !panModeActive.value)
@@ -1447,6 +1777,11 @@ function handleViewportPointerLeave(event: PointerEvent) {
   cursorState.value.visible = false
   cursorSampleValue.value = null
   clearFillPreview()
+  if (selectionStart.value) {
+    selectionStart.value = null
+    selectionDraft.value = null
+    renderSelectionOverlay(selectionData.value)
+  }
   handleViewportPointerUp(event)
 }
 
@@ -1543,6 +1878,31 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   z-index: 7;
 }
 
+.layer-mask-editor__selection-working {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 80, 0.4);
+  background: rgba(10, 10, 12, 0.85);
+  color: #ffe7a0;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.layer-mask-editor__selection-working .layer-mask-editor__spinner {
+  width: 18px;
+  height: 18px;
+}
+
 .layer-mask-editor__spinner {
   width: 30px;
   height: 30px;
@@ -1621,6 +1981,13 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   pointer-events: none;
   z-index: 1;
   transition: opacity 0.2s ease;
+}
+
+.layer-mask-editor__canvas--selection {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .layer-mask-editor__onion {
