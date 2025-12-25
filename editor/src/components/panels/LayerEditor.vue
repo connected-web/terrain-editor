@@ -250,28 +250,36 @@
                       </select>
                     </label>
                     <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span>Perlin scale (px)</span>
+                      <span title="Noise cell size. Lower values = finer detail.">
+                        Perlin scale (px)
+                      </span>
                       <div class="layer-editor__slider-input">
                         <input type="range" min="4" max="64" v-model.number="perlinScale">
                         <input type="number" min="2" max="128" v-model.number="perlinScale">
                       </div>
                     </label>
                     <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span>Perlin rotation (°)</span>
+                      <span title="Rotate the noise pattern. Does not rotate the brush shape.">
+                        Perlin rotation (°)
+                      </span>
                       <div class="layer-editor__slider-input">
                         <input type="range" min="-180" max="180" v-model.number="perlinRotation">
                         <input type="number" min="-180" max="180" v-model.number="perlinRotation">
                       </div>
                     </label>
                     <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span>Perlin density (%)</span>
+                      <span title="Higher density keeps more of the noise field.">
+                        Perlin density (%)
+                      </span>
                       <div class="layer-editor__slider-input">
                         <input type="range" min="5" max="100" v-model.number="perlinDensityPercent">
                         <input type="number" min="0" max="100" v-model.number="perlinDensityPercent">
                       </div>
                     </label>
                     <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span>Perlin softness (%)</span>
+                      <span title="Softens the falloff toward the brush edge.">
+                        Perlin softness (%)
+                      </span>
                       <div class="layer-editor__slider-input">
                         <input type="range" min="0" max="100" v-model.number="perlinSoftnessPercent">
                         <input type="number" min="0" max="100" v-model.number="perlinSoftnessPercent">
