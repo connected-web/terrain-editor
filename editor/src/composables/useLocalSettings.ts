@@ -15,6 +15,9 @@ export type BrushPreset = {
 
 export type BrushSettings = {
   presetId: string
+  brushShape: 'round' | 'square' | 'triangle' | 'line'
+  brushTexture: 'none' | 'spray' | 'perlin'
+  brushAngle: number
   toolSettings: {
     brush: { size: number; opacity: number; softness: number; spacing: number; flow: number }
     erase: { size: number; opacity: number; softness: number; spacing: number; flow: number }

@@ -73,6 +73,13 @@
       :sample-value="cursorSampleValue"
       :show-target-dot="toolMode === 'fill'"
       :fixed-icon-offset="toolMode === 'fill' || flatSampleActive"
+      :brush-shape="brushShape"
+      :brush-angle="brushAngleDegrees"
+    />
+    <div
+      v-if="debugCursor && debugDotStyle"
+      class="layer-mask-editor__debug-dot"
+      :style="debugDotStyle"
     />
     <div
       v-if="fillPreviewPending || fillPreviewLoading"
@@ -102,6 +109,9 @@ const props = defineProps<{
   brushSoftness?: number
   brushFlow?: number
   brushSpacing?: number
+  brushShape?: 'round' | 'square' | 'triangle' | 'line'
+  brushTexture?: 'none' | 'spray' | 'perlin'
+  brushAngle?: number
   flatLevel?: number
   fillLevel?: number
   fillTolerance?: number
@@ -141,11 +151,16 @@ const hasValidImage = computed(() => {
 const isDrawing = ref(false)
 const lastX = ref(0)
 const lastY = ref(0)
+const pendingAnchor = ref<{ x: number; y: number } | null>(null)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
 const brushFlow = computed(() => Math.min(1, Math.max(0.05, props.brushFlow ?? 1)))
 const brushSpacing = computed(() => Math.min(2, Math.max(0.2, props.brushSpacing ?? 1)))
+const brushShape = computed(() => props.brushShape ?? 'round')
+const brushTexture = computed(() => props.brushTexture ?? 'none')
+const brushAngleDegrees = computed(() => props.brushAngle ?? 0)
+const brushAngle = computed(() => (brushAngleDegrees.value * Math.PI) / 180)
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const fillLevel = computed(() => Math.min(1, Math.max(0, props.fillLevel ?? flatLevel.value)))
 const fillTolerance = computed(() => Math.min(1, Math.max(0, props.fillTolerance ?? 0.1)))
@@ -553,7 +568,7 @@ function clearOverlay() {
   }
 }
 
-function stampBrush(x: number, y: number) {
+function stampBrush(x: number, y: number, angle = 0) {
   const ctx = getContext('overlay')
   const overlay = overlayCanvasRef.value
   if (!ctx || !overlay) return
@@ -561,23 +576,188 @@ function stampBrush(x: number, y: number) {
   if (radius <= 0) return
   const softness = brushSoftness.value
   const hardness = Math.max(0, 1 - softness)
-  const innerRadius = Math.max(0, radius * hardness)
+  const innerRadius = Math.max(1, radius * hardness)
   const tint =
     currentStrokeMode.value === 'erase'
       ? '255,64,64'
       : currentStrokeMode.value === 'flat'
         ? '64,200,255'
         : '255,255,255'
-  const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius)
-  gradient.addColorStop(0, `rgba(${tint},1)`)
-  gradient.addColorStop(1, `rgba(${tint},0)`)
-  ctx.fillStyle = gradient
   ctx.globalCompositeOperation = 'source-over'
+  if (brushTexture.value === 'spray') {
+    const count = Math.max(12, Math.floor(radius * radius * 0.14))
+    ctx.fillStyle = `rgba(${tint},1)`
+    for (let i = 0; i < count; i += 1) {
+      const sprayAngle = Math.random() * Math.PI * 2
+      const dist = Math.sqrt(Math.random()) * radius
+      const px = x + Math.cos(sprayAngle) * dist
+      const py = y + Math.sin(sprayAngle) * dist
+      if (!isInsideShape(px - x, py - y, radius, angle)) continue
+      ctx.globalAlpha = brushFlow.value * (0.35 + Math.random() * 0.6)
+      ctx.fillRect(px, py, 1, 1)
+    }
+    ctx.globalAlpha = 1
+    return
+  }
+  if (brushTexture.value === 'perlin') {
+    const step = Math.max(1, Math.round(radius / 8))
+    const noiseScale = Math.max(18, radius * 0.6)
+    ctx.fillStyle = `rgba(${tint},1)`
+    for (let oy = -radius; oy <= radius; oy += step) {
+      for (let ox = -radius; ox <= radius; ox += step) {
+        if (!isInsideShape(ox, oy, radius, angle)) continue
+        const noise = valueNoise((x + ox) / noiseScale, (y + oy) / noiseScale)
+        if (noise < 0.2) continue
+        const falloff = 1 - Math.min(1, Math.sqrt(ox * ox + oy * oy) / radius)
+        ctx.globalAlpha = brushFlow.value * noise * falloff
+        ctx.fillRect(x + ox, y + oy, step, step)
+      }
+    }
+    ctx.globalAlpha = 1
+    return
+  }
+  if (brushShape.value === 'round') {
+    if (hardness >= 0.99) {
+      ctx.fillStyle = `rgba(${tint},1)`
+      ctx.globalAlpha = brushFlow.value
+      ctx.beginPath()
+      ctx.arc(x, y, radius, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = 1
+      return
+    }
+    const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius)
+    gradient.addColorStop(0, `rgba(${tint},1)`)
+    gradient.addColorStop(1, `rgba(${tint},0)`)
+    ctx.fillStyle = gradient
+    ctx.globalAlpha = brushFlow.value
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+    return
+  }
+  ctx.fillStyle = `rgba(${tint},1)`
   ctx.globalAlpha = brushFlow.value
-  ctx.beginPath()
-  ctx.arc(x, y, radius, 0, Math.PI * 2)
-  ctx.fill()
+  drawShape(ctx, x, y, radius, angle)
+  ctx.globalAlpha = brushFlow.value * Math.max(0.25, softness * 0.6)
+  drawShape(ctx, x, y, radius * 1.1, angle)
   ctx.globalAlpha = 1
+}
+
+function valueNoise(x: number, y: number) {
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+  const x1 = x0 + 1
+  const y1 = y0 + 1
+  const sx = x - x0
+  const sy = y - y0
+  const n00 = hashNoise(x0, y0)
+  const n10 = hashNoise(x1, y0)
+  const n01 = hashNoise(x0, y1)
+  const n11 = hashNoise(x1, y1)
+  const ix0 = lerp(n00, n10, smoothStep(sx))
+  const ix1 = lerp(n01, n11, smoothStep(sx))
+  return lerp(ix0, ix1, smoothStep(sy))
+}
+
+function hashNoise(x: number, y: number) {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+  return s - Math.floor(s)
+}
+
+function smoothStep(t: number) {
+  return t * t * (3 - 2 * t)
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
+function isInsideShape(dx: number, dy: number, radius: number, angle: number) {
+  const rotated = rotatePoint(dx, dy, -angle)
+  const rx = rotated.x
+  const ry = rotated.y
+  if (brushShape.value === 'round') {
+    return rx * rx + ry * ry <= radius * radius
+  }
+  if (brushShape.value === 'square') {
+    return Math.max(Math.abs(rx), Math.abs(ry)) <= radius
+  }
+  if (brushShape.value === 'line') {
+    const halfThickness = radius * 0.25
+    return Math.abs(ry) <= halfThickness && Math.abs(rx) <= radius
+  }
+  return pointInTriangle(rx, ry, radius)
+}
+
+function drawShape(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, angle: number) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(angle)
+  if (brushShape.value === 'square') {
+    ctx.beginPath()
+    ctx.rect(-radius, -radius, radius * 2, radius * 2)
+    ctx.fill()
+    ctx.restore()
+    return
+  }
+  if (brushShape.value === 'line') {
+    const thickness = radius * 0.5
+    ctx.beginPath()
+    ctx.rect(-radius, -thickness / 2, radius * 2, thickness)
+    ctx.fill()
+    ctx.restore()
+    return
+  }
+  if (brushShape.value === 'triangle') {
+    const w = radius * 2
+    const h = w * Math.sqrt(3) / 2
+    const apexY = -2 * h / 3
+    const baseY = h / 3
+    ctx.beginPath()
+    ctx.moveTo(0, apexY)
+    ctx.lineTo(-w / 2, baseY)
+    ctx.lineTo(w / 2, baseY)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
+function pointInTriangle(dx: number, dy: number, radius: number) {
+  const w = radius * 2
+  const h = w * Math.sqrt(3) / 2
+  const ax = 0
+  const ay = -2 * h / 3
+  const bx = -w / 2
+  const by = h / 3
+  const cx = w / 2
+  const cy = h / 3
+  const v0x = cx - ax
+  const v0y = cy - ay
+  const v1x = bx - ax
+  const v1y = by - ay
+  const v2x = dx - ax
+  const v2y = dy - ay
+  const dot00 = v0x * v0x + v0y * v0y
+  const dot01 = v0x * v1x + v0y * v1y
+  const dot02 = v0x * v2x + v0y * v2y
+  const dot11 = v1x * v1x + v1y * v1y
+  const dot12 = v1x * v2x + v1y * v2y
+  const invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
+  const u = (dot11 * dot02 - dot01 * dot12) * invDenom
+  const v = (dot00 * dot12 - dot01 * dot02) * invDenom
+  return u >= 0 && v >= 0 && u + v <= 1
+}
+
+function rotatePoint(dx: number, dy: number, angle: number) {
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  return {
+    x: dx * cos - dy * sin,
+    y: dx * sin + dy * cos
+  }
 }
 
 function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
@@ -586,11 +766,12 @@ function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
     1,
     Math.ceil(Math.hypot(toX - fromX, toY - fromY) / spacingStep)
   )
+  const angle = brushAngle.value
   for (let i = 0; i <= steps; i += 1) {
     const t = steps === 0 ? 0 : i / steps
     const x = fromX + (toX - fromX) * t
     const y = fromY + (toY - fromY) * t
-    stampBrush(x, y)
+    stampBrush(x, y, angle)
   }
 }
 
@@ -610,11 +791,25 @@ function handlePointerDown(event: MouseEvent) {
     fillAtPoint(x, y)
     return
   }
+  if (event.shiftKey) {
+    if (pendingAnchor.value) {
+      clearOverlay()
+      drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, x, y)
+      commitOverlay()
+      pendingAnchor.value = null
+      return
+    }
+    pendingAnchor.value = { x, y }
+    clearOverlay()
+    stampBrush(x, y, brushAngle.value)
+    return
+  }
+  pendingAnchor.value = null
   isDrawing.value = true
   lastX.value = x
   lastY.value = y
   clearOverlay()
-  stampBrush(x, y)
+  stampBrush(x, y, brushAngle.value)
 }
 
 function handlePointerMove(event: MouseEvent) {
@@ -1169,19 +1364,44 @@ const fillSpinnerStyle = computed(() => ({
   left: `${cursorState.value.position.x}px`,
   top: `${cursorState.value.position.y}px`
 }))
+const debugCursor = ref(Boolean(import.meta.env.DEV))
+const debugCoords = ref<{ x: number; y: number } | null>(null)
+const debugDotStyle = computed(() => {
+  if (!debugCursor.value || !debugCoords.value) return null
+  const root = editorRootRef.value
+  const canvas = canvasRef.value
+  if (!root || !canvas) return null
+  const rootRect = root.getBoundingClientRect()
+  const canvasRect = canvas.getBoundingClientRect()
+  return {
+    left: `${canvasRect.left + (debugCoords.value.x / canvas.width) * canvasRect.width - rootRect.left}px`,
+    top: `${canvasRect.top + (debugCoords.value.y / canvas.height) * canvasRect.height - rootRect.top}px`
+  }
+})
 
 function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const root = editorRootRef.value
   if (!root) return
-  const rect = root.getBoundingClientRect()
+  const canvas = canvasRef.value
+  const rootRect = root.getBoundingClientRect()
   cursorState.value.position = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    x: event.clientX - rootRect.left,
+    y: event.clientY - rootRect.top
+  }
+  if (!canvas) {
+    cursorState.value.visible = cursorInside.value && showCustomCursor.value
+    debugCoords.value = null
+    return
+  }
+  const coords = canvasCoordsFromEvent(event as MouseEvent)
+  debugCoords.value = coords
+  if (debugDotStyle.value) {
+    cursorState.value.position = {
+      x: parseFloat(debugDotStyle.value.left),
+      y: parseFloat(debugDotStyle.value.top)
+    }
   }
   cursorState.value.visible = cursorInside.value && showCustomCursor.value
-  const canvas = canvasRef.value
-  if (!canvas) return
-  const coords = canvasCoordsFromEvent(event as MouseEvent)
   if (flatSampleActive.value || toolMode.value === 'fill') {
     cursorSampleValue.value = sampleMaskValue(coords.x, coords.y)
   } else if (cursorSampleValue.value !== null) {
@@ -1292,6 +1512,18 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   z-index: 6;
 }
 
+.layer-mask-editor__debug-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 80, 80, 0.9);
+  box-shadow: 0 0 6px rgba(255, 80, 80, 0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+}
+
 .layer-mask-editor__spinner {
   width: 30px;
   height: 30px;
@@ -1335,6 +1567,8 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 }
 
 .layer-mask-editor__canvas {
+  position: absolute;
+  inset: 0;
   image-rendering: pixelated;
   background: transparent;
   display: block;
@@ -1352,12 +1586,6 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 
 .layer-mask-editor__canvas--luminance {
   mix-blend-mode: lighten;
-}
-
-.layer-mask-editor__canvas--overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
 }
 
 .layer-mask-editor__canvas--preview {

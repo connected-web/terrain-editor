@@ -8,7 +8,41 @@
     <span class="layer-mask-cursor__icon" :style="iconStyle">
       <Icon :icon="icon" aria-hidden="true" />
     </span>
-    <span v-if="showBrushRing" class="layer-mask-cursor__brush" :style="brushStyle" />
+    <span
+      v-if="showBrushRing && brushShape === 'round'"
+      class="layer-mask-cursor__brush"
+      :style="brushStyle"
+    />
+    <svg
+      v-else-if="showBrushRing"
+      class="layer-mask-cursor__shape"
+      :style="shapeStyle"
+      viewBox="0 0 100 100"
+      aria-hidden="true"
+    >
+      <rect
+        v-if="brushShape === 'square'"
+        :x="shapeInset"
+        :y="shapeInset"
+        :width="shapeSize"
+        :height="shapeSize"
+        rx="4"
+        ry="4"
+      />
+      <polygon
+        v-else-if="brushShape === 'triangle'"
+        :points="trianglePoints"
+      />
+      <rect
+        v-else-if="brushShape === 'line'"
+        :x="shapeInset"
+        :y="lineTop"
+        :width="shapeSize"
+        :height="lineThicknessView"
+        rx="2"
+        ry="2"
+      />
+    </svg>
     <span v-if="showSwatch" class="layer-mask-cursor__swatch" :style="swatchStyle">
       <span class="layer-mask-cursor__swatch-label">{{ swatchLabel }}</span>
     </span>
@@ -34,6 +68,8 @@ const props = withDefaults(defineProps<{
   sampleValue?: number | null
   showTargetDot?: boolean
   fixedIconOffset?: boolean
+  brushShape?: 'round' | 'square' | 'triangle' | 'line'
+  brushAngle?: number
 }>(), {
   mode: 'paint',
   icon: 'paint-brush',
@@ -42,7 +78,9 @@ const props = withDefaults(defineProps<{
   anchor: 'center',
   sampleValue: null,
   showTargetDot: false,
-  fixedIconOffset: false
+  fixedIconOffset: false,
+  brushShape: 'round',
+  brushAngle: 0
 })
 
 const diameter = computed(() => Math.max(4, props.brushSize * props.zoom))
@@ -58,6 +96,28 @@ const brushStyle = computed(() => ({
   transform: `translate(-50%, -50%)`,
   opacity: Math.max(0.35, props.opacity ?? 1)
 }))
+
+const shapeStyle = computed(() => ({
+  width: `${diameter.value}px`,
+  height: `${diameter.value}px`,
+  transform: `translate(-50%, -50%) rotate(${props.brushAngle ?? 0}deg)`,
+  opacity: Math.max(0.35, props.opacity ?? 1)
+}))
+
+const lineThicknessView = 25
+const shapeInset = 1.5
+const shapeSize = 100 - shapeInset * 2
+const lineTop = 50 - lineThicknessView / 2
+const trianglePoints = computed(() => {
+  const width = shapeSize
+  const height = (width * Math.sqrt(3)) / 2
+  const apexY = shapeInset + (shapeSize - height) / 2
+  const baseY = apexY + height
+  const leftX = shapeInset
+  const rightX = shapeInset + shapeSize
+  const centerX = shapeInset + shapeSize / 2
+  return `${centerX},${apexY} ${leftX},${baseY} ${rightX},${baseY}`
+})
 
 const ICON_PADDING = 6
 const FIXED_ICON_OFFSET = 26
@@ -123,6 +183,28 @@ const swatchStyle = computed(() => {
 
 .layer-mask-cursor--erase .layer-mask-cursor__brush {
   border-style: dashed;
+}
+
+.layer-mask-cursor--erase .layer-mask-cursor__shape rect,
+.layer-mask-cursor--erase .layer-mask-cursor__shape polygon {
+  stroke-dasharray: 6 4;
+}
+
+.layer-mask-cursor__shape {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  transform-origin: 50% 50%;
+}
+
+.layer-mask-cursor__shape rect,
+.layer-mask-cursor__shape polygon {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.85));
 }
 
 .layer-mask-cursor__swatch {

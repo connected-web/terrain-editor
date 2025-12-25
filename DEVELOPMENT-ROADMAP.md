@@ -78,7 +78,8 @@
 - 💡 Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
 - 💡 Create/delete layer flows (with confirmation)
 - ✅ Fill tool (paint bucket)
-- 💡 Brush type menu (basic, spray, Perlin noise)
+- ✅ Brush type menu (basic, spray, Perlin noise)
+- 💡 Fix brush cursor vs stamp alignment at non-1x zoom
 - 💡 Save/load custom brushes (name + icon)
 - 💡 Layer import via drag/drop or file upload
 - 💡 More advanced brush modes (spray, Perlin, texture-based)

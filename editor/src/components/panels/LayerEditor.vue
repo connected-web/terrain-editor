@@ -177,6 +177,9 @@
               :brush-softness="strokeSettings.softness"
               :brush-flow="strokeSettings.flow"
               :brush-spacing="strokeSettings.spacing"
+              :brush-shape="brushShape"
+              :brush-texture="brushTexture"
+              :brush-angle="brushAngle"
               :flat-level="toolSettings.flat.level"
               :fill-level="toolSettings.fill.level"
               :fill-tolerance="toolSettings.fill.tolerance"
@@ -224,8 +227,32 @@
                   <Icon :icon="toolSettingsOpen ? 'chevron-up' : 'chevron-down'" />
                 </button>
                 <div v-if="toolSettingsOpen" class="layer-editor__section-body">
-              <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
-                <label class="layer-editor__field">
+                  <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
+                    <label class="layer-editor__field">
+                      <span>Brush shape</span>
+                      <select v-model="brushShape">
+                        <option value="round">Round</option>
+                        <option value="square">Square</option>
+                        <option value="triangle">Triangle</option>
+                        <option value="line">Line</option>
+                      </select>
+                    </label>
+                    <label class="layer-editor__field">
+                      <span>Brush texture</span>
+                      <select v-model="brushTexture">
+                        <option value="none">None</option>
+                        <option value="spray">Spray</option>
+                        <option value="perlin">Perlin</option>
+                      </select>
+                    </label>
+                    <label v-if="brushShape !== 'round'" class="layer-editor__slider-field">
+                      <span>Rotation (°)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="-180" max="180" v-model.number="brushAngle">
+                        <input type="number" min="-180" max="180" v-model.number="brushAngle">
+                      </div>
+                    </label>
+                    <label class="layer-editor__field">
                   <div class="layer-editor__field-header">
                     <span>Preset</span>
                     <div class="layer-editor__preset-icons">
@@ -780,6 +807,9 @@ const fillTolerancePercent = computed({
   }
 })
 const flatSampleMode = ref(false)
+const brushShape = ref<'round' | 'square' | 'triangle' | 'line'>('round')
+const brushTexture = ref<'none' | 'spray' | 'perlin'>('none')
+const brushAngle = ref(0)
 
 const activeMaskAsset = computed(() => {
   if (!props.activeLayer?.mask) return null
@@ -960,6 +990,9 @@ function applyPreset(preset: BrushPreset) {
 function getBrushSettingsSnapshot(): BrushSettings {
   return {
     presetId: activePresetId.value,
+    brushShape: brushShape.value,
+    brushTexture: brushTexture.value,
+    brushAngle: brushAngle.value,
     toolSettings: {
       brush: { ...toolSettings.brush },
       erase: { ...toolSettings.erase },
@@ -978,6 +1011,9 @@ function serializeBrushSettings(settings: BrushSettings) {
 function applyBrushSettings(settings: BrushSettings) {
   const presetExists = Boolean(getPresetById(settings.presetId))
   activePresetId.value = presetExists ? settings.presetId : basePresets[0]?.id ?? DEFAULT_PRESET_ID
+  brushShape.value = settings.brushShape ?? 'round'
+  brushTexture.value = settings.brushTexture ?? 'none'
+  brushAngle.value = settings.brushAngle ?? 0
   toolSettings.brush = { ...toolSettings.brush, ...settings.toolSettings.brush }
   toolSettings.erase = { ...toolSettings.erase, ...settings.toolSettings.erase }
   toolSettings.flat = { ...toolSettings.flat, ...settings.toolSettings.flat }
@@ -1091,7 +1127,7 @@ watch(
   { immediate: true }
 )
 watch(
-  [toolSettings, pinState, pinnedValues, activePresetId],
+  [toolSettings, pinState, pinnedValues, activePresetId, brushShape, brushTexture, brushAngle],
   () => {
     if (shouldSwitchToCustom()) {
       activePresetId.value = CUSTOM_PRESET_ID

@@ -382,13 +382,19 @@ watch(
     }
   }
 )
+function syncViewerPause() {
+  const viewerHandle = handle.value
+  const open = layersApi.layerEditorOpen.value
+  if (viewerHandle) {
+    viewerHandle.setMaxPixelRatio(open ? 1 : 1.5)
+    viewerHandle.setRenderPaused(open)
+  }
+}
+
 watch(
   [() => handle.value, () => layersApi.layerEditorOpen.value],
-  ([viewerHandle, open]) => {
-    if (viewerHandle) {
-      viewerHandle.setMaxPixelRatio(open ? 1 : 1.5)
-      viewerHandle.setRenderPaused(open)
-    }
+  ([, open]) => {
+    syncViewerPause()
     if (!open) {
       pendingLayerSwitchViewState.value = null
     } else {
@@ -402,6 +408,13 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => viewerLifecycleState.value,
+  () => {
+    syncViewerPause()
+  }
 )
 const resolvedLayerViewStateForUrl = computed(() => {
   if (pendingLayerViewStateRoute.value.id && pendingLayerViewStateRoute.value.state) {
