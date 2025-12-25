@@ -585,14 +585,20 @@ function stampBrush(x: number, y: number, angle = 0) {
         : '255,255,255'
   ctx.globalCompositeOperation = 'source-over'
   if (brushTexture.value === 'spray') {
+    const shapeBound =
+      brushShape.value === 'square'
+        ? radius * Math.SQRT2
+        : brushShape.value === 'triangle'
+          ? radius * 1.2
+          : radius
     const count = Math.max(12, Math.floor(radius * radius * 0.14))
     ctx.fillStyle = `rgba(${tint},1)`
     for (let i = 0; i < count; i += 1) {
-      const sprayAngle = Math.random() * Math.PI * 2
-      const dist = Math.sqrt(Math.random()) * radius
-      const px = x + Math.cos(sprayAngle) * dist
-      const py = y + Math.sin(sprayAngle) * dist
-      if (!isInsideShape(px - x, py - y, radius, angle)) continue
+      const rx = (Math.random() * 2 - 1) * shapeBound
+      const ry = (Math.random() * 2 - 1) * shapeBound
+      if (!isInsideShape(rx, ry, radius, angle)) continue
+      const px = x + rx
+      const py = y + ry
       ctx.globalAlpha = brushFlow.value * (0.35 + Math.random() * 0.6)
       ctx.fillRect(px, py, 1, 1)
     }
