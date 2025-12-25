@@ -112,6 +112,10 @@ const props = defineProps<{
   brushShape?: 'round' | 'square' | 'triangle' | 'line'
   brushTexture?: 'none' | 'spray' | 'perlin'
   brushAngle?: number
+  perlinScale?: number
+  perlinDensity?: number
+  perlinRotation?: number
+  perlinSoftness?: number
   flatLevel?: number
   fillLevel?: number
   fillTolerance?: number
@@ -161,6 +165,10 @@ const brushShape = computed(() => props.brushShape ?? 'round')
 const brushTexture = computed(() => props.brushTexture ?? 'none')
 const brushAngleDegrees = computed(() => props.brushAngle ?? 0)
 const brushAngle = computed(() => (brushAngleDegrees.value * Math.PI) / 180)
+const perlinScale = computed(() => Math.max(2, props.perlinScale ?? 12))
+const perlinDensity = computed(() => Math.min(1, Math.max(0, props.perlinDensity ?? 0.7)))
+const perlinRotation = computed(() => props.perlinRotation ?? 0)
+const perlinSoftness = computed(() => Math.min(1, Math.max(0, props.perlinSoftness ?? 0.6)))
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const fillLevel = computed(() => Math.min(1, Math.max(0, props.fillLevel ?? flatLevel.value)))
 const fillTolerance = computed(() => Math.min(1, Math.max(0, props.fillTolerance ?? 0.1)))
@@ -606,16 +614,21 @@ function stampBrush(x: number, y: number, angle = 0) {
     return
   }
   if (brushTexture.value === 'perlin') {
-    const step = Math.max(1, Math.round(radius / 8))
-    const noiseScale = Math.max(18, radius * 0.6)
+    const step = Math.max(1, Math.round(perlinScale.value / 6))
+    const noiseScale = perlinScale.value
+    const threshold = 1 - perlinDensity.value
+    const rotation = (perlinRotation.value * Math.PI) / 180
+    const noiseFalloffPower = 1 + (1 - perlinSoftness.value) * 2
     ctx.fillStyle = `rgba(${tint},1)`
     for (let oy = -radius; oy <= radius; oy += step) {
       for (let ox = -radius; ox <= radius; ox += step) {
         if (!isInsideShape(ox, oy, radius, angle)) continue
-        const noise = valueNoise((x + ox) / noiseScale, (y + oy) / noiseScale)
-        if (noise < 0.2) continue
+        const rotated = rotatePoint(ox, oy, rotation)
+        const noise = valueNoise((x + rotated.x) / noiseScale, (y + rotated.y) / noiseScale)
+        if (noise < threshold) continue
         const falloff = 1 - Math.min(1, Math.sqrt(ox * ox + oy * oy) / radius)
-        ctx.globalAlpha = brushFlow.value * noise * falloff
+        const smoothed = Math.pow(falloff, noiseFalloffPower)
+        ctx.globalAlpha = brushFlow.value * noise * smoothed
         ctx.fillRect(x + ox, y + oy, step, step)
       }
     }

@@ -180,6 +180,10 @@
               :brush-shape="brushShape"
               :brush-texture="brushTexture"
               :brush-angle="brushAngle"
+              :perlin-scale="perlinScale"
+              :perlin-density="perlinDensity"
+              :perlin-rotation="perlinRotation"
+              :perlin-softness="perlinSoftness"
               :flat-level="toolSettings.flat.level"
               :fill-level="toolSettings.fill.level"
               :fill-tolerance="toolSettings.fill.tolerance"
@@ -244,6 +248,34 @@
                         <option value="spray">Spray</option>
                         <option value="perlin">Perlin</option>
                       </select>
+                    </label>
+                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
+                      <span>Perlin scale (px)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="4" max="64" v-model.number="perlinScale">
+                        <input type="number" min="2" max="128" v-model.number="perlinScale">
+                      </div>
+                    </label>
+                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
+                      <span>Perlin rotation (°)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="-180" max="180" v-model.number="perlinRotation">
+                        <input type="number" min="-180" max="180" v-model.number="perlinRotation">
+                      </div>
+                    </label>
+                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
+                      <span>Perlin density (%)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="5" max="100" v-model.number="perlinDensityPercent">
+                        <input type="number" min="0" max="100" v-model.number="perlinDensityPercent">
+                      </div>
+                    </label>
+                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
+                      <span>Perlin softness (%)</span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="0" max="100" v-model.number="perlinSoftnessPercent">
+                        <input type="number" min="0" max="100" v-model.number="perlinSoftnessPercent">
+                      </div>
                     </label>
                     <label v-if="brushShape !== 'round'" class="layer-editor__slider-field">
                       <span>Rotation (°)</span>
@@ -810,6 +842,22 @@ const flatSampleMode = ref(false)
 const brushShape = ref<'round' | 'square' | 'triangle' | 'line'>('round')
 const brushTexture = ref<'none' | 'spray' | 'perlin'>('none')
 const brushAngle = ref(0)
+const perlinScale = ref(12)
+const perlinDensity = ref(0.7)
+const perlinRotation = ref(0)
+const perlinSoftness = ref(0.6)
+const perlinDensityPercent = computed({
+  get: () => Math.round(perlinDensity.value * 100),
+  set: (value: number) => {
+    perlinDensity.value = clamp(value / 100, 0, 1)
+  }
+})
+const perlinSoftnessPercent = computed({
+  get: () => Math.round(perlinSoftness.value * 100),
+  set: (value: number) => {
+    perlinSoftness.value = clamp(value / 100, 0, 1)
+  }
+})
 
 const activeMaskAsset = computed(() => {
   if (!props.activeLayer?.mask) return null
@@ -993,6 +1041,10 @@ function getBrushSettingsSnapshot(): BrushSettings {
     brushShape: brushShape.value,
     brushTexture: brushTexture.value,
     brushAngle: brushAngle.value,
+    perlinScale: perlinScale.value,
+    perlinDensity: perlinDensity.value,
+    perlinRotation: perlinRotation.value,
+    perlinSoftness: perlinSoftness.value,
     toolSettings: {
       brush: { ...toolSettings.brush },
       erase: { ...toolSettings.erase },
@@ -1014,6 +1066,10 @@ function applyBrushSettings(settings: BrushSettings) {
   brushShape.value = settings.brushShape ?? 'round'
   brushTexture.value = settings.brushTexture ?? 'none'
   brushAngle.value = settings.brushAngle ?? 0
+  perlinScale.value = settings.perlinScale ?? 12
+  perlinDensity.value = settings.perlinDensity ?? 0.7
+  perlinRotation.value = settings.perlinRotation ?? 0
+  perlinSoftness.value = settings.perlinSoftness ?? 0.6
   toolSettings.brush = { ...toolSettings.brush, ...settings.toolSettings.brush }
   toolSettings.erase = { ...toolSettings.erase, ...settings.toolSettings.erase }
   toolSettings.flat = { ...toolSettings.flat, ...settings.toolSettings.flat }
@@ -1127,7 +1183,19 @@ watch(
   { immediate: true }
 )
 watch(
-  [toolSettings, pinState, pinnedValues, activePresetId, brushShape, brushTexture, brushAngle],
+  [
+    toolSettings,
+    pinState,
+    pinnedValues,
+    activePresetId,
+    brushShape,
+    brushTexture,
+    brushAngle,
+    perlinScale,
+    perlinDensity,
+    perlinRotation,
+    perlinSoftness
+  ],
   () => {
     if (shouldSwitchToCustom()) {
       activePresetId.value = CUSTOM_PRESET_ID
