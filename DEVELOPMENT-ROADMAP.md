@@ -72,20 +72,22 @@
 - ✅ Layer asset uploads (heightmap, masks, overlays) with dimension validation + store integration
 - ✅ Brush presets + pinned overrides (size/opacity) for mask tooling
 - ✅ Flat tool ink sampling from existing heightmap values
-- 💡 Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
-- 💡 Preserve unsaved strokes on biome colour change (temp buffer + warnings)
-- 💡 Layer reorder via drag/drop (needs between-item drop + better z-indexing)
-- 💡 Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
-- 💡 Create/delete layer flows (with confirmation)
+- ✅ Improved heightmap editing tools (raise/lower, sculpt presets, softness curves)
+- ✅ Preserve unsaved strokes on biome colour change (temp buffer + warnings)
+- ✅ Layer reorder via drag/drop (needs between-item drop + better z-indexing)
+- ✅ Harmonize editor drop targets with `.wyn` drop overlay (z-index + hit areas)
+- ✅ Create/delete layer flows (with confirmation)
 - ✅ Fill tool (paint bucket)
 - ✅ Brush type menu (basic, spray, Perlin noise)
-- 💡 Fix brush cursor vs stamp alignment at non-1x zoom
-- 💡 Save/load custom brushes (name + icon)
-- 💡 Layer import via drag/drop or file upload
-- 💡 More advanced brush modes (spray, Perlin, texture-based)
-- 💡 Brush preset manager (save/load brushes with icons)
+- ✅ Fix brush cursor vs stamp alignment at non-1x zoom
+- ✅ Save/load custom brushes
+  - 💡 Save custom brushes with name + icon
+- ✅ Layer import via file upload
+- ✅ More advanced brush modes (spray, Perlin, texture-based)
+- ✅ Brush preset manager
+  - 💡 Save/load brushes with custom icons
 - 💡 Additional mask visualization modes
-- 💡 Advanced onion-skin controls
+- ✅ Advanced onion-skin controls
 - 💡 Grid snap + measurement settings for mask tools
 - 💡 Transform tool interactions (translate/scale/rotate selections)
 - 💡 Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background
