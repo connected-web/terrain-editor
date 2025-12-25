@@ -36,6 +36,7 @@
             v-if="activeLayer"
             type="button"
             class="pill-button"
+            title="Export layer"
             @click="handleExportClick()"
           >
             <Icon icon="file-export">Export</Icon>
@@ -44,6 +45,7 @@
             v-if="activeLayer"
             type="button"
             class="pill-button pill-button--ghost"
+            title="Open assets"
             @click="emit('open-assets', { id: activeLayer.id })"
           >
             <Icon icon="image">Assets</Icon>
@@ -60,31 +62,32 @@
               <Icon icon="ellipsis-vertical" />
             </button>
             <div v-if="showOverflowMenu" ref="overflowMenuRef" class="layer-editor__overflow-menu">
-              <button type="button" @click="fitCanvasView(); toggleOverflowMenu(false)">
+              <button type="button" title="Fit to viewport" @click="fitCanvasView(); toggleOverflowMenu(false)">
                 <Icon icon="expand" /> Fit to viewport
               </button>
-              <button type="button" @click="resetCanvas(); toggleOverflowMenu(false)">
+              <button type="button" title="Reset mask" @click="resetCanvas(); toggleOverflowMenu(false)">
                 <Icon icon="arrow-rotate-left" /> Reset mask
               </button>
-              <button type="button" @click="applyCanvas(); toggleOverflowMenu(false)">
+              <button type="button" title="Apply changes" @click="applyCanvas(); toggleOverflowMenu(false)">
                 <Icon icon="floppy-disk" /> Apply changes
               </button>
-              <button type="button" @click="setZoom(1); toggleOverflowMenu(false)">
+              <button type="button" title="Zoom 100%" @click="setZoom(1); toggleOverflowMenu(false)">
                 <Icon icon="magnifying-glass" /> Zoom 100%
               </button>
-              <button type="button" :disabled="!historyState.canUndo" @click="undoCanvas(); toggleOverflowMenu(false)">
+              <button type="button" :disabled="!historyState.canUndo" title="Undo" @click="undoCanvas(); toggleOverflowMenu(false)">
                 <Icon icon="rotate-left" /> Undo
               </button>
-              <button type="button" :disabled="!historyState.canRedo" @click="redoCanvas(); toggleOverflowMenu(false)">
+              <button type="button" :disabled="!historyState.canRedo" title="Redo" @click="redoCanvas(); toggleOverflowMenu(false)">
                 <Icon icon="rotate-right" /> Redo
               </button>
-              <button type="button" @click="handleExportClick(true); toggleOverflowMenu(false)">
+              <button type="button" title="Export with alpha" @click="handleExportClick(true); toggleOverflowMenu(false)">
                 <Icon icon="droplet" /> Export w/ alpha
               </button>
               <button
                 v-if="!isHeightmap"
                 type="button"
                 class="layer-editor__overflow-menu--danger"
+                title="Delete layer"
                 @click="requestActiveLayerDelete()"
               >
                 <Icon icon="trash" /> Delete layer
@@ -94,7 +97,13 @@
               </button>
             </div>
           </div>
-          <button type="button" class="pill-button pill-button--ghost" aria-label="Close editor" @click="handleCloseEditor">
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            aria-label="Close editor"
+            title="Close editor"
+            @click="handleCloseEditor"
+          >
             <Icon icon="xmark" />
           </button>
         </div>
@@ -111,7 +120,12 @@
                 <Icon icon="layer-group" aria-hidden="true" />
                 <span>Layers</span>
               </div>
-              <button type="button" class="pill-button pill-button--ghost layer-editor__layers-add" @click="handleLayerAdd">
+              <button
+                type="button"
+                class="pill-button pill-button--ghost layer-editor__layers-add"
+                title="Add layer"
+                @click="handleLayerAdd"
+              >
                 <Icon icon="plus" />
               </button>
             </div>
@@ -126,11 +140,21 @@
               @reorder-layer="emit('reorder-layer', $event)"
             />
             <div class="layer-editor__layers-actions">
-              <button type="button" class="pill-button pill-button--ghost" @click="toggleGroupVisibility('biome')">
+              <button
+                type="button"
+                class="pill-button pill-button--ghost"
+                title="Toggle biomes"
+                @click="toggleGroupVisibility('biome')"
+              >
                 <Icon icon="adjust" />
                 {{ biomesFullyVisible ? 'Hide biomes' : 'Show biomes' }}
               </button>
-              <button type="button" class="pill-button pill-button--ghost" @click="toggleGroupVisibility('overlay')">
+              <button
+                type="button"
+                class="pill-button pill-button--ghost"
+                title="Toggle overlays"
+                @click="toggleGroupVisibility('overlay')"
+              >
                 <Icon icon="layer-group" />
                 {{ overlaysFullyVisible ? 'Hide overlays' : 'Show overlays' }}
               </button>
@@ -147,7 +171,7 @@
                 'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
               }"
               :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
-              :title="tool.label"
+              :title="`${tool.label} (${tool.shortcut})`"
               @click="selectTool(tool.id)"
             >
               <Icon :icon="tool.icon" aria-hidden="true" />
@@ -206,6 +230,7 @@
                 v-if="props.activeLayer?.mask"
                 type="button"
                 class="pill-button pill-button--ghost"
+                title="Create empty mask"
                 @click="emit('create-empty-mask', { id: props.activeLayer.id })"
               >
                 <Icon icon="plus">Create empty mask</Icon>
@@ -228,6 +253,7 @@
                 <button
                   type="button"
                   class="layer-editor__section-toggle"
+                  title="Toggle tool settings"
                   @click="toolSettingsOpen = !toolSettingsOpen"
                 >
                   <span>Tool settings</span>
@@ -304,6 +330,7 @@
                         class="layer-editor__icon-button"
                         :disabled="!canSavePreset"
                         aria-label="Save preset"
+                        title="Save preset"
                         @click="saveCustomPreset"
                       >
                         <Icon icon="bookmark" aria-hidden="true" />
@@ -313,6 +340,7 @@
                         class="layer-editor__icon-button layer-editor__icon-button--danger"
                         :disabled="!canDeletePreset"
                         aria-label="Delete preset"
+                        title="Delete preset"
                         @click="deleteActivePreset"
                       >
                         <Icon icon="trash" aria-hidden="true" />
@@ -332,6 +360,7 @@
                       type="button"
                       class="layer-editor__pin-button"
                       :class="{ 'layer-editor__pin-button--active': pinState.size }"
+                      title="Pin size"
                       @click="togglePin('size')"
                     >
                       <Icon icon="thumbtack">{{ pinState.size ? 'Pinned' : 'Pin' }}</Icon>
@@ -359,6 +388,7 @@
                       type="button"
                       class="layer-editor__pin-button"
                       :class="{ 'layer-editor__pin-button--active': pinState.opacity }"
+                      title="Pin opacity"
                       @click="togglePin('opacity')"
                     >
                       <Icon icon="thumbtack">{{ pinState.opacity ? 'Pinned' : 'Pin' }}</Icon>
@@ -405,6 +435,7 @@
                       type="button"
                       class="layer-editor__pin-button"
                       :class="{ 'layer-editor__pin-button--active': pinState.level }"
+                      title="Pin ink level"
                       @click="togglePin('level')"
                     >
                       <Icon icon="thumbtack">{{ pinState.level ? 'Pinned' : 'Pin' }}</Icon>
@@ -434,6 +465,7 @@
                     type="button"
                     class="pill-button pill-button--ghost"
                     :class="{ 'pill-button--active': flatSampleMode }"
+                    title="Ink from canvas"
                     @click="toggleFlatSampleMode"
                   >
                     <Icon icon="eye-dropper">Ink from canvas</Icon>
@@ -462,7 +494,26 @@
                       <button
                         type="button"
                         class="pill-button pill-button--ghost"
+                        :disabled="!canUndoSelection"
+                        title="Undo selection"
+                        @click="undoSelection"
+                      >
+                        <Icon icon="rotate-left">Undo selection ({{ selectionUndoCount }})</Icon>
+                      </button>
+                      <button
+                        type="button"
+                        class="pill-button pill-button--ghost"
+                        :disabled="!canRedoSelection"
+                        title="Redo selection"
+                        @click="redoSelection"
+                      >
+                        <Icon icon="rotate-right">Redo selection ({{ selectionRedoCount }})</Icon>
+                      </button>
+                      <button
+                        type="button"
+                        class="pill-button pill-button--ghost"
                         :disabled="!selectionState"
+                        title="Clear selection"
                         @click="clearSelection"
                       >
                         <Icon icon="xmark">Clear selection</Icon>
@@ -503,6 +554,7 @@
                 <button
                   type="button"
                   class="layer-editor__section-toggle"
+                  title="Toggle layer settings"
                   @click="layerSettingsOpen = !layerSettingsOpen"
                 >
                   <span>Layer settings</span>
@@ -523,6 +575,7 @@
                       type="button"
                       class="layer-editor__segment-button"
                       :class="{ 'layer-editor__segment-button--active': maskViewMode === 'grayscale' }"
+                      title="Mask view: B/W"
                       @click="maskViewMode = 'grayscale'"
                     >
                       B/W
@@ -532,6 +585,7 @@
                       class="layer-editor__segment-button"
                       :class="{ 'layer-editor__segment-button--active': maskViewMode === 'color' }"
                       :disabled="isHeightmap"
+                      title="Mask view: Colour"
                       @click="maskViewMode = 'color'"
                     >
                       Colour
@@ -556,6 +610,7 @@
                 <button
                   type="button"
                   class="layer-editor__section-toggle"
+                  title="Toggle layer utilities"
                   @click="layerUtilitiesOpen = !layerUtilitiesOpen"
                 >
                   <span>Layer utilities</span>
@@ -563,10 +618,10 @@
                 </button>
                 <div v-if="layerUtilitiesOpen" class="layer-editor__section-body">
                   <div class="layer-editor__properties-actions">
-                    <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
+                    <button type="button" class="pill-button pill-button--ghost" title="Reset mask" @click="resetCanvas">
                       <Icon icon="arrow-rotate-left" /> Reset mask
                     </button>
-                    <button type="button" class="pill-button" @click="applyCanvas">
+                    <button type="button" class="pill-button" title="Apply changes" @click="applyCanvas">
                       <Icon icon="floppy-disk" /> Apply changes
                     </button>
                   </div>
@@ -578,26 +633,26 @@
 
         <footer class="layer-editor__status">
           <div class="layer-editor__status-left">
-            <button type="button" class="pill-button pill-button--ghost" @click="fitCanvasView">
+            <button type="button" class="pill-button pill-button--ghost" title="Fit to viewport" @click="fitCanvasView">
               Fit
             </button>
-            <button type="button" class="pill-button pill-button--ghost" @click="setZoom(1)">
+            <button type="button" class="pill-button pill-button--ghost" title="Zoom 100%" @click="setZoom(1)">
               100%
             </button>
             <span>Zoom: {{ zoomLabel }}</span>
             <span>Coords: {{ coordLabel }}</span>
           </div>
           <div class="layer-editor__status-right">
-            <button type="button" class="pill-button pill-button--ghost" @click="resetCanvas">
+            <button type="button" class="pill-button pill-button--ghost" title="Reset mask" @click="resetCanvas">
               <Icon icon="arrow-rotate-left">Reset</Icon>
             </button>
-            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canUndo" @click="undoCanvas">
+            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canUndo" title="Undo" @click="undoCanvas">
               <Icon icon="rotate-left">Undo ({{ historyState.undoSteps }})</Icon>
             </button>
-            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canRedo" @click="redoCanvas">
+            <button type="button" class="pill-button pill-button--ghost layer-editor__status-button" :disabled="!historyState.canRedo" title="Redo" @click="redoCanvas">
               <Icon icon="rotate-right">Redo ({{ historyState.redoSteps }})</Icon>
             </button>
-            <button type="button" class="pill-button" @click="applyCanvas">
+            <button type="button" class="pill-button" title="Apply changes" @click="applyCanvas">
               <Icon icon="shuffle">Apply</Icon>
             </button>
           </div>
@@ -888,6 +943,43 @@ const perlinRotation = ref(0)
 const perlinSoftness = ref(0.6)
 const selectionMode = ref<'rect' | 'fill'>('rect')
 const selectionState = ref<SelectionData | null>(null)
+const selectionHistory = ref<Array<SelectionData | null>>([])
+const selectionHistoryIndex = ref(-1)
+const selectionHistorySync = ref(false)
+selectionHistory.value = [null]
+selectionHistoryIndex.value = 0
+
+function cloneSelection(selection: SelectionData | null): SelectionData | null {
+  if (!selection) return null
+  if (selection.type === 'rect') {
+    return { ...selection }
+  }
+  return {
+    type: 'mask',
+    width: selection.width,
+    height: selection.height,
+    mask: new Uint8Array(selection.mask)
+  }
+}
+
+function pushSelectionHistory(selection: SelectionData | null) {
+  if (selectionHistorySync.value) return
+  const next = cloneSelection(selection)
+  if (selectionHistoryIndex.value < selectionHistory.value.length - 1) {
+    selectionHistory.value = selectionHistory.value.slice(0, selectionHistoryIndex.value + 1)
+  }
+  selectionHistory.value.push(next)
+  selectionHistoryIndex.value = selectionHistory.value.length - 1
+}
+
+const canUndoSelection = computed(() => selectionHistoryIndex.value > 0)
+const canRedoSelection = computed(() =>
+  selectionHistoryIndex.value >= 0 && selectionHistoryIndex.value < selectionHistory.value.length - 1
+)
+const selectionUndoCount = computed(() => Math.max(0, selectionHistoryIndex.value))
+const selectionRedoCount = computed(() =>
+  Math.max(0, selectionHistory.value.length - selectionHistoryIndex.value - 1)
+)
 const perlinDensityPercent = computed({
   get: () => Math.round(perlinDensity.value * 100),
   set: (value: number) => {
@@ -1164,10 +1256,31 @@ function toggleFlatSampleMode() {
 
 function handleSelectionChange(selection: SelectionData | null) {
   selectionState.value = selection
+  pushSelectionHistory(selection)
 }
 
 function clearSelection() {
   selectionState.value = null
+  pushSelectionHistory(null)
+}
+
+function undoSelection() {
+  if (!canUndoSelection.value) return
+  selectionHistorySync.value = true
+  selectionHistoryIndex.value = Math.max(0, selectionHistoryIndex.value - 1)
+  selectionState.value = cloneSelection(selectionHistory.value[selectionHistoryIndex.value] ?? null)
+  selectionHistorySync.value = false
+}
+
+function redoSelection() {
+  if (!canRedoSelection.value) return
+  selectionHistorySync.value = true
+  selectionHistoryIndex.value = Math.min(
+    selectionHistory.value.length - 1,
+    selectionHistoryIndex.value + 1
+  )
+  selectionState.value = cloneSelection(selectionHistory.value[selectionHistoryIndex.value] ?? null)
+  selectionHistorySync.value = false
 }
 
 function saveCustomPreset() {
