@@ -87,7 +87,6 @@
 - ✅ Brush preset manager
   - 💡 Save/load brushes with custom icons
 - ✅ Selection tool (rect + fill, persistent across layers)
-- 💡 Additional mask visualization modes
 - ✅ Advanced onion-skin controls
 - 💡 Grid snap + measurement settings for mask tools
 - 💡 Transform tool interactions (translate/scale/rotate selections)
