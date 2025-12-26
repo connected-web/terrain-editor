@@ -216,6 +216,7 @@
               :grid-mode="gridMode"
               :grid-opacity="gridOpacity"
               :grid-size="gridSize"
+              :grid-color="gridColor"
               :snap-enabled="snapEnabled"
               :snap-size="snapSize"
               :angle-snap-enabled="angleSnapEnabled"
@@ -288,6 +289,14 @@
                           <input type="range" min="4" max="256" v-model.number="gridSize">
                           <input type="number" min="1" max="512" v-model.number="gridSize">
                         </div>
+                      </label>
+                      <label class="layer-editor__field layer-editor__color-field">
+                        <span>Grid colour</span>
+                        <input
+                          type="color"
+                          v-model="gridColor"
+                          aria-label="Grid colour"
+                        >
                       </label>
                       <label class="layer-editor__field">
                         <span>Grid snap</span>
@@ -976,6 +985,7 @@ const gridEnabled = ref(true)
 const gridMode = ref<'underlay' | 'overlay'>('underlay')
 const gridOpacity = ref(0.35)
 const gridSize = ref(32)
+const gridColor = ref('#ffffff')
 const snapEnabled = ref(false)
 const snapSize = ref(16)
 const angleSnapEnabled = ref(false)

@@ -167,6 +167,7 @@ const props = defineProps<{
   gridMode?: 'underlay' | 'overlay'
   gridOpacity?: number
   gridSize?: number
+  gridColor?: string
   snapEnabled?: boolean
   snapSize?: number
   angleSnapEnabled?: boolean
@@ -227,6 +228,7 @@ const gridEnabled = computed(() => props.gridEnabled ?? false)
 const gridMode = computed(() => props.gridMode ?? 'underlay')
 const gridOpacity = computed(() => Math.min(1, Math.max(0, props.gridOpacity ?? 0.35)))
 const gridSize = computed(() => Math.max(1, props.gridSize ?? 32))
+const gridColor = computed(() => props.gridColor ?? '#ffffff')
 const snapEnabled = computed(() => props.snapEnabled ?? false)
 const snapSize = computed(() => Math.max(1, props.snapSize ?? 16))
 const angleSnapEnabled = computed(() => props.angleSnapEnabled ?? false)
@@ -616,7 +618,7 @@ function renderGridOverlay() {
   ctx.clearRect(0, 0, width, height)
   if (!gridEnabled.value) return
   const step = Math.max(1, Math.round(gridSize.value))
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+  ctx.strokeStyle = gridColor.value
   ctx.lineWidth = 1
   ctx.beginPath()
   for (let x = 0; x <= width; x += step) {
@@ -1836,7 +1838,7 @@ watch(
 )
 
 watch(
-  [gridEnabled, gridSize, gridMode, gridOpacity, () => canvasDimensions.value.width, () => canvasDimensions.value.height],
+  [gridEnabled, gridSize, gridMode, gridOpacity, gridColor, () => canvasDimensions.value.width, () => canvasDimensions.value.height],
   () => {
     renderGridOverlay()
   }
