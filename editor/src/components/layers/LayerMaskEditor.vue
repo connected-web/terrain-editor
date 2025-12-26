@@ -34,6 +34,13 @@
             draggable="false"
           />
           <canvas
+            ref="gridCanvasRef"
+            class="layer-mask-editor__canvas layer-mask-editor__canvas--grid"
+            :style="gridCanvasStyle"
+            draggable="false"
+            aria-hidden="true"
+          />
+          <canvas
             ref="colorCanvasRef"
             class="layer-mask-editor__canvas layer-mask-editor__canvas--color"
             :style="colorCanvasStyle"
@@ -100,6 +107,11 @@
       <div class="layer-mask-editor__spinner"></div>
       <span>Applying selection…</span>
     </div>
+    <div
+      v-if="snapDotStyle && snapEnabled"
+      class="layer-mask-editor__snap-dot"
+      :style="snapDotStyle"
+    ></div>
   </div>
 </template>
 
@@ -151,6 +163,13 @@ const props = defineProps<{
   maskColor?: [number, number, number] | null
   selection?: SelectionData | null
   selectionMode?: 'rect' | 'fill'
+  gridEnabled?: boolean
+  gridMode?: 'underlay' | 'overlay'
+  gridOpacity?: number
+  gridSize?: number
+  snapEnabled?: boolean
+  snapSize?: number
+  angleSnapEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -167,6 +186,7 @@ const emit = defineEmits<{
 const editorRootRef = ref<HTMLDivElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
+const gridCanvasRef = ref<HTMLCanvasElement | null>(null)
 const overlayCanvasRef = ref<HTMLCanvasElement | null>(null)
 const selectionCanvasRef = ref<HTMLCanvasElement | null>(null)
 const colorCanvasRef = ref<HTMLCanvasElement | null>(null)
@@ -202,6 +222,14 @@ const perlinRotation = computed(() => props.perlinRotation ?? 0)
 const perlinSoftness = computed(() => Math.min(1, Math.max(0, props.perlinSoftness ?? 0.6)))
 const selectionMode = computed(() => props.selectionMode ?? 'rect')
 const selectionData = computed(() => props.selection ?? null)
+const gridEnabled = computed(() => props.gridEnabled ?? false)
+const gridMode = computed(() => props.gridMode ?? 'underlay')
+const gridOpacity = computed(() => Math.min(1, Math.max(0, props.gridOpacity ?? 0.35)))
+const gridSize = computed(() => Math.max(1, props.gridSize ?? 32))
+const snapEnabled = computed(() => props.snapEnabled ?? false)
+const snapSize = computed(() => Math.max(1, props.snapSize ?? 16))
+const angleSnapEnabled = computed(() => props.angleSnapEnabled ?? false)
+const snapGuide = ref<{ start: { x: number; y: number }; end: { x: number; y: number }; angle: number } | null>(null)
 const flatLevel = computed(() => Math.min(1, Math.max(0, props.flatLevel ?? 0.5)))
 const fillLevel = computed(() => Math.min(1, Math.max(0, props.fillLevel ?? flatLevel.value)))
 const fillTolerance = computed(() => Math.min(1, Math.max(0, props.fillTolerance ?? 0.1)))
@@ -221,6 +249,7 @@ const currentStrokeMode = computed<'paint' | 'erase' | 'flat'>(() => {
 })
 const cursorMode = computed<'paint' | 'erase' | 'pan'>(() => {
   if (panModeActive.value) return 'pan'
+  if (toolMode.value === 'grid') return 'paint'
   return currentStrokeMode.value === 'erase' ? 'erase' : 'paint'
 })
 const viewMode = computed(() => props.viewMode ?? 'grayscale')
@@ -308,6 +337,8 @@ const activeCursorIcon = computed(() => {
     return 'eye-dropper'
   }
   switch (toolMode.value) {
+    case 'grid':
+      return 'border-all'
     case 'select':
       return 'crosshairs'
     case 'fill':
@@ -359,6 +390,10 @@ const canvasSurfaceStyle = computed(() => ({
 }))
 const overlayCanvasStyle = computed(() => ({
   opacity: Math.min(1, Math.max(0.01, brushOpacity.value))
+}))
+const gridCanvasStyle = computed(() => ({
+  opacity: gridEnabled.value ? String(gridOpacity.value) : '0',
+  zIndex: gridMode.value === 'overlay' ? 1 : 0
 }))
 
 function clamp01(value: number) {
@@ -477,6 +512,11 @@ function loadImage () {
       preview.height = height
       getContext('preview')?.clearRect(0, 0, width, height)
     }
+    if (gridCanvasRef.value) {
+      gridCanvasRef.value.width = width
+      gridCanvasRef.value.height = height
+      gridCanvasRef.value.getContext('2d')?.clearRect(0, 0, width, height)
+    }
     if (selectionCanvasRef.value) {
       selectionCanvasRef.value.width = width
       selectionCanvasRef.value.height = height
@@ -490,6 +530,7 @@ function loadImage () {
     image.value = null
     canvasDimensions.value = { width: 0, height: 0 }
     seedHistory()
+    renderGridOverlay()
     emit('ready')
     return
   }
@@ -514,6 +555,7 @@ function loadImage () {
     image.value = img
     renderMaskCanvas()
     renderPreviewCanvas()
+    renderGridOverlay()
     seedHistory()
     emit('ready')
   }
@@ -560,6 +602,31 @@ function renderPreviewCanvas() {
     imageData.data[offset + 3] = v
   }
   ctx.putImageData(imageData, 0, 0)
+}
+
+function renderGridOverlay() {
+  const canvas = gridCanvasRef.value
+  const { width, height } = canvasDimensions.value
+  if (!canvas || !width || !height) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  if (canvas.width !== width) canvas.width = width
+  if (canvas.height !== height) canvas.height = height
+  ctx.clearRect(0, 0, width, height)
+  if (!gridEnabled.value) return
+  const step = Math.max(1, Math.round(gridSize.value))
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let x = 0; x <= width; x += step) {
+    ctx.moveTo(x + 0.5, 0)
+    ctx.lineTo(x + 0.5, height)
+  }
+  for (let y = 0; y <= height; y += step) {
+    ctx.moveTo(0, y + 0.5)
+    ctx.lineTo(width, y + 0.5)
+  }
+  ctx.stroke()
 }
 
 function renderColorPreviewCanvas() {
@@ -646,7 +713,25 @@ function renderSelectionOverlay(
     ctx.putImageData(selectionOverlayCache.value.image, 0, 0)
   }
 
-  if (!draft) return
+  if (snapGuide.value && angleSnapEnabled.value) {
+    const { start, end, angle } = snapGuide.value
+    ctx.strokeStyle = 'rgba(120, 220, 255, 0.7)'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([4, 6])
+    ctx.beginPath()
+    ctx.moveTo(start.x + 0.5, start.y + 0.5)
+    ctx.lineTo(end.x + 0.5, end.y + 0.5)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(120, 220, 255, 0.9)'
+    ctx.font = '12px "Space Grotesk", sans-serif'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText(`${Math.round(angle)}°`, end.x + 6, end.y - 6)
+  }
+
+  if (!draft) {
+    return
+  }
   const x = Math.max(0, Math.min(width, draft.x))
   const y = Math.max(0, Math.min(height, draft.y))
   const w = Math.max(1, Math.min(width - x, draft.width))
@@ -675,6 +760,30 @@ function canvasCoordsFromEvent(event: MouseEvent) {
   return {
     x: (event.clientX - rect.left) * scaleX,
     y: (event.clientY - rect.top) * scaleY
+  }
+}
+
+function snapPoint(point: { x: number; y: number }) {
+  if (!snapEnabled.value) return point
+  const step = Math.max(1, snapSize.value)
+  return {
+    x: Math.round(point.x / step) * step,
+    y: Math.round(point.y / step) * step
+  }
+}
+
+function snapAngle(start: { x: number; y: number }, end: { x: number; y: number }) {
+  if (!angleSnapEnabled.value) return end
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const dist = Math.hypot(dx, dy)
+  if (dist === 0) return end
+  const angle = Math.atan2(dy, dx)
+  const step = Math.PI / 12
+  const snapped = Math.round(angle / step) * step
+  return {
+    x: start.x + Math.cos(snapped) * dist,
+    y: start.y + Math.sin(snapped) * dist
   }
 }
 
@@ -994,18 +1103,19 @@ function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
 function handlePointerDown(event: MouseEvent) {
   if (panModeActive.value || event.button !== 0) return
   markUserViewportInteraction()
-  const { x, y } = canvasCoordsFromEvent(event)
+  if (toolMode.value === 'grid') return
+  const snapped = snapPoint(canvasCoordsFromEvent(event))
   if (toolMode.value === 'select') {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
     selectionDraftMode.value = modifier
     if (selectionMode.value === 'fill') {
-      const selection = combineSelection(selectionData.value, buildFillSelection(x, y), modifier)
+      const selection = combineSelection(selectionData.value, buildFillSelection(snapped.x, snapped.y), modifier)
       selectionDraft.value = null
       renderSelectionOverlay(selectionData.value ?? null, null, modifier)
       emit('selection-change', selection)
       return
     }
-    selectionStart.value = { x, y }
+    selectionStart.value = snapped
     const draft = buildRectSelection(selectionStart.value, selectionStart.value)
     selectionDraft.value = draft
     requestAnimationFrame(() => {
@@ -1014,7 +1124,7 @@ function handlePointerDown(event: MouseEvent) {
     return
   }
   if (flatSampleActive.value) {
-    const sampled = sampleMaskValue(x, y)
+    const sampled = sampleMaskValue(snapped.x, snapped.y)
     if (sampled !== null) {
       emit('flat-sample', sampled)
     }
@@ -1022,28 +1132,28 @@ function handlePointerDown(event: MouseEvent) {
   }
   if (toolMode.value === 'fill') {
     clearFillPreview()
-    fillAtPoint(x, y)
+    fillAtPoint(snapped.x, snapped.y)
     return
   }
   if (event.shiftKey) {
     if (pendingAnchor.value) {
       clearOverlay()
-      drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, x, y)
+      drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, snapped.x, snapped.y)
       commitOverlay()
       pendingAnchor.value = null
       return
     }
-    pendingAnchor.value = { x, y }
+    pendingAnchor.value = snapped
     clearOverlay()
-    stampBrush(x, y, brushAngle.value)
+    stampBrush(snapped.x, snapped.y, brushAngle.value)
     return
   }
   pendingAnchor.value = null
   isDrawing.value = true
-  lastX.value = x
-  lastY.value = y
+  lastX.value = snapped.x
+  lastY.value = snapped.y
   clearOverlay()
-  stampBrush(x, y, brushAngle.value)
+  stampBrush(snapped.x, snapped.y, brushAngle.value)
 }
 
 function handlePointerMove(event: MouseEvent) {
@@ -1051,8 +1161,17 @@ function handlePointerMove(event: MouseEvent) {
   if (toolMode.value === 'select' && selectionStart.value) {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
     selectionDraftMode.value = modifier
-    const { x, y } = canvasCoordsFromEvent(event)
-    const draft = buildRectSelection(selectionStart.value, { x, y })
+    const snapped = snapPoint(canvasCoordsFromEvent(event))
+    const angled = snapAngle(selectionStart.value, snapped)
+    if (angleSnapEnabled.value) {
+      const dx = angled.x - selectionStart.value.x
+      const dy = angled.y - selectionStart.value.y
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+      snapGuide.value = { start: selectionStart.value, end: angled, angle }
+    } else {
+      snapGuide.value = null
+    }
+    const draft = buildRectSelection(selectionStart.value, angled)
     selectionDraft.value = draft
     requestAnimationFrame(() => {
       renderSelectionOverlay(selectionData.value ?? null, draft, modifier)
@@ -1060,10 +1179,10 @@ function handlePointerMove(event: MouseEvent) {
     return
   }
   if (!isDrawing.value) return
-  const { x, y } = canvasCoordsFromEvent(event)
-  drawStroke(lastX.value, lastY.value, x, y)
-  lastX.value = x
-  lastY.value = y
+  const snapped = snapPoint(canvasCoordsFromEvent(event))
+  drawStroke(lastX.value, lastY.value, snapped.x, snapped.y)
+  lastX.value = snapped.x
+  lastY.value = snapped.y
 }
 
 function handlePointerUp() {
@@ -1071,6 +1190,7 @@ function handlePointerUp() {
     const selection = combineSelection(selectionData.value, selectionDraft.value, selectionDraftMode.value)
     selectionStart.value = null
     selectionDraft.value = null
+    snapGuide.value = null
     requestAnimationFrame(() => {
       renderSelectionOverlay(selectionData.value ?? null)
     })
@@ -1668,6 +1788,13 @@ watch(
   { immediate: true }
 )
 
+watch(
+  [gridEnabled, gridSize, gridMode, gridOpacity, () => canvasDimensions.value.width, () => canvasDimensions.value.height],
+  () => {
+    renderGridOverlay()
+  }
+)
+
 const selectionDraft = ref<SelectionRect | null>(null)
 const selectionStart = ref<{ x: number; y: number } | null>(null)
 const selectionDraftMode = ref<'replace' | 'add' | 'subtract'>('replace')
@@ -1727,6 +1854,19 @@ const debugDotStyle = computed(() => {
     top: `${canvasRect.top + (debugCoords.value.y / canvas.height) * canvasRect.height - rootRect.top}px`
   }
 })
+const snapCoords = ref<{ x: number; y: number } | null>(null)
+const snapDotStyle = computed(() => {
+  if (!snapCoords.value) return null
+  const root = editorRootRef.value
+  const canvas = canvasRef.value
+  if (!root || !canvas) return null
+  const rootRect = root.getBoundingClientRect()
+  const canvasRect = canvas.getBoundingClientRect()
+  return {
+    left: `${canvasRect.left + (snapCoords.value.x / canvas.width) * canvasRect.width - rootRect.left}px`,
+    top: `${canvasRect.top + (snapCoords.value.y / canvas.height) * canvasRect.height - rootRect.top}px`
+  }
+})
 
 function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const root = editorRootRef.value
@@ -1740,10 +1880,17 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   if (!canvas) {
     cursorState.value.visible = cursorInside.value && showCustomCursor.value
     debugCoords.value = null
+    snapCoords.value = null
     return
   }
   const coords = canvasCoordsFromEvent(event as MouseEvent)
+  const snapped = snapPoint(coords)
   debugCoords.value = coords
+  if (snapEnabled.value && (Math.abs(coords.x - snapped.x) > 0.5 || Math.abs(coords.y - snapped.y) > 0.5)) {
+    snapCoords.value = snapped
+  } else {
+    snapCoords.value = null
+  }
   if (debugDotStyle.value) {
     cursorState.value.position = {
       x: parseFloat(debugDotStyle.value.left),
@@ -1752,18 +1899,18 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   }
   cursorState.value.visible = cursorInside.value && showCustomCursor.value
   if (flatSampleActive.value || toolMode.value === 'fill') {
-    cursorSampleValue.value = sampleMaskValue(coords.x, coords.y)
+    cursorSampleValue.value = sampleMaskValue(snapped.x, snapped.y)
   } else if (cursorSampleValue.value !== null) {
     cursorSampleValue.value = null
   }
   if (toolMode.value === 'fill') {
-    scheduleFillPreview(coords.x, coords.y)
+    scheduleFillPreview(snapped.x, snapped.y)
   } else {
     clearFillPreview()
   }
   emit('cursor-move', {
-    x: Math.round(coords.x),
-    y: Math.round(coords.y)
+    x: Math.round(snapped.x),
+    y: Math.round(snapped.y)
   })
 }
 
@@ -1776,6 +1923,7 @@ function handleViewportPointerLeave(event: PointerEvent) {
   cursorInside.value = false
   cursorState.value.visible = false
   cursorSampleValue.value = null
+  snapGuide.value = null
   clearFillPreview()
   if (selectionStart.value) {
     selectionStart.value = null
@@ -1903,6 +2051,18 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   height: 18px;
 }
 
+.layer-mask-editor__snap-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(130, 200, 255, 0.95);
+  box-shadow: 0 0 6px rgba(60, 120, 200, 0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+}
+
 .layer-mask-editor__spinner {
   width: 30px;
   height: 30px;
@@ -1973,6 +2133,12 @@ function getOnionStyle(layer: OnionLayerOverlay) {
   pointer-events: none;
   z-index: 1;
   mix-blend-mode: normal;
+}
+
+.layer-mask-editor__canvas--grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .layer-mask-editor__canvas--color {

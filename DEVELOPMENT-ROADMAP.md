@@ -89,6 +89,9 @@
 - ✅ Selection tool (rect + fill, persistent across layers)
 - ✅ Advanced onion-skin controls
 - 💡 Grid snap + measurement settings for mask tools
+- 💡 Line tool for masks
+- 💡 Rectangle tool for masks
+- 💡 Geometry layer + snapping (circles/lines/paths as paint guides)
 - 💡 Transform tool interactions (translate/scale/rotate selections)
 - 💡 Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background
 

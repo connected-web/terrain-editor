@@ -212,6 +212,13 @@
               :fill-level="toolSettings.fill.level"
               :fill-tolerance="toolSettings.fill.tolerance"
               :flat-sample-mode="flatSampleMode"
+              :grid-enabled="gridEnabled"
+              :grid-mode="gridMode"
+              :grid-opacity="gridOpacity"
+              :grid-size="gridSize"
+              :snap-enabled="snapEnabled"
+              :snap-size="snapSize"
+              :angle-snap-enabled="angleSnapEnabled"
               :selection="selectionState"
               :selection-mode="selectionMode"
               :onion-layers="onionLayerSources"
@@ -239,15 +246,6 @@
           </div>
 
           <aside class="layer-editor__properties">
-            <div class="layer-editor__properties-header">
-              <div>
-                <h3 class="layer-editor__tool-heading">
-                  <Icon :icon="currentTool.icon" />
-                  <span>{{ currentTool.label }} ({{ currentTool.shortcut }})</span>
-                </h3>
-                <p class="layer-editor__properties-hint">{{ currentTool.description }}</p>
-              </div>
-            </div>
             <div class="layer-editor__properties-body">
               <div class="layer-editor__section">
                 <button
@@ -256,265 +254,281 @@
                   title="Toggle tool settings"
                   @click="toolSettingsOpen = !toolSettingsOpen"
                 >
-                  <span>Tool settings</span>
+                  <span class="layer-editor__section-title">{{ currentTool.label }} ({{ currentTool.shortcut }})</span>
+                  <Icon icon="circle-info" :title="currentTool.description" />
                   <Icon :icon="toolSettingsOpen ? 'chevron-up' : 'chevron-down'" />
                 </button>
                 <div v-if="toolSettingsOpen" class="layer-editor__section-body">
-                  <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
-                    <label class="layer-editor__field">
-                      <span>Brush shape</span>
-                      <select v-model="brushShape">
-                        <option value="round">Round</option>
-                        <option value="square">Square</option>
-                        <option value="triangle">Triangle</option>
-                        <option value="line">Line</option>
-                      </select>
-                    </label>
-                    <label class="layer-editor__field">
-                      <span>Brush texture</span>
-                      <select v-model="brushTexture">
-                        <option value="none">None</option>
-                        <option value="spray">Spray</option>
-                        <option value="perlin">Perlin</option>
-                      </select>
-                    </label>
-                    <label v-if="brushShape !== 'round'" class="layer-editor__slider-field">
-                      <span>Rotation (°)</span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="-180" max="180" v-model.number="brushAngle">
-                        <input type="number" min="-180" max="180" v-model.number="brushAngle">
-                      </div>
-                    </label>
-                    <label class="layer-editor__field">
-                  <div class="layer-editor__field-header">
-                    <span>Preset</span>
-                    <div class="layer-editor__preset-icons">
-                      <button
-                        type="button"
-                        class="layer-editor__icon-button"
-                        :disabled="!canSavePreset"
-                        aria-label="Save preset"
-                        title="Save preset"
-                        @click="saveCustomPreset"
-                      >
-                        <Icon icon="bookmark" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        class="layer-editor__icon-button layer-editor__icon-button--danger"
-                        :disabled="!canDeletePreset"
-                        aria-label="Delete preset"
-                        title="Delete preset"
-                        @click="deleteActivePreset"
-                      >
-                        <Icon icon="trash" aria-hidden="true" />
-                      </button>
+                  <template v-if="activeTool === 'grid'">
+                    <div class="layer-editor__control-stack">
+                      <label class="layer-editor__field">
+                        <span>Grid</span>
+                        <select v-model="gridEnabled">
+                          <option :value="true">On</option>
+                          <option :value="false">Off</option>
+                        </select>
+                      </label>
+                      <label class="layer-editor__field">
+                        <span>Layer</span>
+                        <select v-model="gridMode">
+                          <option value="underlay">Underlay</option>
+                          <option value="overlay">Overlay</option>
+                        </select>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <span>Opacity (%)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="5" max="100" v-model.number="gridOpacityPercent">
+                          <input type="number" min="5" max="100" v-model.number="gridOpacityPercent">
+                        </div>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <span>Grid size (px)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="4" max="256" v-model.number="gridSize">
+                          <input type="number" min="1" max="512" v-model.number="gridSize">
+                        </div>
+                      </label>
+                      <label class="layer-editor__field">
+                        <span>Snapping</span>
+                        <select v-model="snapEnabled">
+                          <option :value="true">On</option>
+                          <option :value="false">Off</option>
+                        </select>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <span>Snap size (px)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="2" max="128" v-model.number="snapSize">
+                          <input type="number" min="1" max="256" v-model.number="snapSize">
+                        </div>
+                      </label>
+                      <label class="layer-editor__field">
+                        <span>Angle snap</span>
+                        <select v-model="angleSnapEnabled">
+                          <option :value="true">On</option>
+                          <option :value="false">Off</option>
+                        </select>
+                      </label>
                     </div>
-                  </div>
-                  <select v-model="activePresetId">
-                    <option v-for="preset in presetOptions" :key="preset.id" :value="preset.id">
-                      {{ preset.label }}
-                    </option>
-                  </select>
-                </label>
-                <label class="layer-editor__slider-field">
-                  <div class="layer-editor__slider-label">
-                    <span>Size (px)</span>
-                    <button
-                      type="button"
-                      class="layer-editor__pin-button"
-                      :class="{ 'layer-editor__pin-button--active': pinState.size }"
-                      title="Pin size"
-                      @click="togglePin('size')"
-                    >
-                      <Icon icon="thumbtack">{{ pinState.size ? 'Pinned' : 'Pin' }}</Icon>
-                    </button>
-                  </div>
-                  <div class="layer-editor__slider-input">
-                    <input
-                      type="range"
-                      min="1"
-                      max="256"
-                      v-model.number="sizeValue"
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      max="512"
-                      v-model.number="sizeValue"
-                    >
-                  </div>
-                </label>
-                <label class="layer-editor__slider-field">
-                  <div class="layer-editor__slider-label">
-                    <span>Opacity (%)</span>
-                    <button
-                      type="button"
-                      class="layer-editor__pin-button"
-                      :class="{ 'layer-editor__pin-button--active': pinState.opacity }"
-                      title="Pin opacity"
-                      @click="togglePin('opacity')"
-                    >
-                      <Icon icon="thumbtack">{{ pinState.opacity ? 'Pinned' : 'Pin' }}</Icon>
-                    </button>
-                  </div>
-                  <div class="layer-editor__slider-input">
-                    <input
-                      type="range"
-                      min="5"
-                      max="100"
-                      v-model.number="opacityPercent"
-                    >
-                    <input
-                      type="number"
-                      min="5"
-                      max="100"
-                      v-model.number="opacityPercent"
-                    >
-                  </div>
-                </label>
-                <label class="layer-editor__slider-field">
-                  <span>Softness</span>
-                  <div class="layer-editor__slider-input">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      v-model.number="softnessPercent"
-                    >
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      v-model.number="softnessPercent"
-                    >
-                  </div>
-                </label>
-              </div>
-                  <div v-if="inkControlsVisible" class="layer-editor__control-stack">
-                <label class="layer-editor__slider-field">
-                  <div class="layer-editor__slider-label">
-                    <span>Ink level (%)</span>
-                    <button
-                      type="button"
-                      class="layer-editor__pin-button"
-                      :class="{ 'layer-editor__pin-button--active': pinState.level }"
-                      title="Pin ink level"
-                      @click="togglePin('level')"
-                    >
-                      <Icon icon="thumbtack">{{ pinState.level ? 'Pinned' : 'Pin' }}</Icon>
-                    </button>
-                  </div>
-                  <div class="layer-editor__slider-input">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      v-model.number="flatPercent"
-                    >
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      v-model.number="flatPercent"
-                    >
-                  </div>
-                </label>
-                <div class="layer-editor__flat-preview">
-                  <span class="layer-editor__flat-swatch" :style="flatSwatchStyle"></span>
-                  <span class="layer-editor__flat-label">{{ flatPercent }}%</span>
-                </div>
-                <div v-if="activeTool === 'flat' || activeTool === 'fill'" class="layer-editor__inline-actions">
-                  <button
-                    type="button"
-                    class="pill-button pill-button--ghost"
-                    :class="{ 'pill-button--active': flatSampleMode }"
-                    title="Ink from canvas"
-                    @click="toggleFlatSampleMode"
-                  >
-                    <Icon icon="eye-dropper">Ink from canvas</Icon>
-                  </button>
-                  <p class="layer-editor__inline-hint">
-                    Click the canvas to sample a height value.
-                  </p>
-                </div>
-              </div>
-                  <div v-if="activeTool === 'select'" class="layer-editor__control-stack">
-                    <label class="layer-editor__field">
-                      <span>Selection mode</span>
-                      <select v-model="selectionMode">
-                        <option value="rect">Rectangle</option>
-                        <option value="fill">Fill (tolerance)</option>
-                      </select>
-                    </label>
-                    <label v-if="selectionMode === 'fill'" class="layer-editor__slider-field">
-                      <span>Tolerance (%)</span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
-                        <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
-                      </div>
-                    </label>
-                    <div class="layer-editor__inline-actions">
-                      <button
-                        type="button"
-                        class="pill-button pill-button--ghost"
-                        :disabled="!canUndoSelection"
-                        title="Undo selection"
-                        @click="undoSelection"
-                      >
-                        <Icon icon="rotate-left">Undo selection ({{ selectionUndoCount }})</Icon>
-                      </button>
-                      <button
-                        type="button"
-                        class="pill-button pill-button--ghost"
-                        :disabled="!canRedoSelection"
-                        title="Redo selection"
-                        @click="redoSelection"
-                      >
-                        <Icon icon="rotate-right">Redo selection ({{ selectionRedoCount }})</Icon>
-                      </button>
-                      <button
-                        type="button"
-                        class="pill-button pill-button--ghost"
-                        :disabled="!selectionState"
-                        title="Clear selection"
-                        @click="clearSelection"
-                      >
-                        <Icon icon="xmark">Clear selection</Icon>
-                      </button>
+                  </template>
+                  <template v-else>
+                    <div v-if="supportsBrushProperties" class="layer-editor__control-stack">
+                      <label class="layer-editor__field">
+                        <span>Brush shape</span>
+                        <select v-model="brushShape">
+                          <option value="round">Round</option>
+                          <option value="square">Square</option>
+                          <option value="triangle">Triangle</option>
+                          <option value="line">Line</option>
+                        </select>
+                      </label>
+                      <label class="layer-editor__field">
+                        <span>Brush texture</span>
+                        <select v-model="brushTexture">
+                          <option value="none">None</option>
+                          <option value="spray">Spray</option>
+                          <option value="perlin">Perlin</option>
+                        </select>
+                      </label>
+                      <label v-if="brushShape !== 'round'" class="layer-editor__slider-field">
+                        <span>Rotation (°)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="-180" max="180" v-model.number="brushAngle">
+                          <input type="number" min="-180" max="180" v-model.number="brushAngle">
+                        </div>
+                      </label>
+                      <label class="layer-editor__field">
+                        <div class="layer-editor__field-header">
+                          <span>Preset</span>
+                          <div class="layer-editor__preset-icons">
+                            <button
+                              type="button"
+                              class="layer-editor__icon-button"
+                              :disabled="!canSavePreset"
+                              aria-label="Save preset"
+                              title="Save preset"
+                              @click="saveCustomPreset"
+                            >
+                              <Icon icon="bookmark" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              class="layer-editor__icon-button layer-editor__icon-button--danger"
+                              :disabled="!canDeletePreset"
+                              aria-label="Delete preset"
+                              title="Delete preset"
+                              @click="deleteActivePreset"
+                            >
+                              <Icon icon="trash" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                        <select v-model="activePresetId">
+                          <option v-for="preset in presetOptions" :key="preset.id" :value="preset.id">
+                            {{ preset.label }}
+                          </option>
+                        </select>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <div class="layer-editor__slider-label">
+                          <span>Size (px)</span>
+                          <button
+                            type="button"
+                            class="layer-editor__pin-button"
+                            :class="{ 'layer-editor__pin-button--active': pinState.size }"
+                            title="Pin size"
+                            @click="togglePin('size')"
+                          >
+                            <Icon icon="thumbtack">{{ pinState.size ? 'Pinned' : 'Pin' }}</Icon>
+                          </button>
+                        </div>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="1" max="256" v-model.number="sizeValue">
+                          <input type="number" min="1" max="512" v-model.number="sizeValue">
+                        </div>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <div class="layer-editor__slider-label">
+                          <span>Opacity (%)</span>
+                          <button
+                            type="button"
+                            class="layer-editor__pin-button"
+                            :class="{ 'layer-editor__pin-button--active': pinState.opacity }"
+                            title="Pin opacity"
+                            @click="togglePin('opacity')"
+                          >
+                            <Icon icon="thumbtack">{{ pinState.opacity ? 'Pinned' : 'Pin' }}</Icon>
+                          </button>
+                        </div>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="5" max="100" v-model.number="opacityPercent">
+                          <input type="number" min="5" max="100" v-model.number="opacityPercent">
+                        </div>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <span>Softness</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="0" max="100" v-model.number="softnessPercent">
+                          <input type="number" min="0" max="100" v-model.number="softnessPercent">
+                        </div>
+                      </label>
                     </div>
-                    <p class="layer-editor__inline-hint">
-                      Shift adds to selection. Alt/Ctrl subtracts.
-                    </p>
-                  </div>
-                  <div v-if="activeTool === 'fill'" class="layer-editor__control-stack">
-                    <label class="layer-editor__slider-field">
-                      <span>Tolerance (%)</span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
-                        <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
+                    <div v-if="inkControlsVisible" class="layer-editor__control-stack">
+                      <label class="layer-editor__slider-field">
+                        <div class="layer-editor__slider-label">
+                          <span>Ink level (%)</span>
+                          <button
+                            type="button"
+                            class="layer-editor__pin-button"
+                            :class="{ 'layer-editor__pin-button--active': pinState.level }"
+                            title="Pin ink level"
+                            @click="togglePin('level')"
+                          >
+                            <Icon icon="thumbtack">{{ pinState.level ? 'Pinned' : 'Pin' }}</Icon>
+                          </button>
+                        </div>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="0" max="100" v-model.number="flatPercent">
+                          <input type="number" min="0" max="100" v-model.number="flatPercent">
+                        </div>
+                      </label>
+                      <div class="layer-editor__flat-preview">
+                        <span class="layer-editor__flat-swatch" :style="flatSwatchStyle"></span>
+                        <span class="layer-editor__flat-label">{{ flatPercent }}%</span>
                       </div>
-                    </label>
-                  </div>
-              <div v-if="supportsBrushProperties" class="layer-editor__control-stack layer-editor__control-stack--advanced">
-                <label class="layer-editor__slider-field">
-                  <span>Spacing (%)</span>
-                  <div class="layer-editor__slider-input">
-                    <input type="range" min="20" max="200" v-model.number="spacingPercent">
-                    <input type="number" min="20" max="200" v-model.number="spacingPercent">
-                  </div>
-                </label>
-                <label class="layer-editor__slider-field">
-                  <span>Flow (%)</span>
-                  <div class="layer-editor__slider-input">
-                    <input type="range" min="5" max="100" v-model.number="flowPercent">
-                    <input type="number" min="5" max="100" v-model.number="flowPercent">
-                  </div>
-                </label>
-              </div>
+                      <div v-if="activeTool === 'flat' || activeTool === 'fill'" class="layer-editor__inline-actions">
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :class="{ 'pill-button--active': flatSampleMode }"
+                          title="Ink from canvas"
+                          @click="toggleFlatSampleMode"
+                        >
+                          <Icon icon="eye-dropper">Ink from canvas</Icon>
+                        </button>
+                        <p class="layer-editor__inline-hint">
+                          Click the canvas to sample a height value.
+                        </p>
+                      </div>
+                    </div>
+                    <div v-if="activeTool === 'select'" class="layer-editor__control-stack">
+                      <label class="layer-editor__field">
+                        <span>Selection mode</span>
+                        <select v-model="selectionMode">
+                          <option value="rect">Rectangle</option>
+                          <option value="fill">Fill (tolerance)</option>
+                        </select>
+                      </label>
+                      <label v-if="selectionMode === 'fill'" class="layer-editor__slider-field">
+                        <span>Tolerance (%)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
+                          <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
+                        </div>
+                      </label>
+                      <div class="layer-editor__inline-actions">
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canUndoSelection"
+                          title="Undo selection"
+                          @click="undoSelection"
+                        >
+                          <Icon icon="rotate-left">Undo selection ({{ selectionUndoCount }})</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canRedoSelection"
+                          title="Redo selection"
+                          @click="redoSelection"
+                        >
+                          <Icon icon="rotate-right">Redo selection ({{ selectionRedoCount }})</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!selectionState"
+                          title="Clear selection"
+                          @click="clearSelection"
+                        >
+                          <Icon icon="xmark">Clear selection</Icon>
+                        </button>
+                      </div>
+                      <p class="layer-editor__inline-hint">
+                        Shift adds to selection. Alt/Ctrl subtracts.
+                      </p>
+                    </div>
+                    <div v-if="activeTool === 'fill'" class="layer-editor__control-stack">
+                      <label class="layer-editor__slider-field">
+                        <span>Tolerance (%)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="0" max="100" v-model.number="fillTolerancePercent">
+                          <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
+                        </div>
+                      </label>
+                    </div>
+                    <div v-if="supportsBrushProperties" class="layer-editor__control-stack layer-editor__control-stack--advanced">
+                      <label class="layer-editor__slider-field">
+                        <span>Spacing (%)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="20" max="200" v-model.number="spacingPercent">
+                          <input type="number" min="20" max="200" v-model.number="spacingPercent">
+                        </div>
+                      </label>
+                      <label class="layer-editor__slider-field">
+                        <span>Flow (%)</span>
+                        <div class="layer-editor__slider-input">
+                          <input type="range" min="5" max="100" v-model.number="flowPercent">
+                          <input type="number" min="5" max="100" v-model.number="flowPercent">
+                        </div>
+                      </label>
+                    </div>
+                  </template>
                 </div>
               </div>
-              <div v-if="brushTexture === 'perlin'" class="layer-editor__section">
+              <div v-if="brushTexture === 'perlin' && supportsBrushProperties" class="layer-editor__section">
                 <button
                   type="button"
                   class="layer-editor__section-toggle"
@@ -576,49 +590,49 @@
                   <Icon :icon="layerSettingsOpen ? 'chevron-up' : 'chevron-down'" />
                 </button>
                 <div v-if="layerSettingsOpen" class="layer-editor__section-body">
-                <label class="layer-editor__field">
-                  <span>Background</span>
-                  <select v-model="previewBackground">
-                    <option value="grid">Checkerboard</option>
-                    <option value="solid">Solid black</option>
-                  </select>
-                </label>
-                <label class="layer-editor__field">
-                  <span>Mask view</span>
-                  <div class="layer-editor__segment">
-                    <button
-                      type="button"
-                      class="layer-editor__segment-button"
-                      :class="{ 'layer-editor__segment-button--active': maskViewMode === 'grayscale' }"
-                      title="Mask view: B/W"
-                      @click="maskViewMode = 'grayscale'"
-                    >
-                      B/W
-                    </button>
-                    <button
-                      type="button"
-                      class="layer-editor__segment-button"
-                      :class="{ 'layer-editor__segment-button--active': maskViewMode === 'color' }"
-                      :disabled="isHeightmap"
-                      title="Mask view: Colour"
-                      @click="maskViewMode = 'color'"
-                    >
-                      Colour
-                    </button>
-                  </div>
-                </label>
-                <label
-                  v-if="supportsColourPicker && activeLayer"
-                  class="layer-editor__field layer-editor__color-field"
-                >
-                  <span>Layer colour</span>
-                  <input
-                    type="color"
-                    :value="layerColourHex"
-                    aria-label="Layer colour"
-                    @change="handleColourChange"
+                  <label class="layer-editor__field">
+                    <span>Background</span>
+                    <select v-model="previewBackground">
+                      <option value="grid">Checkerboard</option>
+                      <option value="solid">Solid black</option>
+                    </select>
+                  </label>
+                  <label class="layer-editor__field">
+                    <span>Mask view</span>
+                    <div class="layer-editor__segment">
+                      <button
+                        type="button"
+                        class="layer-editor__segment-button"
+                        :class="{ 'layer-editor__segment-button--active': maskViewMode === 'grayscale' }"
+                        title="Mask view: B/W"
+                        @click="maskViewMode = 'grayscale'"
+                      >
+                        B/W
+                      </button>
+                      <button
+                        type="button"
+                        class="layer-editor__segment-button"
+                        :class="{ 'layer-editor__segment-button--active': maskViewMode === 'color' }"
+                        :disabled="isHeightmap"
+                        title="Mask view: Colour"
+                        @click="maskViewMode = 'color'"
+                      >
+                        Colour
+                      </button>
+                    </div>
+                  </label>
+                  <label
+                    v-if="supportsColourPicker && activeLayer"
+                    class="layer-editor__field layer-editor__color-field"
                   >
-                </label>
+                    <span>Layer colour</span>
+                    <input
+                      type="color"
+                      :value="layerColourHex"
+                      aria-label="Layer colour"
+                      @change="handleColourChange"
+                    >
+                  </label>
                 </div>
               </div>
               <div class="layer-editor__section">
@@ -699,7 +713,8 @@ const TOOL_PALETTE = [
   { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: false },
   { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: false },
   { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.', onlyHeightmap: false, disabled: false },
-  { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true }
+  { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true },
+  { id: 'grid', label: 'Grid', icon: 'border-all', shortcut: 'R', description: 'Grid and snapping settings.', onlyHeightmap: false, disabled: false }
 ] as const
 
 type BrushPreset = {
@@ -957,6 +972,13 @@ const perlinScale = ref(12)
 const perlinDensity = ref(0.7)
 const perlinRotation = ref(0)
 const perlinSoftness = ref(0.6)
+const gridEnabled = ref(true)
+const gridMode = ref<'underlay' | 'overlay'>('underlay')
+const gridOpacity = ref(0.35)
+const gridSize = ref(32)
+const snapEnabled = ref(false)
+const snapSize = ref(16)
+const angleSnapEnabled = ref(false)
 const selectionMode = ref<'rect' | 'fill'>('rect')
 const selectionState = ref<SelectionData | null>(null)
 const selectionHistory = ref<Array<SelectionData | null>>([])
@@ -996,6 +1018,12 @@ const selectionUndoCount = computed(() => Math.max(0, selectionHistoryIndex.valu
 const selectionRedoCount = computed(() =>
   Math.max(0, selectionHistory.value.length - selectionHistoryIndex.value - 1)
 )
+const gridOpacityPercent = computed({
+  get: () => Math.round(gridOpacity.value * 100),
+  set: (value: number) => {
+    gridOpacity.value = clamp(value / 100, 0.05, 1)
+  }
+})
 const perlinDensityPercent = computed({
   get: () => Math.round(perlinDensity.value * 100),
   set: (value: number) => {
@@ -2185,6 +2213,7 @@ function clamp(value: number, min: number, max: number) {
   opacity: 0.7;
 }
 
+
 .layer-editor__tool-button--active {
   border-color: rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.12);
@@ -2439,6 +2468,15 @@ function clamp(value: number, min: number, max: number) {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
+}
+
+.layer-editor__section-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .layer-editor__section-body {
