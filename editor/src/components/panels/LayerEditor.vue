@@ -278,42 +278,6 @@
                         <option value="perlin">Perlin</option>
                       </select>
                     </label>
-                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span title="Noise cell size. Lower values = finer detail.">
-                        Perlin scale (px)
-                      </span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="4" max="64" v-model.number="perlinScale">
-                        <input type="number" min="2" max="128" v-model.number="perlinScale">
-                      </div>
-                    </label>
-                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span title="Rotate the noise pattern. Does not rotate the brush shape.">
-                        Perlin rotation (°)
-                      </span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="-180" max="180" v-model.number="perlinRotation">
-                        <input type="number" min="-180" max="180" v-model.number="perlinRotation">
-                      </div>
-                    </label>
-                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span title="Higher density keeps more of the noise field.">
-                        Perlin density (%)
-                      </span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="5" max="100" v-model.number="perlinDensityPercent">
-                        <input type="number" min="0" max="100" v-model.number="perlinDensityPercent">
-                      </div>
-                    </label>
-                    <label v-if="brushTexture === 'perlin'" class="layer-editor__slider-field">
-                      <span title="Softens the falloff toward the brush edge.">
-                        Perlin softness (%)
-                      </span>
-                      <div class="layer-editor__slider-input">
-                        <input type="range" min="0" max="100" v-model.number="perlinSoftnessPercent">
-                        <input type="number" min="0" max="100" v-model.number="perlinSoftnessPercent">
-                      </div>
-                    </label>
                     <label v-if="brushShape !== 'round'" class="layer-editor__slider-field">
                       <span>Rotation (°)</span>
                       <div class="layer-editor__slider-input">
@@ -550,6 +514,57 @@
               </div>
                 </div>
               </div>
+              <div v-if="brushTexture === 'perlin'" class="layer-editor__section">
+                <button
+                  type="button"
+                  class="layer-editor__section-toggle"
+                  title="Toggle Perlin settings"
+                  @click="perlinSettingsOpen = !perlinSettingsOpen"
+                >
+                  <span>Perlin settings</span>
+                  <Icon :icon="perlinSettingsOpen ? 'chevron-up' : 'chevron-down'" />
+                </button>
+                <div v-if="perlinSettingsOpen" class="layer-editor__section-body">
+                  <div class="layer-editor__control-stack">
+                    <label class="layer-editor__slider-field">
+                      <span title="Noise cell size. Lower values = finer detail.">
+                        Perlin scale (px)
+                      </span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="4" max="64" v-model.number="perlinScale">
+                        <input type="number" min="2" max="128" v-model.number="perlinScale">
+                      </div>
+                    </label>
+                    <label class="layer-editor__slider-field">
+                      <span title="Rotate the noise pattern. Does not rotate the brush shape.">
+                        Perlin rotation (°)
+                      </span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="-180" max="180" v-model.number="perlinRotation">
+                        <input type="number" min="-180" max="180" v-model.number="perlinRotation">
+                      </div>
+                    </label>
+                    <label class="layer-editor__slider-field">
+                      <span title="Higher density keeps more of the noise field.">
+                        Perlin density (%)
+                      </span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="5" max="100" v-model.number="perlinDensityPercent">
+                        <input type="number" min="0" max="100" v-model.number="perlinDensityPercent">
+                      </div>
+                    </label>
+                    <label class="layer-editor__slider-field">
+                      <span title="Softens the falloff toward the brush edge.">
+                        Perlin softness (%)
+                      </span>
+                      <div class="layer-editor__slider-input">
+                        <input type="range" min="0" max="100" v-model.number="perlinSoftnessPercent">
+                        <input type="number" min="0" max="100" v-model.number="perlinSoftnessPercent">
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
               <div class="layer-editor__section">
                 <button
                   type="button"
@@ -753,6 +768,7 @@ watch(
 const maskEditorRef = ref<InstanceType<typeof LayerMaskEditor> | null>(null)
 const previewBackground = ref<'grid' | 'solid'>('grid')
 const toolSettingsOpen = ref(true)
+const perlinSettingsOpen = ref(true)
 const layerSettingsOpen = ref(true)
 const layerUtilitiesOpen = ref(true)
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
