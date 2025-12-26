@@ -290,7 +290,7 @@
                         </div>
                       </label>
                       <label class="layer-editor__field">
-                        <span>Snapping</span>
+                        <span>Grid snap</span>
                         <select v-model="snapEnabled">
                           <option :value="true">On</option>
                           <option :value="false">Off</option>

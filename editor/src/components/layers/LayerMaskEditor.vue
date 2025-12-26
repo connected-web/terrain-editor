@@ -207,6 +207,7 @@ const isDrawing = ref(false)
 const lastX = ref(0)
 const lastY = ref(0)
 const pendingAnchor = ref<{ x: number; y: number } | null>(null)
+const strokeAnchor = ref<{ x: number; y: number } | null>(null)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
@@ -680,7 +681,7 @@ function renderSelectionOverlay(
   if (canvas.width !== width) canvas.width = width
   if (canvas.height !== height) canvas.height = height
   ctx.clearRect(0, 0, width, height)
-  if (!selection && !draft) return
+  if (!selection && !draft && !(snapGuide.value && angleSnapEnabled.value)) return
 
   if (selection?.type === 'rect') {
     if (selection.canvasWidth !== width || selection.canvasHeight !== height) return
@@ -1104,7 +1105,9 @@ function handlePointerDown(event: MouseEvent) {
   if (panModeActive.value || event.button !== 0) return
   markUserViewportInteraction()
   if (toolMode.value === 'grid') return
-  const snapped = snapPoint(canvasCoordsFromEvent(event))
+  const rawPoint = canvasCoordsFromEvent(event)
+  const freehandOverride = event.ctrlKey || event.metaKey
+  const snapped = toolMode.value === 'select' && angleSnapEnabled.value ? rawPoint : snapPoint(rawPoint)
   if (toolMode.value === 'select') {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
     selectionDraftMode.value = modifier
@@ -1138,7 +1141,9 @@ function handlePointerDown(event: MouseEvent) {
   if (event.shiftKey) {
     if (pendingAnchor.value) {
       clearOverlay()
-      drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, snapped.x, snapped.y)
+      const lineEnd =
+        angleSnapEnabled.value && !freehandOverride ? snapAngle(pendingAnchor.value, snapped) : snapped
+      drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, lineEnd.x, lineEnd.y)
       commitOverlay()
       pendingAnchor.value = null
       return
@@ -1150,6 +1155,7 @@ function handlePointerDown(event: MouseEvent) {
   }
   pendingAnchor.value = null
   isDrawing.value = true
+  strokeAnchor.value = snapped
   lastX.value = snapped.x
   lastY.value = snapped.y
   clearOverlay()
@@ -1161,7 +1167,8 @@ function handlePointerMove(event: MouseEvent) {
   if (toolMode.value === 'select' && selectionStart.value) {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
     selectionDraftMode.value = modifier
-    const snapped = snapPoint(canvasCoordsFromEvent(event))
+    const rawPoint = canvasCoordsFromEvent(event)
+    const snapped = angleSnapEnabled.value ? rawPoint : snapPoint(rawPoint)
     const angled = snapAngle(selectionStart.value, snapped)
     if (angleSnapEnabled.value) {
       const dx = angled.x - selectionStart.value.x
@@ -1178,11 +1185,46 @@ function handlePointerMove(event: MouseEvent) {
     })
     return
   }
+  if (pendingAnchor.value && !isDrawing.value) {
+    const rawPoint = canvasCoordsFromEvent(event)
+    const freehandOverride = event.ctrlKey || event.metaKey
+    const snapped = snapPoint(rawPoint)
+    const target =
+      angleSnapEnabled.value && !freehandOverride ? snapAngle(pendingAnchor.value, snapped) : snapped
+    if (angleSnapEnabled.value && !freehandOverride) {
+      const dx = target.x - pendingAnchor.value.x
+      const dy = target.y - pendingAnchor.value.y
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+      snapGuide.value = { start: pendingAnchor.value, end: target, angle }
+    } else {
+      snapGuide.value = null
+    }
+    requestAnimationFrame(() => {
+      renderSelectionOverlay(selectionData.value ?? null)
+    })
+    return
+  }
   if (!isDrawing.value) return
-  const snapped = snapPoint(canvasCoordsFromEvent(event))
-  drawStroke(lastX.value, lastY.value, snapped.x, snapped.y)
-  lastX.value = snapped.x
-  lastY.value = snapped.y
+  const rawPoint = canvasCoordsFromEvent(event)
+  const freehandOverride = event.ctrlKey || event.metaKey
+  const snapped = snapPoint(rawPoint)
+  const anchor = strokeAnchor.value ?? { x: lastX.value, y: lastY.value }
+  const target =
+    angleSnapEnabled.value && !freehandOverride ? snapAngle(anchor, snapped) : snapped
+  if (angleSnapEnabled.value && !freehandOverride) {
+    const dx = target.x - anchor.x
+    const dy = target.y - anchor.y
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+    snapGuide.value = { start: anchor, end: target, angle }
+  } else {
+    snapGuide.value = null
+  }
+  requestAnimationFrame(() => {
+    renderSelectionOverlay(selectionData.value ?? null)
+  })
+  drawStroke(lastX.value, lastY.value, target.x, target.y)
+  lastX.value = target.x
+  lastY.value = target.y
 }
 
 function handlePointerUp() {
@@ -1201,6 +1243,11 @@ function handlePointerUp() {
   }
   if (!isDrawing.value) return
   isDrawing.value = false
+  strokeAnchor.value = null
+  snapGuide.value = null
+  requestAnimationFrame(() => {
+    renderSelectionOverlay(selectionData.value ?? null)
+  })
   if (selectionData.value) {
     selectionApplyBusy.value = true
     requestAnimationFrame(() => {
