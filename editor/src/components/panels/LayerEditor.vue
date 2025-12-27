@@ -1398,6 +1398,7 @@ async function copySelection() {
 function pasteSelection() {
   const editor = maskEditorRef.value
   if (!editor) return
+  activeTool.value = 'select'
   void (async () => {
     const startedFromClipboard = await editor.pasteFromClipboard()
     if (startedFromClipboard) {
@@ -1417,6 +1418,7 @@ function pasteSelection() {
 async function pasteSelectionFromClipboard(mode: 'replace' | 'merge' = pasteMode.value) {
   const editor = maskEditorRef.value
   if (!editor) return
+  activeTool.value = 'select'
   pasteMode.value = mode
   const started = await editor.pasteFromClipboard()
   if (started) {

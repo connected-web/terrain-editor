@@ -82,11 +82,11 @@
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
       :show-brush-ring="!flatSampleActive && ['brush', 'erase', 'flat'].includes(toolMode)"
-      :icon-anchor="toolMode === 'select' ? 'center' : 'offset'"
+      :icon-anchor="['select', 'grid', 'hand'].includes(toolMode) ? 'center' : 'offset'"
       :anchor="flatSampleActive && toolMode !== 'fill' ? 'bottom-left' : 'center'"
       :sample-value="cursorSampleValue"
       :show-target-dot="toolMode === 'fill'"
-      :fixed-icon-offset="toolMode === 'fill' || flatSampleActive"
+      :fixed-icon-offset="toolMode === 'fill' || flatSampleActive || toolMode === 'grid'"
       :brush-shape="brushShape"
       :brush-angle="brushAngleDegrees"
     />
