@@ -88,7 +88,7 @@
   - 💡 Save/load brushes with custom icons
 - ✅ Selection tool (rect + fill, persistent across layers)
 - ✅ Advanced onion-skin controls
-- 💡 Grid snap + measurement settings for mask tools
+- ✅ Grid snap + measurement settings for mask tools
 - 💡 Line tool for masks
 - 💡 Rectangle tool for masks
 - 💡 Geometry layer + snapping (circles/lines/paths as paint guides)

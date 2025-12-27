@@ -1147,7 +1147,7 @@ function handlePointerDown(event: MouseEvent) {
         angleSnapEnabled.value && !freehandOverride ? snapAngle(pendingAnchor.value, snapped) : snapped
       drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, lineEnd.x, lineEnd.y)
       commitOverlay()
-      pendingAnchor.value = null
+      pendingAnchor.value = lineEnd
       return
     }
     pendingAnchor.value = snapped
