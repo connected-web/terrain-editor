@@ -904,6 +904,36 @@ function applyPasteBuffer() {
   return true
 }
 
+function buildPasteBufferFromImageData(imageData: ImageData) {
+  const bufferValues = new Float32Array(imageData.width * imageData.height)
+  const bufferMask = new Uint8Array(imageData.width * imageData.height)
+  const data = imageData.data
+  for (let i = 0; i < bufferValues.length; i += 1) {
+    const idx = i * 4
+    const r = data[idx]
+    const g = data[idx + 1]
+    const b = data[idx + 2]
+    const a = data[idx + 3] / 255
+    if (a <= 0) continue
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    const coverage = luminance * a
+    if (coverage <= 0.01) continue
+    bufferValues[i] = luminance
+    bufferMask[i] = 1
+  }
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    values: bufferValues,
+    mask: bufferMask
+  }
+}
+
+function setPasteBufferFromImageData(imageData: ImageData) {
+  pasteBuffer.value = buildPasteBufferFromImageData(imageData)
+  return startPasteFromBuffer()
+}
+
 function clearOverlay() {
   const ctx = getContext('overlay')
   const overlay = overlayCanvasRef.value
@@ -1606,28 +1636,7 @@ async function pasteFromClipboard() {
     if (!ctx) return false
     ctx.drawImage(bitmap, 0, 0)
     const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
-    const data = imageData.data
-    const bufferValues = new Float32Array(bitmap.width * bitmap.height)
-    const bufferMask = new Uint8Array(bitmap.width * bitmap.height)
-    for (let i = 0; i < bufferValues.length; i += 1) {
-      const idx = i * 4
-      const r = data[idx]
-      const g = data[idx + 1]
-      const b = data[idx + 2]
-      const a = data[idx + 3] / 255
-      if (a <= 0) continue
-      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-      bufferValues[i] = luminance * a
-      bufferMask[i] = 1
-    }
-    pasteBuffer.value = {
-      width: bitmap.width,
-      height: bitmap.height,
-      values: bufferValues,
-      mask: bufferMask
-    }
-    startPasteFromBuffer()
-    return true
+    return setPasteBufferFromImageData(imageData)
   } catch {
     return false
   }
@@ -2174,7 +2183,8 @@ defineExpose({
   startPasteFromBuffer,
   applyPasteBuffer,
   clearPasteOverlay,
-  pasteFromClipboard
+  pasteFromClipboard,
+  setPasteBufferFromImageData
 })
 
 watch(

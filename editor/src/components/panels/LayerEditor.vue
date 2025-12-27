@@ -493,7 +493,7 @@
                           title="Copy selection (Cmd/Ctrl+C)"
                           @click="copySelection"
                         >
-                          <Icon icon="copy">Copy</Icon>
+                          <Icon icon="copy">Copy (Cmd/Ctrl+C)</Icon>
                         </button>
                         <button
                           type="button"
@@ -502,7 +502,7 @@
                           title="Paste selection (Cmd/Ctrl+P)"
                           @click="pasteSelection"
                         >
-                          <Icon icon="paste">Paste</Icon>
+                          <Icon icon="paste">Paste (Cmd/Ctrl+P)</Icon>
                         </button>
                         <button
                           v-if="pasteActive"
@@ -523,6 +523,12 @@
                           <Icon icon="xmark">Cancel</Icon>
                         </button>
                       </div>
+                      <p v-if="pasteNotice" class="layer-editor__inline-hint">
+                        {{ pasteNotice }}
+                      </p>
+                      <p v-else-if="clipboardHasImage" class="layer-editor__inline-hint">
+                        Clipboard image ready.
+                      </p>
                       <div class="layer-editor__inline-actions">
                         <button
                           type="button"
@@ -1041,6 +1047,9 @@ const selectionState = ref<SelectionData | null>(null)
 const pasteAvailable = ref(false)
 const pasteActive = ref(false)
 const pasteMode = ref<'replace' | 'merge'>('replace')
+const pasteNotice = ref('')
+let pasteNoticeTimer: number | null = null
+const clipboardHasImage = ref(false)
 const selectionHistory = ref<Array<SelectionData | null>>([])
 const selectionHistoryIndex = ref(-1)
 const selectionHistorySync = ref(false)
@@ -1078,7 +1087,9 @@ const selectionUndoCount = computed(() => Math.max(0, selectionHistoryIndex.valu
 const selectionRedoCount = computed(() =>
   Math.max(0, selectionHistory.value.length - selectionHistoryIndex.value - 1)
 )
-const canPasteSelection = computed(() => pasteAvailable.value && !pasteActive.value)
+const canPasteSelection = computed(() =>
+  (pasteAvailable.value || clipboardHasImage.value) && !pasteActive.value
+)
 const gridOpacityPercent = computed({
   get: () => Math.round(gridOpacity.value * 100),
   set: (value: number) => {
@@ -1133,6 +1144,9 @@ watch(activeTool, (next) => {
   }
   if (next !== 'select' && pasteActive.value) {
     cancelPasteSelection()
+  }
+  if (next === 'select') {
+    void refreshClipboardStatus()
   }
 })
 
@@ -1389,11 +1403,13 @@ function pasteSelection() {
     if (startedFromClipboard) {
       pasteAvailable.value = true
       pasteActive.value = true
+      setPasteNotice('Pasted from system clipboard.')
       return
     }
     const started = editor.startPasteFromBuffer()
     if (started) {
       pasteActive.value = true
+      setPasteNotice('Used app clipboard buffer.')
     }
   })()
 }
@@ -1427,6 +1443,55 @@ function cancelPasteSelection() {
 
 function handlePasteApplied() {
   pasteActive.value = false
+}
+
+function setPasteNotice(message: string) {
+  pasteNotice.value = message
+  if (pasteNoticeTimer !== null) {
+    window.clearTimeout(pasteNoticeTimer)
+  }
+  pasteNoticeTimer = window.setTimeout(() => {
+    pasteNotice.value = ''
+    pasteNoticeTimer = null
+  }, 2500)
+}
+
+async function refreshClipboardStatus() {
+  if (!navigator.clipboard?.read) {
+    clipboardHasImage.value = false
+    return
+  }
+  try {
+    const items = await navigator.clipboard.read()
+    clipboardHasImage.value = items.some((entry) => entry.types.includes('image/png'))
+  } catch {
+    clipboardHasImage.value = false
+  }
+}
+
+async function handlePasteEvent(event: ClipboardEvent) {
+  const editor = maskEditorRef.value
+  const items = event.clipboardData?.items
+  if (!editor || !items) return
+  const item = Array.from(items).find((entry) => entry.type === 'image/png')
+  if (!item) return
+  const file = item.getAsFile()
+  if (!file) return
+  const bitmap = await createImageBitmap(file)
+  const canvas = document.createElement('canvas')
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.drawImage(bitmap, 0, 0)
+  const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+  const started = editor.setPasteBufferFromImageData(imageData)
+  if (started) {
+    pasteAvailable.value = true
+    pasteActive.value = true
+    setPasteNotice('Clipboard image captured.')
+    clipboardHasImage.value = true
+  }
 }
 
 function undoSelection() {
@@ -2040,6 +2105,9 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick)
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('paste', handlePasteEvent)
+  window.addEventListener('focus', refreshClipboardStatus)
+  document.addEventListener('visibilitychange', refreshClipboardStatus)
 })
 
 onBeforeUnmount(() => {
@@ -2049,6 +2117,9 @@ onBeforeUnmount(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('paste', handlePasteEvent)
+  window.removeEventListener('focus', refreshClipboardStatus)
+  document.removeEventListener('visibilitychange', refreshClipboardStatus)
 })
 
 onBeforeUnmount(() => {
