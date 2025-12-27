@@ -220,6 +220,7 @@
               :snap-enabled="snapEnabled"
               :snap-size="snapSize"
               :angle-snap-enabled="angleSnapEnabled"
+              :paste-mode="pasteMode"
               :selection="selectionState"
               :selection-mode="selectionMode"
               :onion-layers="onionLayerSources"
@@ -231,6 +232,7 @@
               @view-change="handleMaskViewChange"
               @flat-sample="handleFlatSample"
               @selection-change="handleSelectionChange"
+              @paste-applied="handlePasteApplied"
             />
             <div v-else class="layer-editor__placeholder">
               <p>No mask image found for this layer.</p>
@@ -476,6 +478,13 @@
                           <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
                         </div>
                       </label>
+                      <label class="layer-editor__field">
+                        <span>Paste mode</span>
+                        <select v-model="pasteMode">
+                          <option value="replace">Replace</option>
+                          <option value="merge">Merge</option>
+                        </select>
+                      </label>
                       <div class="layer-editor__inline-actions">
                         <button
                           type="button"
@@ -499,7 +508,7 @@
                           v-if="pasteActive"
                           type="button"
                           class="pill-button"
-                          title="Place paste (Space)"
+                          title="Place paste"
                           @click="applyPasteSelection"
                         >
                           <Icon icon="check">Place</Icon>
@@ -1031,6 +1040,7 @@ const selectionMode = ref<'rect' | 'fill'>('rect')
 const selectionState = ref<SelectionData | null>(null)
 const pasteAvailable = ref(false)
 const pasteActive = ref(false)
+const pasteMode = ref<'replace' | 'merge'>('replace')
 const selectionHistory = ref<Array<SelectionData | null>>([])
 const selectionHistoryIndex = ref(-1)
 const selectionHistorySync = ref(false)
@@ -1388,9 +1398,10 @@ function pasteSelection() {
   })()
 }
 
-async function pasteSelectionFromClipboard() {
+async function pasteSelectionFromClipboard(mode: 'replace' | 'merge' = pasteMode.value) {
   const editor = maskEditorRef.value
   if (!editor) return
+  pasteMode.value = mode
   const started = await editor.pasteFromClipboard()
   if (started) {
     pasteAvailable.value = true
@@ -1411,6 +1422,10 @@ function cancelPasteSelection() {
   const editor = maskEditorRef.value
   if (!editor) return
   editor.clearPasteOverlay()
+  pasteActive.value = false
+}
+
+function handlePasteApplied() {
   pasteActive.value = false
 }
 
@@ -1985,22 +2000,20 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     void copySelection()
     return
   }
+  if ((event.metaKey || event.ctrlKey) && key === 'e') {
+    event.preventDefault()
+    void pasteSelectionFromClipboard('merge')
+    return
+  }
   if ((event.metaKey || event.ctrlKey) && (key === 'p' || key === 'v')) {
     event.preventDefault()
     void pasteSelectionFromClipboard()
     return
   }
-  if (!event.metaKey && !event.ctrlKey && !event.altKey && pasteActive.value) {
-    if (key === ' ' || key === 'enter') {
-      event.preventDefault()
-      applyPasteSelection()
-      return
-    }
-    if (key === 'escape') {
-      event.preventDefault()
-      cancelPasteSelection()
-      return
-    }
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && pasteActive.value && key === 'escape') {
+    event.preventDefault()
+    cancelPasteSelection()
+    return
   }
   if ((event.metaKey || event.ctrlKey) && key === 'z') {
     event.preventDefault()

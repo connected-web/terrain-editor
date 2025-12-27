@@ -168,6 +168,7 @@ const props = defineProps<{
   gridOpacity?: number
   gridSize?: number
   gridColor?: string
+  pasteMode?: 'replace' | 'merge'
   snapEnabled?: boolean
   snapSize?: number
   angleSnapEnabled?: boolean
@@ -182,6 +183,7 @@ const emit = defineEmits<{
   (ev: 'view-change', payload: ViewState): void
   (ev: 'flat-sample', value: number): void
   (ev: 'selection-change', selection: SelectionData | null): void
+  (ev: 'paste-applied'): void
 }>()
 
 const editorRootRef = ref<HTMLDivElement | null>(null)
@@ -236,6 +238,7 @@ const gridMode = computed(() => props.gridMode ?? 'underlay')
 const gridOpacity = computed(() => Math.min(1, Math.max(0, props.gridOpacity ?? 0.35)))
 const gridSize = computed(() => Math.max(1, props.gridSize ?? 32))
 const gridColor = computed(() => props.gridColor ?? '#ffffff')
+const pasteMode = computed<'replace' | 'merge'>(() => props.pasteMode ?? 'replace')
 const snapEnabled = computed(() => props.snapEnabled ?? false)
 const snapSize = computed(() => Math.max(1, props.snapSize ?? 16))
 const angleSnapEnabled = computed(() => props.angleSnapEnabled ?? false)
@@ -848,6 +851,16 @@ function renderPasteOverlay() {
     data[idx + 3] = alpha
   }
   ctx.putImageData(imageData, Math.round(position.x), Math.round(position.y))
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 4])
+  ctx.strokeRect(
+    Math.round(position.x) + 0.5,
+    Math.round(position.y) + 0.5,
+    buffer.width,
+    buffer.height
+  )
+  ctx.setLineDash([])
 }
 
 function clearPasteOverlay() {
@@ -863,6 +876,7 @@ function applyPasteBuffer() {
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
   if (!buffer || !position || !values || !width || !height) return false
+  const mode = pasteMode.value
   for (let y = 0; y < buffer.height; y += 1) {
     const destY = Math.round(position.y) + y
     if (destY < 0 || destY >= height) continue
@@ -872,13 +886,21 @@ function applyPasteBuffer() {
       const sourceIndex = y * buffer.width + x
       if (!buffer.mask[sourceIndex]) continue
       const destIndex = destY * width + destX
-      values[destIndex] = buffer.values[sourceIndex]
+      const sourceValue = buffer.values[sourceIndex]
+      if (mode === 'merge') {
+        const alpha = sourceValue
+        const current = values[destIndex]
+        values[destIndex] = current + alpha * (sourceValue - current)
+      } else {
+        values[destIndex] = sourceValue
+      }
     }
   }
   renderMaskCanvas()
   renderPreviewCanvas()
   pushHistorySnapshot()
   clearPasteOverlay()
+  emit('paste-applied')
   return true
 }
 
@@ -1278,6 +1300,7 @@ function handlePointerDown(event: MouseEvent) {
       pasteDragOffset.value = { x: offsetX, y: offsetY }
       return
     }
+    applyPasteBuffer()
     return
   }
   if (toolMode.value === 'select') {
