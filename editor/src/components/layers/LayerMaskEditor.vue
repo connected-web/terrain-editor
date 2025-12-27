@@ -209,6 +209,13 @@ const lastX = ref(0)
 const lastY = ref(0)
 const pendingAnchor = ref<{ x: number; y: number } | null>(null)
 const strokeAnchor = ref<{ x: number; y: number } | null>(null)
+const pasteBuffer = ref<{ width: number; height: number; values: Float32Array; mask: Uint8Array } | null>(null)
+const pastePosition = ref<{ x: number; y: number } | null>(null)
+const pasteDragOffset = ref<{ x: number; y: number } | null>(null)
+const lastCanvasCoords = ref<{ x: number; y: number } | null>(null)
+const lastStrokePoint = ref<{ x: number; y: number } | null>(null)
+const selectionBounds = ref<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null)
+const pasteFollowCursor = ref(false)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
@@ -790,6 +797,91 @@ function snapAngle(start: { x: number; y: number }, end: { x: number; y: number 
   }
 }
 
+function getSelectionBounds(selection: SelectionData, width: number, height: number) {
+  if (selection.type === 'rect') {
+    const x = Math.max(0, Math.min(width - 1, Math.floor(selection.x)))
+    const y = Math.max(0, Math.min(height - 1, Math.floor(selection.y)))
+    const w = Math.max(1, Math.min(width - x, Math.floor(selection.width)))
+    const h = Math.max(1, Math.min(height - y, Math.floor(selection.height)))
+    return { x, y, width: w, height: h }
+  }
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let i = 0; i < selection.mask.length; i += 1) {
+    if (!selection.mask[i]) continue
+    const px = i % width
+    const py = Math.floor(i / width)
+    if (px < minX) minX = px
+    if (py < minY) minY = py
+    if (px > maxX) maxX = px
+    if (py > maxY) maxY = py
+  }
+  if (maxX < 0 || maxY < 0) return null
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX + 1),
+    height: Math.max(1, maxY - minY + 1)
+  }
+}
+
+function renderPasteOverlay() {
+  const buffer = pasteBuffer.value
+  const position = pastePosition.value
+  const overlay = overlayCanvasRef.value
+  const ctx = getContext('overlay')
+  const { width, height } = canvasDimensions.value
+  if (!buffer || !position || !overlay || !ctx || !width || !height) return
+  ctx.clearRect(0, 0, overlay.width, overlay.height)
+  const imageData = ctx.createImageData(buffer.width, buffer.height)
+  const data = imageData.data
+  for (let i = 0; i < buffer.values.length; i += 1) {
+    const alpha = buffer.mask[i] ? 255 : 0
+    if (alpha === 0) continue
+    const v = Math.round(buffer.values[i] * 255)
+    const idx = i * 4
+    data[idx] = v
+    data[idx + 1] = v
+    data[idx + 2] = v
+    data[idx + 3] = alpha
+  }
+  ctx.putImageData(imageData, Math.round(position.x), Math.round(position.y))
+}
+
+function clearPasteOverlay() {
+  pastePosition.value = null
+  pasteDragOffset.value = null
+  pasteFollowCursor.value = false
+  clearOverlay()
+}
+
+function applyPasteBuffer() {
+  const buffer = pasteBuffer.value
+  const position = pastePosition.value
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!buffer || !position || !values || !width || !height) return false
+  for (let y = 0; y < buffer.height; y += 1) {
+    const destY = Math.round(position.y) + y
+    if (destY < 0 || destY >= height) continue
+    for (let x = 0; x < buffer.width; x += 1) {
+      const destX = Math.round(position.x) + x
+      if (destX < 0 || destX >= width) continue
+      const sourceIndex = y * buffer.width + x
+      if (!buffer.mask[sourceIndex]) continue
+      const destIndex = destY * width + destX
+      values[destIndex] = buffer.values[sourceIndex]
+    }
+  }
+  renderMaskCanvas()
+  renderPreviewCanvas()
+  pushHistorySnapshot()
+  clearPasteOverlay()
+  return true
+}
+
 function clearOverlay() {
   const ctx = getContext('overlay')
   const overlay = overlayCanvasRef.value
@@ -944,6 +1036,18 @@ function isSelectedIndex(index: number, width: number, height: number) {
   const selection = selectionData.value
   if (!selection) return true
   if (!isSelectionCompatible(selection, width, height)) return true
+  if (selectionBounds.value) {
+    const x = index % width
+    const y = Math.floor(index / width)
+    if (
+      x < selectionBounds.value.minX ||
+      x > selectionBounds.value.maxX ||
+      y < selectionBounds.value.minY ||
+      y > selectionBounds.value.maxY
+    ) {
+      return false
+    }
+  }
   if (selection.type === 'rect') {
     const x = index % width
     const y = Math.floor(index / width)
@@ -961,6 +1065,16 @@ function isSelectedPoint(x: number, y: number, width: number, height: number) {
   const selection = selectionData.value
   if (!selection) return true
   if (!isSelectionCompatible(selection, width, height)) return true
+  if (selectionBounds.value) {
+    if (
+      x < selectionBounds.value.minX ||
+      x > selectionBounds.value.maxX ||
+      y < selectionBounds.value.minY ||
+      y > selectionBounds.value.maxY
+    ) {
+      return false
+    }
+  }
   if (selection.type === 'rect') {
     return (
       x >= selection.x &&
@@ -992,6 +1106,44 @@ function selectionToMask(selection: SelectionData | null, width: number, height:
     }
   }
   return mask
+}
+
+function updateSelectionBounds(selection: SelectionData | null) {
+  const { width, height } = canvasDimensions.value
+  if (!selection || !width || !height) {
+    selectionBounds.value = null
+    return
+  }
+  if (!isSelectionCompatible(selection, width, height)) {
+    selectionBounds.value = null
+    return
+  }
+  if (selection.type === 'rect') {
+    const minX = Math.max(0, Math.floor(selection.x))
+    const minY = Math.max(0, Math.floor(selection.y))
+    const maxX = Math.min(width - 1, Math.floor(selection.x + selection.width))
+    const maxY = Math.min(height - 1, Math.floor(selection.y + selection.height))
+    selectionBounds.value = { minX, minY, maxX, maxY }
+    return
+  }
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let i = 0; i < selection.mask.length; i += 1) {
+    if (!selection.mask[i]) continue
+    const px = i % width
+    const py = Math.floor(i / width)
+    if (px < minX) minX = px
+    if (py < minY) minY = py
+    if (px > maxX) maxX = px
+    if (py > maxY) maxY = py
+  }
+  if (maxX < 0 || maxY < 0) {
+    selectionBounds.value = null
+    return
+  }
+  selectionBounds.value = { minX, minY, maxX, maxY }
 }
 
 function combineSelection(
@@ -1110,6 +1262,24 @@ function handlePointerDown(event: MouseEvent) {
   const rawPoint = canvasCoordsFromEvent(event)
   const freehandOverride = event.ctrlKey || event.metaKey
   const snapped = toolMode.value === 'select' && angleSnapEnabled.value ? rawPoint : snapPoint(rawPoint)
+  if (pasteFollowCursor.value && pasteBuffer.value && !pasteDragOffset.value) {
+    pasteFollowCursor.value = false
+    return
+  }
+  if (pastePosition.value && pasteBuffer.value) {
+    const offsetX = rawPoint.x - pastePosition.value.x
+    const offsetY = rawPoint.y - pastePosition.value.y
+    if (
+      offsetX >= 0 &&
+      offsetY >= 0 &&
+      offsetX <= pasteBuffer.value.width &&
+      offsetY <= pasteBuffer.value.height
+    ) {
+      pasteDragOffset.value = { x: offsetX, y: offsetY }
+      return
+    }
+    return
+  }
   if (toolMode.value === 'select') {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
     selectionDraftMode.value = modifier
@@ -1126,6 +1296,9 @@ function handlePointerDown(event: MouseEvent) {
     requestAnimationFrame(() => {
       renderSelectionOverlay(selectionData.value ?? null, draft, modifier)
     })
+    return
+  }
+  if (selectionData.value && !isSelectedPoint(snapped.x, snapped.y, canvasDimensions.value.width, canvasDimensions.value.height)) {
     return
   }
   if (flatSampleActive.value) {
@@ -1148,11 +1321,14 @@ function handlePointerDown(event: MouseEvent) {
       drawStroke(pendingAnchor.value.x, pendingAnchor.value.y, lineEnd.x, lineEnd.y)
       commitOverlay()
       pendingAnchor.value = lineEnd
+      lastStrokePoint.value = lineEnd
       return
     }
-    pendingAnchor.value = snapped
+    pendingAnchor.value = lastStrokePoint.value ?? snapped
     clearOverlay()
-    stampBrush(snapped.x, snapped.y, brushAngle.value)
+    if (!lastStrokePoint.value) {
+      stampBrush(snapped.x, snapped.y, brushAngle.value)
+    }
     return
   }
   pendingAnchor.value = null
@@ -1185,6 +1361,17 @@ function handlePointerMove(event: MouseEvent) {
     requestAnimationFrame(() => {
       renderSelectionOverlay(selectionData.value ?? null, draft, modifier)
     })
+    return
+  }
+  if (pasteDragOffset.value && pastePosition.value && pasteBuffer.value) {
+    const rawPoint = canvasCoordsFromEvent(event)
+    const desired = {
+      x: rawPoint.x - pasteDragOffset.value.x,
+      y: rawPoint.y - pasteDragOffset.value.y
+    }
+    const snapped = snapEnabled.value ? snapPoint(desired) : desired
+    pastePosition.value = snapped
+    renderPasteOverlay()
     return
   }
   if (pendingAnchor.value && !isDrawing.value) {
@@ -1230,6 +1417,10 @@ function handlePointerMove(event: MouseEvent) {
 }
 
 function handlePointerUp() {
+  if (pasteDragOffset.value) {
+    pasteDragOffset.value = null
+    return
+  }
   if (toolMode.value === 'select' && selectionStart.value) {
     const selection = combineSelection(selectionData.value, selectionDraft.value, selectionDraftMode.value)
     selectionStart.value = null
@@ -1247,6 +1438,10 @@ function handlePointerUp() {
   isDrawing.value = false
   strokeAnchor.value = null
   snapGuide.value = null
+  if (selectionData.value) {
+    updateSelectionBounds(selectionData.value)
+  }
+  lastStrokePoint.value = { x: lastX.value, y: lastY.value }
   requestAnimationFrame(() => {
     renderSelectionOverlay(selectionData.value ?? null)
   })
@@ -1293,6 +1488,128 @@ function commitOverlay() {
   pushHistorySnapshot()
 }
 
+async function copySelectionToClipboard() {
+  const selection = selectionData.value
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!selection || !values || !width || !height) return false
+  const bounds = getSelectionBounds(selection, width, height)
+  if (!bounds) return false
+  const bufferValues = new Float32Array(bounds.width * bounds.height)
+  const bufferMask = new Uint8Array(bounds.width * bounds.height)
+  for (let y = 0; y < bounds.height; y += 1) {
+    for (let x = 0; x < bounds.width; x += 1) {
+      const sourceX = bounds.x + x
+      const sourceY = bounds.y + y
+      const sourceIndex = sourceY * width + sourceX
+      const isSelected =
+        selection.type === 'rect' ? true : selection.mask[sourceIndex] === 1
+      const destIndex = y * bounds.width + x
+      if (!isSelected) continue
+      bufferValues[destIndex] = values[sourceIndex]
+      bufferMask[destIndex] = 1
+    }
+  }
+  pasteBuffer.value = {
+    width: bounds.width,
+    height: bounds.height,
+    values: bufferValues,
+    mask: bufferMask
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = bounds.width
+  canvas.height = bounds.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return true
+  const imageData = ctx.createImageData(bounds.width, bounds.height)
+  const data = imageData.data
+  for (let i = 0; i < bufferValues.length; i += 1) {
+    const alpha = bufferMask[i] ? 255 : 0
+    if (alpha === 0) continue
+    const v = Math.round(bufferValues[i] * 255)
+    const idx = i * 4
+    data[idx] = v
+    data[idx + 1] = v
+    data[idx + 2] = v
+    data[idx + 3] = alpha
+  }
+  ctx.putImageData(imageData, 0, 0)
+  try {
+    if (navigator.clipboard?.write) {
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((result) => resolve(result), 'image/png')
+      })
+      if (blob) {
+        const item = new ClipboardItem({ 'image/png': blob })
+        await navigator.clipboard.write([item])
+      }
+    }
+  } catch {
+    return true
+  }
+  return true
+}
+
+function startPasteFromBuffer() {
+  if (!pasteBuffer.value) return false
+  const { width, height } = canvasDimensions.value
+  const viewState = getViewState()
+  const center = {
+    x: (width || 0) * viewState.centerX,
+    y: (height || 0) * viewState.centerY
+  }
+  pastePosition.value = {
+    x: center.x - pasteBuffer.value.width / 2,
+    y: center.y - pasteBuffer.value.height / 2
+  }
+  pasteFollowCursor.value = true
+  renderPasteOverlay()
+  return true
+}
+
+async function pasteFromClipboard() {
+  if (!navigator.clipboard?.read) return false
+  try {
+    const items = await navigator.clipboard.read()
+    const item = items.find((entry) => entry.types.includes('image/png'))
+    if (!item) return false
+    const blob = await item.getType('image/png')
+    const bitmap = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return false
+    ctx.drawImage(bitmap, 0, 0)
+    const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+    const data = imageData.data
+    const bufferValues = new Float32Array(bitmap.width * bitmap.height)
+    const bufferMask = new Uint8Array(bitmap.width * bitmap.height)
+    for (let i = 0; i < bufferValues.length; i += 1) {
+      const idx = i * 4
+      const r = data[idx]
+      const g = data[idx + 1]
+      const b = data[idx + 2]
+      const a = data[idx + 3] / 255
+      if (a <= 0) continue
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+      bufferValues[i] = luminance * a
+      bufferMask[i] = 1
+    }
+    pasteBuffer.value = {
+      width: bitmap.width,
+      height: bitmap.height,
+      values: bufferValues,
+      mask: bufferMask
+    }
+    startPasteFromBuffer()
+    return true
+  } catch {
+    return false
+  }
+}
+
 function sampleMaskValue(x: number, y: number) {
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
@@ -1320,6 +1637,7 @@ function scheduleFillPreview(x: number, y: number) {
 }
 
 function clearFillPreview() {
+  if (pastePosition.value) return
   if (fillPreviewTimer !== null) {
     window.clearTimeout(fillPreviewTimer)
     fillPreviewTimer = null
@@ -1828,7 +2146,12 @@ defineExpose({
   getCanvasSize,
   seedHistory,
   suspendViewTracking,
-  resumeViewTracking
+  resumeViewTracking,
+  copySelectionToClipboard,
+  startPasteFromBuffer,
+  applyPasteBuffer,
+  clearPasteOverlay,
+  pasteFromClipboard
 })
 
 watch(
@@ -1862,6 +2185,7 @@ watch(
   selectionData,
   () => {
     selectionOverlayCache.value = null
+    updateSelectionBounds(selectionData.value ?? null)
   },
   { deep: true }
 )
@@ -1934,6 +2258,7 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   }
   const coords = canvasCoordsFromEvent(event as MouseEvent)
   const snapped = snapPoint(coords)
+  lastCanvasCoords.value = { x: snapped.x, y: snapped.y }
   debugCoords.value = coords
   if (snapEnabled.value && (Math.abs(coords.x - snapped.x) > 0.5 || Math.abs(coords.y - snapped.y) > 0.5)) {
     snapCoords.value = snapped
@@ -1947,14 +2272,22 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
     }
   }
   cursorState.value.visible = cursorInside.value && showCustomCursor.value
+  if (pasteFollowCursor.value && pasteBuffer.value) {
+    const desired = {
+      x: snapped.x - pasteBuffer.value.width / 2,
+      y: snapped.y - pasteBuffer.value.height / 2
+    }
+    pastePosition.value = snapEnabled.value ? snapPoint(desired) : desired
+    renderPasteOverlay()
+  }
   if (flatSampleActive.value || toolMode.value === 'fill') {
     cursorSampleValue.value = sampleMaskValue(snapped.x, snapped.y)
   } else if (cursorSampleValue.value !== null) {
     cursorSampleValue.value = null
   }
-  if (toolMode.value === 'fill') {
+  if (toolMode.value === 'fill' && !pastePosition.value) {
     scheduleFillPreview(snapped.x, snapped.y)
-  } else {
+  } else if (!pastePosition.value) {
     clearFillPreview()
   }
   emit('cursor-move', {

@@ -91,6 +91,7 @@
 - ✅ Grid snap + measurement settings for mask tools
 - 💡 Line tool for masks
 - 💡 Rectangle tool for masks
+- 💡 Copy/paste selections (PNG clipboard compatible)
 - 💡 Geometry layer + snapping (circles/lines/paths as paint guides)
 - 💡 Transform tool interactions (translate/scale/rotate selections)
 - 💡 Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background

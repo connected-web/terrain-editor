@@ -480,6 +480,44 @@
                         <button
                           type="button"
                           class="pill-button pill-button--ghost"
+                          :disabled="!selectionState"
+                          title="Copy selection (Cmd/Ctrl+C)"
+                          @click="copySelection"
+                        >
+                          <Icon icon="copy">Copy</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canPasteSelection"
+                          title="Paste selection (Cmd/Ctrl+P)"
+                          @click="pasteSelection"
+                        >
+                          <Icon icon="paste">Paste</Icon>
+                        </button>
+                        <button
+                          v-if="pasteActive"
+                          type="button"
+                          class="pill-button"
+                          title="Place paste (Space)"
+                          @click="applyPasteSelection"
+                        >
+                          <Icon icon="check">Place</Icon>
+                        </button>
+                        <button
+                          v-if="pasteActive"
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          title="Cancel paste (Esc)"
+                          @click="cancelPasteSelection"
+                        >
+                          <Icon icon="xmark">Cancel</Icon>
+                        </button>
+                      </div>
+                      <div class="layer-editor__inline-actions">
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
                           :disabled="!canUndoSelection"
                           title="Undo selection"
                           @click="undoSelection"
@@ -991,6 +1029,8 @@ const snapSize = ref(16)
 const angleSnapEnabled = ref(false)
 const selectionMode = ref<'rect' | 'fill'>('rect')
 const selectionState = ref<SelectionData | null>(null)
+const pasteAvailable = ref(false)
+const pasteActive = ref(false)
 const selectionHistory = ref<Array<SelectionData | null>>([])
 const selectionHistoryIndex = ref(-1)
 const selectionHistorySync = ref(false)
@@ -1028,6 +1068,7 @@ const selectionUndoCount = computed(() => Math.max(0, selectionHistoryIndex.valu
 const selectionRedoCount = computed(() =>
   Math.max(0, selectionHistory.value.length - selectionHistoryIndex.value - 1)
 )
+const canPasteSelection = computed(() => pasteAvailable.value && !pasteActive.value)
 const gridOpacityPercent = computed({
   get: () => Math.round(gridOpacity.value * 100),
   set: (value: number) => {
@@ -1079,6 +1120,9 @@ watch(isHeightmap, (isH) => {
 watch(activeTool, (next) => {
   if (next !== 'flat' && next !== 'fill') {
     flatSampleMode.value = false
+  }
+  if (next !== 'select' && pasteActive.value) {
+    cancelPasteSelection()
   }
 })
 
@@ -1316,6 +1360,58 @@ function handleSelectionChange(selection: SelectionData | null) {
 function clearSelection() {
   selectionState.value = null
   pushSelectionHistory(null)
+}
+
+async function copySelection() {
+  const editor = maskEditorRef.value
+  if (!editor) return
+  const didCopy = await editor.copySelectionToClipboard()
+  if (didCopy) {
+    pasteAvailable.value = true
+  }
+}
+
+function pasteSelection() {
+  const editor = maskEditorRef.value
+  if (!editor) return
+  void (async () => {
+    const startedFromClipboard = await editor.pasteFromClipboard()
+    if (startedFromClipboard) {
+      pasteAvailable.value = true
+      pasteActive.value = true
+      return
+    }
+    const started = editor.startPasteFromBuffer()
+    if (started) {
+      pasteActive.value = true
+    }
+  })()
+}
+
+async function pasteSelectionFromClipboard() {
+  const editor = maskEditorRef.value
+  if (!editor) return
+  const started = await editor.pasteFromClipboard()
+  if (started) {
+    pasteAvailable.value = true
+    pasteActive.value = true
+  }
+}
+
+function applyPasteSelection() {
+  const editor = maskEditorRef.value
+  if (!editor) return
+  const applied = editor.applyPasteBuffer()
+  if (applied) {
+    pasteActive.value = false
+  }
+}
+
+function cancelPasteSelection() {
+  const editor = maskEditorRef.value
+  if (!editor) return
+  editor.clearPasteOverlay()
+  pasteActive.value = false
 }
 
 function undoSelection() {
@@ -1884,6 +1980,28 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     return
   }
   const key = event.key.toLowerCase()
+  if ((event.metaKey || event.ctrlKey) && key === 'c') {
+    event.preventDefault()
+    void copySelection()
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && (key === 'p' || key === 'v')) {
+    event.preventDefault()
+    void pasteSelectionFromClipboard()
+    return
+  }
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && pasteActive.value) {
+    if (key === ' ' || key === 'enter') {
+      event.preventDefault()
+      applyPasteSelection()
+      return
+    }
+    if (key === 'escape') {
+      event.preventDefault()
+      cancelPasteSelection()
+      return
+    }
+  }
   if ((event.metaKey || event.ctrlKey) && key === 'z') {
     event.preventDefault()
     if (event.shiftKey) {
