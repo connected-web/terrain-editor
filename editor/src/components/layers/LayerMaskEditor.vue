@@ -218,6 +218,7 @@ const lastCanvasCoords = ref<{ x: number; y: number } | null>(null)
 const lastStrokePoint = ref<{ x: number; y: number } | null>(null)
 const selectionBounds = ref<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null)
 const pasteFollowCursor = ref(false)
+const pasteLocked = ref(false)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
@@ -724,6 +725,19 @@ function renderSelectionOverlay(
       selectionOverlayCache.value = { width, height, image: imageData }
     }
     ctx.putImageData(selectionOverlayCache.value.image, 0, 0)
+    if (selectionBounds.value) {
+      ctx.strokeStyle = 'rgba(255, 215, 80, 0.9)'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 4])
+      const bounds = selectionBounds.value
+      ctx.strokeRect(
+        bounds.minX + 0.5,
+        bounds.minY + 0.5,
+        Math.max(1, bounds.maxX - bounds.minX + 1),
+        Math.max(1, bounds.maxY - bounds.minY + 1)
+      )
+      ctx.setLineDash([])
+    }
   }
 
   if (snapGuide.value && angleSnapEnabled.value) {
@@ -867,7 +881,55 @@ function clearPasteOverlay() {
   pastePosition.value = null
   pasteDragOffset.value = null
   pasteFollowCursor.value = false
+  pasteLocked.value = false
   clearOverlay()
+}
+
+type PasteTransform = 'flip-h' | 'flip-v' | 'rotate-cw' | 'rotate-ccw'
+
+function transformPasteBuffer(buffer: { width: number; height: number; values: Float32Array; mask: Uint8Array }, action: PasteTransform) {
+  if (action === 'flip-h') {
+    const nextValues = new Float32Array(buffer.width * buffer.height)
+    const nextMask = new Uint8Array(buffer.width * buffer.height)
+    for (let y = 0; y < buffer.height; y += 1) {
+      for (let x = 0; x < buffer.width; x += 1) {
+        const sourceIndex = y * buffer.width + x
+        const destIndex = y * buffer.width + (buffer.width - 1 - x)
+        nextValues[destIndex] = buffer.values[sourceIndex]
+        nextMask[destIndex] = buffer.mask[sourceIndex]
+      }
+    }
+    return { ...buffer, values: nextValues, mask: nextMask }
+  }
+  if (action === 'flip-v') {
+    const nextValues = new Float32Array(buffer.width * buffer.height)
+    const nextMask = new Uint8Array(buffer.width * buffer.height)
+    for (let y = 0; y < buffer.height; y += 1) {
+      for (let x = 0; x < buffer.width; x += 1) {
+        const sourceIndex = y * buffer.width + x
+        const destIndex = (buffer.height - 1 - y) * buffer.width + x
+        nextValues[destIndex] = buffer.values[sourceIndex]
+        nextMask[destIndex] = buffer.mask[sourceIndex]
+      }
+    }
+    return { ...buffer, values: nextValues, mask: nextMask }
+  }
+  const nextWidth = buffer.height
+  const nextHeight = buffer.width
+  const nextValues = new Float32Array(nextWidth * nextHeight)
+  const nextMask = new Uint8Array(nextWidth * nextHeight)
+  for (let y = 0; y < buffer.height; y += 1) {
+    for (let x = 0; x < buffer.width; x += 1) {
+      const sourceIndex = y * buffer.width + x
+      const destIndex =
+        action === 'rotate-cw'
+          ? x * nextWidth + (nextWidth - 1 - y)
+          : (nextHeight - 1 - x) * nextWidth + y
+      nextValues[destIndex] = buffer.values[sourceIndex]
+      nextMask[destIndex] = buffer.mask[sourceIndex]
+    }
+  }
+  return { width: nextWidth, height: nextHeight, values: nextValues, mask: nextMask }
 }
 
 function applyPasteBuffer() {
@@ -899,7 +961,9 @@ function applyPasteBuffer() {
   renderMaskCanvas()
   renderPreviewCanvas()
   pushHistorySnapshot()
+  pasteBuffer.value = null
   clearPasteOverlay()
+  emit('selection-change', null)
   emit('paste-applied')
   return true
 }
@@ -932,6 +996,64 @@ function buildPasteBufferFromImageData(imageData: ImageData) {
 function setPasteBufferFromImageData(imageData: ImageData) {
   pasteBuffer.value = buildPasteBufferFromImageData(imageData)
   return startPasteFromBuffer()
+}
+
+function beginPasteFromSelection() {
+  const selection = selectionData.value
+  const values = maskValues.value
+  const { width, height } = canvasDimensions.value
+  if (!selection || !values || !width || !height) return false
+  const bounds = getSelectionBounds(selection, width, height)
+  if (!bounds) return false
+  const bufferValues = new Float32Array(bounds.width * bounds.height)
+  const bufferMask = new Uint8Array(bounds.width * bounds.height)
+  for (let y = 0; y < bounds.height; y += 1) {
+    for (let x = 0; x < bounds.width; x += 1) {
+      const sourceX = bounds.x + x
+      const sourceY = bounds.y + y
+      const sourceIndex = sourceY * width + sourceX
+      const isSelected =
+        selection.type === 'rect' ? true : selection.mask[sourceIndex] === 1
+      if (!isSelected) continue
+      const destIndex = y * bounds.width + x
+      bufferValues[destIndex] = values[sourceIndex]
+      bufferMask[destIndex] = 1
+      values[sourceIndex] = 0
+    }
+  }
+  pasteBuffer.value = {
+    width: bounds.width,
+    height: bounds.height,
+    values: bufferValues,
+    mask: bufferMask
+  }
+  renderMaskCanvas()
+  renderPreviewCanvas()
+  pushHistorySnapshot()
+  pastePosition.value = { x: bounds.x, y: bounds.y }
+  pasteFollowCursor.value = false
+  pasteLocked.value = true
+  renderPasteOverlay()
+  emit('selection-change', null)
+  return true
+}
+
+function applyPasteTransform(action: PasteTransform) {
+  if (!pasteBuffer.value && selectionData.value) {
+    if (!beginPasteFromSelection()) return false
+  }
+  if (!pasteBuffer.value || !pastePosition.value) return false
+  const center = {
+    x: pastePosition.value.x + pasteBuffer.value.width / 2,
+    y: pastePosition.value.y + pasteBuffer.value.height / 2
+  }
+  pasteBuffer.value = transformPasteBuffer(pasteBuffer.value, action)
+  pastePosition.value = {
+    x: center.x - pasteBuffer.value.width / 2,
+    y: center.y - pasteBuffer.value.height / 2
+  }
+  renderPasteOverlay()
+  return true
 }
 
 function clearOverlay() {
@@ -1316,6 +1438,7 @@ function handlePointerDown(event: MouseEvent) {
   const snapped = toolMode.value === 'select' && angleSnapEnabled.value ? rawPoint : snapPoint(rawPoint)
   if (pasteFollowCursor.value && pasteBuffer.value && !pasteDragOffset.value) {
     pasteFollowCursor.value = false
+    pasteLocked.value = true
     return
   }
   if (pastePosition.value && pasteBuffer.value) {
@@ -1328,9 +1451,12 @@ function handlePointerDown(event: MouseEvent) {
       offsetY <= pasteBuffer.value.height
     ) {
       pasteDragOffset.value = { x: offsetX, y: offsetY }
+      pasteLocked.value = true
       return
     }
-    applyPasteBuffer()
+    if (pasteLocked.value) {
+      applyPasteBuffer()
+    }
     return
   }
   if (toolMode.value === 'select') {
@@ -1617,6 +1743,7 @@ function startPasteFromBuffer() {
     y: center.y - pasteBuffer.value.height / 2
   }
   pasteFollowCursor.value = true
+  pasteLocked.value = false
   renderPasteOverlay()
   return true
 }
@@ -2181,6 +2308,8 @@ defineExpose({
   resumeViewTracking,
   copySelectionToClipboard,
   startPasteFromBuffer,
+  beginPasteFromSelection,
+  applyPasteTransform,
   applyPasteBuffer,
   clearPasteOverlay,
   pasteFromClipboard,

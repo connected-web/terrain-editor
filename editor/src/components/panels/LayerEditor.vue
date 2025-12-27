@@ -498,6 +498,14 @@
                         <button
                           type="button"
                           class="pill-button pill-button--ghost"
+                          title="Select all (Cmd/Ctrl+A)"
+                          @click="selectAll"
+                        >
+                          <Icon icon="expand">Select all (Cmd/Ctrl+A)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
                           :disabled="!canPasteSelection"
                           title="Paste selection (Cmd/Ctrl+P)"
                           @click="pasteSelection"
@@ -529,6 +537,44 @@
                       <p v-else-if="clipboardHasImage" class="layer-editor__inline-hint">
                         Clipboard image ready.
                       </p>
+                      <div class="layer-editor__inline-actions">
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Flip horizontal (Cmd/Ctrl+Shift+H)"
+                          @click="applySelectionTransform('flip-h')"
+                        >
+                          <Icon icon="arrows-left-right">Flip H (Cmd/Ctrl+Shift+H)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Flip vertical (Cmd/Ctrl+Shift+V)"
+                          @click="applySelectionTransform('flip-v')"
+                        >
+                          <Icon icon="arrows-up-down">Flip V (Cmd/Ctrl+Shift+V)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Rotate clockwise (Cmd/Ctrl+R)"
+                          @click="applySelectionTransform('rotate-cw')"
+                        >
+                          <Icon icon="rotate-right">Rotate CW (Cmd/Ctrl+R)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Rotate counter-clockwise (Cmd/Ctrl+Shift+R)"
+                          @click="applySelectionTransform('rotate-ccw')"
+                        >
+                          <Icon icon="rotate-left">Rotate CCW (Cmd/Ctrl+Shift+R)</Icon>
+                        </button>
+                      </div>
                       <div class="layer-editor__inline-actions">
                         <button
                           type="button"
@@ -1050,6 +1096,7 @@ const pasteMode = ref<'replace' | 'merge'>('replace')
 const pasteNotice = ref('')
 let pasteNoticeTimer: number | null = null
 const clipboardHasImage = ref(false)
+const canTransformSelection = computed(() => Boolean(selectionState.value) || pasteActive.value)
 const selectionHistory = ref<Array<SelectionData | null>>([])
 const selectionHistoryIndex = ref(-1)
 const selectionHistorySync = ref(false)
@@ -1386,6 +1433,22 @@ function clearSelection() {
   pushSelectionHistory(null)
 }
 
+function selectAll() {
+  const editor = maskEditorRef.value
+  const size = editor?.getCanvasSize()
+  if (!size || !size.width || !size.height) return
+  selectionState.value = {
+    type: 'rect',
+    x: 0,
+    y: 0,
+    width: size.width,
+    height: size.height,
+    canvasWidth: size.width,
+    canvasHeight: size.height
+  }
+  pushSelectionHistory(selectionState.value)
+}
+
 async function copySelection() {
   const editor = maskEditorRef.value
   if (!editor) return
@@ -1445,6 +1508,17 @@ function cancelPasteSelection() {
 
 function handlePasteApplied() {
   pasteActive.value = false
+  clearSelection()
+}
+
+function applySelectionTransform(action: 'flip-h' | 'flip-v' | 'rotate-cw' | 'rotate-ccw') {
+  const editor = maskEditorRef.value
+  if (!editor || !canTransformSelection.value) return
+  activeTool.value = 'select'
+  const applied = editor.applyPasteTransform(action)
+  if (applied) {
+    pasteActive.value = true
+  }
 }
 
 function setPasteNotice(message: string) {
@@ -2072,9 +2146,33 @@ function handleGlobalKeydown(event: KeyboardEvent) {
     void pasteSelectionFromClipboard('merge')
     return
   }
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'h') {
+    event.preventDefault()
+    applySelectionTransform('flip-h')
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'v') {
+    event.preventDefault()
+    applySelectionTransform('flip-v')
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && key === 'r') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      applySelectionTransform('rotate-ccw')
+    } else {
+      applySelectionTransform('rotate-cw')
+    }
+    return
+  }
   if ((event.metaKey || event.ctrlKey) && (key === 'p' || key === 'v')) {
     event.preventDefault()
     void pasteSelectionFromClipboard()
+    return
+  }
+  if ((event.metaKey || event.ctrlKey) && key === 'a') {
+    event.preventDefault()
+    selectAll()
     return
   }
   if (!event.metaKey && !event.ctrlKey && !event.altKey && pasteActive.value && key === 'escape') {
