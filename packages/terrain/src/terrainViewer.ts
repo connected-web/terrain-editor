@@ -1118,19 +1118,45 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   const locationWorldCache = new Map<string, THREE.Vector3>()
   let markerGeneration = 0
 
-  const placementIndicator = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.01, 0.7, 18),
-    new THREE.MeshStandardMaterial({
+  const placementIndicatorHeight = 0.26
+  const placementIndicatorGroup = new THREE.Group()
+  const placementIndicatorMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff5b5b,
+    transparent: true,
+    opacity: 0.85
+  })
+  const placementStem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.01, 0.01, 0.06, 8),
+    placementIndicatorMaterial
+  )
+  placementStem.position.y = 0.03
+
+  const placementDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.014, 10, 10),
+    placementIndicatorMaterial
+  )
+  placementDot.position.y = 0.005
+
+  const placementRing = new THREE.Mesh(
+    new THREE.CircleGeometry(0.12, 32),
+    new THREE.MeshBasicMaterial({
       color: 0xff5b5b,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.2
     })
   )
-  placementIndicator.visible = false
-  scene.add(placementIndicator)
+  placementRing.rotation.x = -Math.PI / 2
+  placementRing.position.y = 0.005
+
+  placementIndicatorGroup.add(placementRing, placementStem, placementDot)
+  placementIndicatorGroup.visible = false
+  scene.add(placementIndicatorGroup)
   disposables.push(() => {
-    placementIndicator.geometry.dispose()
-    ;(placementIndicator.material as THREE.Material).dispose()
+    placementStem.geometry.dispose()
+    placementDot.geometry.dispose()
+    placementRing.geometry.dispose()
+    placementIndicatorMaterial.dispose()
+    ;(placementRing.material as THREE.Material).dispose()
   })
 
   const loader = new THREE.TextureLoader()
@@ -1681,16 +1707,18 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   function updatePlacementIndicator() {
     if (!interactiveEnabled) {
-      placementIndicator.visible = false
+      placementIndicatorGroup.visible = false
       return
     }
     const hit = intersectTerrain()
     if (!hit) {
-      placementIndicator.visible = false
+      placementIndicatorGroup.visible = false
       return
     }
-    placementIndicator.visible = true
-    placementIndicator.position.copy(hit.point).setY(hit.point.y + 0.2)
+    placementIndicatorGroup.visible = true
+    const target = hit.point.clone()
+    target.y += 0.02
+    placementIndicatorGroup.position.copy(target)
   }
 
   function handlePointerMove(event: PointerEvent) {
@@ -1754,7 +1782,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       renderer.domElement.classList.add('terrain-pointer-active')
     } else {
       renderer.domElement.classList.remove('terrain-pointer-active')
-      placementIndicator.visible = false
+      placementIndicatorGroup.visible = false
     }
   }
 
