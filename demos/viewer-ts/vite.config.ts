@@ -8,6 +8,7 @@ const usePackageBuild = process.env.VIEWER_TS_USE_PACKAGE === 'true'
 
 export default defineConfig({
   base: './',
+  publicDir: path.resolve(__dirname, '../../public'),
   resolve: {
     alias: usePackageBuild
       ? {}

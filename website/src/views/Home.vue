@@ -50,6 +50,7 @@
         <p class="muted spacer">{{ map.description }}</p>
         <div class="info-card__actions">
           <a
+            v-if="map.status === 'available'"
             class="button secondary"
             :href="buildViewerUrl(map.filename)"
             target="_blank"
@@ -57,7 +58,9 @@
           >
             Open in Viewer
           </a>
+          <span v-else class="button secondary button--disabled">Open in Viewer</span>
           <a
+            v-if="map.status === 'available'"
             class="button secondary"
             :href="buildEditorUrl(map.filename)"
             target="_blank"
@@ -65,6 +68,7 @@
           >
             Open in Editor
           </a>
+          <span v-else class="button secondary button--disabled">Open in Editor</span>
         </div>
         <div class="status-pill" :class="map.status === 'available' ? 'done' : 'todo'">
           <span>{{ map.status === 'available' ? 'Added' : 'Planned' }} · {{ map.date }}</span>
