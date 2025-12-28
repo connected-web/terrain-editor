@@ -96,12 +96,17 @@ export type ViewerLifecycleState =
   | 'stabilizing'
   | 'ready'
 
+export type RenderScaleMode = 'auto' | 'fixed'
+
 type TerrainInitOptions = {
   onReady?: () => void
   onLifecycleChange?: (state: ViewerLifecycleState) => void
   heightScale?: number
   waterLevelPercent?: number
   maxPixelRatio?: number
+  renderScale?: number
+  renderScaleMode?: RenderScaleMode
+  onRenderSizeChange?: (payload: RenderResolution) => void
   layers?: LayerToggleState
   interactive?: boolean
   onLocationPick?: (payload: LocationPickPayload) => void
@@ -118,7 +123,9 @@ export type TerrainHandle = {
   updateLayers: (state: LayerToggleState) => Promise<void>
   setInteractiveMode: (enabled: boolean) => void
   setMaxPixelRatio: (value: number) => void
+  setRenderScaleMode: (mode: RenderScaleMode, scale?: number) => void
   setRenderPaused: (paused: boolean) => void
+  getRenderResolution: () => RenderResolution
   updateLocations: (locations: TerrainLocation[], focusedId?: string) => void
   setFocusedLocation: (locationId?: string | null) => void
   navigateTo: (payload: {
@@ -143,6 +150,13 @@ export type TerrainHandle = {
 }
 
 export type Cleanup = () => void
+
+export type RenderResolution = {
+  width: number
+  height: number
+  pixelRatio: number
+  renderScale: number
+}
 
 type Resolvable<T> = T | Promise<T>
 
@@ -948,9 +962,17 @@ export async function initTerrainViewer(
   let viewOffsetPixels = 0
 
   let maxPixelRatio = Math.max(1, options.maxPixelRatio ?? 1.5)
+  const minRenderScale = 0.25
+  let renderScaleMode: RenderScaleMode = options.renderScaleMode ?? 'fixed'
+  let renderScale = clampRenderScale(options.renderScale ?? 1)
   let currentPixelRatio = 1
+  function clampRenderScale(value: number) {
+    return THREE.MathUtils.clamp(value, minRenderScale, 1)
+  }
   function resolvePixelRatio() {
-    return Math.max(1, Math.min(window.devicePixelRatio || 1, maxPixelRatio))
+    const deviceRatio = window.devicePixelRatio || 1
+    const scaledRatio = deviceRatio * renderScale
+    return Math.min(scaledRatio, maxPixelRatio)
   }
 
   const renderer = new THREE.WebGLRenderer({
@@ -978,6 +1000,23 @@ export async function initTerrainViewer(
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   container.appendChild(renderer.domElement)
+
+  const renderResolution: RenderResolution = {
+    width: 0,
+    height: 0,
+    pixelRatio: currentPixelRatio,
+    renderScale
+  }
+  function updateRenderResolution() {
+    const bufferSize = new THREE.Vector2()
+    renderer.getDrawingBufferSize(bufferSize)
+    renderResolution.width = Math.round(bufferSize.x)
+    renderResolution.height = Math.round(bufferSize.y)
+    renderResolution.pixelRatio = currentPixelRatio
+    renderResolution.renderScale = renderScale
+    options.onRenderSizeChange?.({ ...renderResolution })
+  }
+  updateRenderResolution()
 
   disposables.push(() => {
     renderer.dispose()
@@ -1554,9 +1593,22 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       if (currentLifecycleState === 'stabilizing' && stabilizingStartTime !== null) {
         const stabilizingDuration = now - stabilizingStartTime
         if (stabilizingDuration > STABILITY_TIMEOUT_MS) {
-          console.warn(`[terrainViewer] Framerate did not stabilize after ${STABILITY_TIMEOUT_MS}ms, forcing ready state`)
-          setLifecycleState('ready')
-          stabilizingStartTime = null
+          if (renderScaleMode === 'auto' && renderScale > minRenderScale + 0.01) {
+            renderScale = clampRenderScale(Number((renderScale * 0.6).toFixed(2)))
+            currentPixelRatio = resolvePixelRatio()
+            renderer.setPixelRatio(currentPixelRatio)
+            renderer.setSize(viewportWidth, viewportHeight, false)
+            updateRenderResolution()
+            frameTimings.length = 0
+            stabilizingStartTime = now
+            console.warn(
+              `[terrainViewer] Framerate unstable after ${STABILITY_TIMEOUT_MS}ms, reducing render scale to ${renderScale}`
+            )
+          } else {
+            console.warn(`[terrainViewer] Framerate did not stabilize after ${STABILITY_TIMEOUT_MS}ms, forcing ready state`)
+            setLifecycleState('ready')
+            stabilizingStartTime = null
+          }
         }
       }
     }
@@ -1585,6 +1637,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     }
     renderer.setSize(clientWidth, clientHeight, false)
     applyViewOffset()
+    updateRenderResolution()
   }
 
   const resizeObserver = new ResizeObserver(() => {
@@ -1791,6 +1844,20 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       maxPixelRatio = Math.max(1, value)
       handleResize()
     },
+    setRenderScaleMode: (mode: RenderScaleMode, scale?: number) => {
+      renderScaleMode = mode
+      if (typeof scale === 'number') {
+        renderScale = clampRenderScale(scale)
+      } else if (renderScaleMode === 'auto') {
+        renderScale = clampRenderScale(renderScale)
+      }
+      currentPixelRatio = resolvePixelRatio()
+      renderer.setPixelRatio(currentPixelRatio)
+      renderer.setSize(viewportWidth, viewportHeight, false)
+      updateRenderResolution()
+      frameTimings.length = 0
+      stabilizingStartTime = null
+    },
     setRenderPaused: (paused: boolean) => {
       renderPaused = paused
       if (paused) {
@@ -1799,6 +1866,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         animationFrame = window.requestAnimationFrame(animate)
       }
     },
+    getRenderResolution: () => ({ ...renderResolution }),
     updateLocations: (locations: TerrainLocation[], focusedId?: string) => {
       setLocationMarkers(locations, focusedId)
     },

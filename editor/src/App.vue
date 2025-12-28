@@ -146,7 +146,11 @@
           @close="setActivePanel('workspace')"
         />
 
-        <SettingsPanel v-else-if="activeDockPanel === 'settings'" :local-settings="localSettings" />
+        <SettingsPanel
+          v-else-if="activeDockPanel === 'settings'"
+          :local-settings="localSettings"
+          :render-resolution="renderResolution"
+        />
 
         <LocationsPanel
           v-else
@@ -311,11 +315,14 @@ const layerBrowserStore = createLayerBrowserStore()
 const datasetRef = ref<TerrainDataset | null>(null)
 const baseThemeRef = ref<TerrainThemeOverrides | undefined>(undefined)
 
+const { localSettings, loadLocalSettings } = useLocalSettings()
+
 const {
   handle,
   status,
   statusFaded,
   viewerLifecycleState,
+  renderResolution,
   updateStatus,
   mountViewer,
   requestViewerRemount,
@@ -323,10 +330,9 @@ const {
   cleanup: cleanupViewer
 } = useViewer({
   getViewerElement: () => viewerShell.value?.getViewerElement() ?? null,
-  getMountContext: getViewerMountContext
+  getMountContext: getViewerMountContext,
+  renderScaleMode: computed(() => localSettings.renderScaleMode)
 })
-
-const { localSettings, loadLocalSettings } = useLocalSettings()
 
 const {
   workspaceForm,

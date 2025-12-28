@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import {
   initTerrainViewer,
   type LayerToggleState,
@@ -10,6 +10,20 @@ import {
   type ViewerLifecycleState
 } from '@connected-web/terrain-editor'
 import { playwrightLog, exposeTerrainViewer } from '../utils/playwrightDebug'
+import type { RenderScaleMode } from './useLocalSettings'
+
+const MAX_PIXEL_RATIO = 99
+const RENDER_SCALE_PRESETS: Record<
+  RenderScaleMode,
+  { mode: 'auto' | 'fixed'; scale: number; maxPixelRatio: number }
+> = {
+  auto: { mode: 'auto', scale: 1, maxPixelRatio: MAX_PIXEL_RATIO },
+  'very-low': { mode: 'fixed', scale: 0.3, maxPixelRatio: MAX_PIXEL_RATIO },
+  low: { mode: 'fixed', scale: 0.5, maxPixelRatio: MAX_PIXEL_RATIO },
+  medium: { mode: 'fixed', scale: 0.75, maxPixelRatio: MAX_PIXEL_RATIO },
+  high: { mode: 'fixed', scale: 0.9, maxPixelRatio: MAX_PIXEL_RATIO },
+  max: { mode: 'fixed', scale: 1, maxPixelRatio: MAX_PIXEL_RATIO }
+}
 
 type MountContext = {
   dataset: TerrainDataset
@@ -25,11 +39,18 @@ type MountContext = {
 export function useViewer(options: {
   getViewerElement: () => HTMLElement | null
   getMountContext: () => MountContext | null
+  renderScaleMode?: Ref<RenderScaleMode>
 }) {
   const handle = ref<TerrainHandle | null>(null)
   const status = ref('Load a Wyn archive to begin.')
   const statusFaded = ref(false)
   const viewerLifecycleState = ref<ViewerLifecycleState>('initializing')
+  const renderResolution = ref({
+    width: 0,
+    height: 0,
+    pixelRatio: 1,
+    renderScale: 1
+  })
   let statusFadeHandle: number | null = null
   let statusFadeToken = 0
   let remountHandle: number | null = null
@@ -78,6 +99,7 @@ export function useViewer(options: {
     if (!viewerElement) return
     disposeViewer()
     viewerLifecycleState.value = 'initializing'
+    const renderPreset = resolveRenderScaleMode()
     handle.value = await initTerrainViewer(viewerElement, nextContext.dataset, {
       layers: nextContext.layerState,
       locations: nextContext.locations,
@@ -85,18 +107,37 @@ export function useViewer(options: {
       theme: nextContext.theme,
       cameraView: nextContext.initialCameraView,
       preserveDrawingBuffer: true,
-      maxPixelRatio: 1.5,
+      maxPixelRatio: renderPreset.maxPixelRatio,
+      renderScale: renderPreset.scale,
+      renderScaleMode: renderPreset.mode,
       onLocationPick: nextContext.onLocationPick,
       onLocationClick: nextContext.onLocationClick,
-      onLifecycleChange: handleLifecycleChange
+      onLifecycleChange: handleLifecycleChange,
+      onRenderSizeChange: (payload) => {
+        renderResolution.value = payload
+      }
     })
     exposeTerrainViewer(handle.value)
+    renderResolution.value = handle.value.getRenderResolution()
+    applyRenderScaleMode()
   }
 
   function disposeViewer() {
     handle.value?.destroy()
     handle.value = null
     exposeTerrainViewer(null)
+  }
+
+  function resolveRenderScaleMode() {
+    const mode = options.renderScaleMode?.value ?? 'auto'
+    return RENDER_SCALE_PRESETS[mode]
+  }
+
+  function applyRenderScaleMode() {
+    if (!handle.value) return
+    const preset = resolveRenderScaleMode()
+    handle.value.setMaxPixelRatio(preset.maxPixelRatio)
+    handle.value.setRenderScaleMode(preset.mode, preset.scale)
   }
 
   function requestViewerRemount() {
@@ -121,11 +162,19 @@ export function useViewer(options: {
     }
   }
 
+  if (options.renderScaleMode) {
+    watch(
+      () => options.renderScaleMode?.value,
+      () => applyRenderScaleMode()
+    )
+  }
+
   return {
     handle,
     status,
     statusFaded,
     viewerLifecycleState,
+    renderResolution,
     updateStatus,
     mountViewer,
     requestViewerRemount,

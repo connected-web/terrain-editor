@@ -32,9 +32,12 @@ export type BrushSettings = {
   pinnedValues: { size: number; opacity: number; level: number }
 }
 
+export type RenderScaleMode = 'auto' | 'very-low' | 'low' | 'medium' | 'high' | 'max'
+
 export type LocalSettings = {
   cameraTracking: boolean
   openLocationsOnSelect: boolean
+  renderScaleMode: RenderScaleMode
   brushSettings: BrushSettings | null
   brushPresets: BrushPreset[]
   gridSettings: {
@@ -52,6 +55,7 @@ export type LocalSettings = {
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   cameraTracking: true,
   openLocationsOnSelect: true,
+  renderScaleMode: 'auto',
   brushSettings: null,
   brushPresets: [],
   gridSettings: {
@@ -76,6 +80,8 @@ export function useLocalSettings() {
       saved.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
     localSettings.openLocationsOnSelect =
       saved.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
+    localSettings.renderScaleMode =
+      saved.renderScaleMode ?? DEFAULT_LOCAL_SETTINGS.renderScaleMode
     localSettings.brushSettings =
       saved.brushSettings ?? DEFAULT_LOCAL_SETTINGS.brushSettings
     localSettings.brushPresets =
