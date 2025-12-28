@@ -26,7 +26,6 @@
             @mousedown="handlePointerDown"
             @mousemove="handlePointerMove"
             @mouseup="handlePointerUp"
-            @mouseleave="handlePointerUp"
           />
           <canvas
             ref="previewCanvasRef"
@@ -220,6 +219,7 @@ const selectionBounds = ref<{ minX: number; minY: number; maxX: number; maxY: nu
 const pasteFollowCursor = ref(false)
 const pasteLocked = ref(false)
 const pasteHover = ref(false)
+const pointerTrackingActive = ref(false)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
@@ -1477,6 +1477,7 @@ function handlePointerDown(event: MouseEvent) {
       return
     }
     selectionStart.value = snapped
+    startPointerTracking()
     const draft = buildRectSelection(selectionStart.value, selectionStart.value)
     selectionDraft.value = draft
     requestAnimationFrame(() => {
@@ -1522,6 +1523,7 @@ function handlePointerDown(event: MouseEvent) {
   strokeAnchor.value = snapped
   lastX.value = snapped.x
   lastY.value = snapped.y
+  startPointerTracking()
   clearOverlay()
   stampBrush(snapped.x, snapped.y, brushAngle.value)
 }
@@ -1618,6 +1620,7 @@ function handlePointerUp() {
     if (selection) {
       emit('selection-change', selection)
     }
+    stopPointerTracking()
     return
   }
   if (!isDrawing.value) return
@@ -1637,9 +1640,11 @@ function handlePointerUp() {
       commitOverlay()
       selectionApplyBusy.value = false
     })
+    stopPointerTracking()
     return
   }
   commitOverlay()
+  stopPointerTracking()
 }
 
 function commitOverlay() {
@@ -2295,6 +2300,20 @@ function markUserViewportInteraction() {
   userViewportActivated = true
 }
 
+function startPointerTracking() {
+  if (pointerTrackingActive.value) return
+  pointerTrackingActive.value = true
+  window.addEventListener('mousemove', handlePointerMove)
+  window.addEventListener('mouseup', handlePointerUp)
+}
+
+function stopPointerTracking() {
+  if (!pointerTrackingActive.value) return
+  pointerTrackingActive.value = false
+  window.removeEventListener('mousemove', handlePointerMove)
+  window.removeEventListener('mouseup', handlePointerUp)
+}
+
 function getCanvasSize() {
   return { ...canvasDimensions.value }
 }
@@ -2487,12 +2506,9 @@ function handleViewportPointerLeave(event: PointerEvent) {
   cursorSampleValue.value = null
   snapGuide.value = null
   clearFillPreview()
-  if (selectionStart.value) {
-    selectionStart.value = null
-    selectionDraft.value = null
-    renderSelectionOverlay(selectionData.value)
+  if (isPanning.value) {
+    handleViewportPointerUp(event)
   }
-  handleViewportPointerUp(event)
 }
 
 watch(showCustomCursor, (canShow) => {
@@ -2510,6 +2526,7 @@ onBeforeUnmount(() => {
     URL.revokeObjectURL(image.value.src)
   }
   clearFillPreview()
+  stopPointerTracking()
 })
 
 function colorToRgba(color: [number, number, number], alpha = 1) {
