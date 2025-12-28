@@ -478,13 +478,6 @@
                           <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
                         </div>
                       </label>
-                      <label class="layer-editor__field">
-                        <span>Paste mode</span>
-                        <select v-model="pasteMode">
-                          <option value="replace">Replace</option>
-                          <option value="merge">Merge</option>
-                        </select>
-                      </label>
                       <div class="layer-editor__inline-actions">
                         <button
                           type="button"
@@ -541,44 +534,6 @@
                         <button
                           type="button"
                           class="pill-button pill-button--ghost"
-                          :disabled="!canTransformSelection"
-                          title="Flip horizontal (Cmd/Ctrl+Shift+H)"
-                          @click="applySelectionTransform('flip-h')"
-                        >
-                          <Icon icon="arrows-left-right">Flip H (Cmd/Ctrl+Shift+H)</Icon>
-                        </button>
-                        <button
-                          type="button"
-                          class="pill-button pill-button--ghost"
-                          :disabled="!canTransformSelection"
-                          title="Flip vertical (Cmd/Ctrl+Shift+V)"
-                          @click="applySelectionTransform('flip-v')"
-                        >
-                          <Icon icon="arrows-up-down">Flip V (Cmd/Ctrl+Shift+V)</Icon>
-                        </button>
-                        <button
-                          type="button"
-                          class="pill-button pill-button--ghost"
-                          :disabled="!canTransformSelection"
-                          title="Rotate clockwise (Cmd/Ctrl+R)"
-                          @click="applySelectionTransform('rotate-cw')"
-                        >
-                          <Icon icon="rotate-right">Rotate CW (Cmd/Ctrl+R)</Icon>
-                        </button>
-                        <button
-                          type="button"
-                          class="pill-button pill-button--ghost"
-                          :disabled="!canTransformSelection"
-                          title="Rotate counter-clockwise (Cmd/Ctrl+Shift+R)"
-                          @click="applySelectionTransform('rotate-ccw')"
-                        >
-                          <Icon icon="rotate-left">Rotate CCW (Cmd/Ctrl+Shift+R)</Icon>
-                        </button>
-                      </div>
-                      <div class="layer-editor__inline-actions">
-                        <button
-                          type="button"
-                          class="pill-button pill-button--ghost"
                           :disabled="!canUndoSelection"
                           title="Undo selection"
                           @click="undoSelection"
@@ -616,6 +571,53 @@
                           <input type="number" min="0" max="100" v-model.number="fillTolerancePercent">
                         </div>
                       </label>
+                    </div>
+                    <div v-if="activeTool === 'transform'" class="layer-editor__control-stack">
+                      <label class="layer-editor__field">
+                        <span>Paste mode</span>
+                        <select v-model="pasteMode">
+                          <option value="replace">Replace</option>
+                          <option value="merge">Merge</option>
+                        </select>
+                      </label>
+                      <div class="layer-editor__inline-actions">
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Flip horizontal (Cmd/Ctrl+Shift+H)"
+                          @click="applySelectionTransform('flip-h')"
+                        >
+                          <Icon icon="arrows-left-right">Flip H (Cmd/Ctrl+Shift+H)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Flip vertical (Cmd/Ctrl+Shift+V)"
+                          @click="applySelectionTransform('flip-v')"
+                        >
+                          <Icon icon="arrows-up-down">Flip V (Cmd/Ctrl+Shift+V)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Rotate clockwise (Cmd/Ctrl+R)"
+                          @click="applySelectionTransform('rotate-cw')"
+                        >
+                          <Icon icon="rotate-right">Rotate CW (Cmd/Ctrl+R)</Icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="pill-button pill-button--ghost"
+                          :disabled="!canTransformSelection"
+                          title="Rotate counter-clockwise (Cmd/Ctrl+Shift+R)"
+                          @click="applySelectionTransform('rotate-ccw')"
+                        >
+                          <Icon icon="rotate-left">Rotate CCW (Cmd/Ctrl+Shift+R)</Icon>
+                        </button>
+                      </div>
                     </div>
                     <div v-if="supportsBrushProperties" class="layer-editor__control-stack layer-editor__control-stack--advanced">
                       <label class="layer-editor__slider-field">
@@ -821,7 +823,7 @@ const TOOL_PALETTE = [
   { id: 'fill', label: 'Fill', icon: 'fill-drip', shortcut: 'G', description: 'Fill contiguous areas.', onlyHeightmap: false, disabled: false },
   { id: 'select', label: 'Select', icon: 'crosshairs', shortcut: 'S', description: 'Select pixels for transforms.', onlyHeightmap: false, disabled: false },
   { id: 'hand', label: 'Hand', icon: 'hand', shortcut: 'H', description: 'Pan the canvas.', onlyHeightmap: false, disabled: false },
-  { id: 'transform', label: 'Transform', icon: 'up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: true },
+  { id: 'transform', label: 'Transform', icon: 'arrows-up-down-left-right', shortcut: 'T', description: 'Transform selections.', onlyHeightmap: false, disabled: false },
   { id: 'grid', label: 'Grid', icon: 'border-all', shortcut: 'R', description: 'Grid and snapping settings.', onlyHeightmap: false, disabled: false }
 ] as const
 
@@ -851,6 +853,16 @@ const props = defineProps<{
   maskViewMode?: 'grayscale' | 'color'
   brushSettings?: BrushSettings | null
   brushPresets?: StoredBrushPreset[]
+  gridSettings?: {
+    gridEnabled: boolean
+    gridMode: 'underlay' | 'overlay'
+    gridOpacity: number
+    gridSize: number
+    gridColor: string
+    snapEnabled: boolean
+    snapSize: number
+    angleSnapEnabled: boolean
+  } | null
 }>()
 
 const emit = defineEmits<{
@@ -876,6 +888,16 @@ const emit = defineEmits<{
   (ev: 'mask-view-change', mode: 'grayscale' | 'color'): void
   (ev: 'update-brush-settings', payload: BrushSettings): void
   (ev: 'update-brush-presets', payload: StoredBrushPreset[]): void
+  (ev: 'update-grid-settings', payload: {
+    gridEnabled: boolean
+    gridMode: 'underlay' | 'overlay'
+    gridOpacity: number
+    gridSize: number
+    gridColor: string
+    snapEnabled: boolean
+    snapSize: number
+    angleSnapEnabled: boolean
+  }): void
 }>()
 
 const layerName = ref('')
@@ -1189,7 +1211,7 @@ watch(activeTool, (next) => {
   if (next !== 'flat' && next !== 'fill') {
     flatSampleMode.value = false
   }
-  if (next !== 'select' && pasteActive.value) {
+  if (!['select', 'transform'].includes(next) && pasteActive.value) {
     cancelPasteSelection()
   }
   if (next === 'select') {
@@ -1468,12 +1490,14 @@ function pasteSelection() {
       pasteAvailable.value = true
       pasteActive.value = true
       setPasteNotice('Pasted from system clipboard.')
+      activeTool.value = 'transform'
       return
     }
     const started = editor.startPasteFromBuffer()
     if (started) {
       pasteActive.value = true
       setPasteNotice('Used app clipboard buffer.')
+      activeTool.value = 'transform'
     }
   })()
 }
@@ -1487,6 +1511,7 @@ async function pasteSelectionFromClipboard(mode: 'replace' | 'merge' = pasteMode
   if (started) {
     pasteAvailable.value = true
     pasteActive.value = true
+    activeTool.value = 'transform'
   }
 }
 
@@ -1509,12 +1534,15 @@ function cancelPasteSelection() {
 function handlePasteApplied() {
   pasteActive.value = false
   clearSelection()
+  if (activeTool.value === 'transform') {
+    activeTool.value = 'select'
+  }
 }
 
 function applySelectionTransform(action: 'flip-h' | 'flip-v' | 'rotate-cw' | 'rotate-ccw') {
   const editor = maskEditorRef.value
   if (!editor || !canTransformSelection.value) return
-  activeTool.value = 'select'
+  activeTool.value = 'transform'
   const applied = editor.applyPasteTransform(action)
   if (applied) {
     pasteActive.value = true
@@ -1566,6 +1594,7 @@ async function handlePasteEvent(event: ClipboardEvent) {
     pasteAvailable.value = true
     pasteActive.value = true
     setPasteNotice('Clipboard image captured.')
+    activeTool.value = 'transform'
     clipboardHasImage.value = true
   }
 }
@@ -1669,6 +1698,21 @@ watch(
   { immediate: true }
 )
 watch(
+  () => props.gridSettings,
+  (next) => {
+    if (!next) return
+    gridEnabled.value = next.gridEnabled
+    gridMode.value = next.gridMode
+    gridOpacity.value = next.gridOpacity
+    gridSize.value = next.gridSize
+    gridColor.value = next.gridColor
+    snapEnabled.value = next.snapEnabled
+    snapSize.value = next.snapSize
+    angleSnapEnabled.value = next.angleSnapEnabled
+  },
+  { immediate: true }
+)
+watch(
   [
     toolSettings,
     pinState,
@@ -1691,6 +1735,22 @@ watch(
     if (signature === lastBrushSettingsSignature.value) return
     lastBrushSettingsSignature.value = signature
     emit('update-brush-settings', snapshot)
+  },
+  { deep: true }
+)
+watch(
+  [gridEnabled, gridMode, gridOpacity, gridSize, gridColor, snapEnabled, snapSize, angleSnapEnabled],
+  () => {
+    emit('update-grid-settings', {
+      gridEnabled: gridEnabled.value,
+      gridMode: gridMode.value,
+      gridOpacity: gridOpacity.value,
+      gridSize: gridSize.value,
+      gridColor: gridColor.value,
+      snapEnabled: snapEnabled.value,
+      snapSize: snapSize.value,
+      angleSnapEnabled: angleSnapEnabled.value
+    })
   },
   { deep: true }
 )

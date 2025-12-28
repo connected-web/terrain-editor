@@ -37,13 +37,33 @@ export type LocalSettings = {
   openLocationsOnSelect: boolean
   brushSettings: BrushSettings | null
   brushPresets: BrushPreset[]
+  gridSettings: {
+    gridEnabled: boolean
+    gridMode: 'underlay' | 'overlay'
+    gridOpacity: number
+    gridSize: number
+    gridColor: string
+    snapEnabled: boolean
+    snapSize: number
+    angleSnapEnabled: boolean
+  }
 }
 
 export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   cameraTracking: true,
   openLocationsOnSelect: true,
   brushSettings: null,
-  brushPresets: []
+  brushPresets: [],
+  gridSettings: {
+    gridEnabled: true,
+    gridMode: 'underlay',
+    gridOpacity: 0.35,
+    gridSize: 32,
+    gridColor: '#ffffff',
+    snapEnabled: false,
+    snapSize: 16,
+    angleSnapEnabled: false
+  }
 }
 
 export function useLocalSettings() {
@@ -60,6 +80,8 @@ export function useLocalSettings() {
       saved.brushSettings ?? DEFAULT_LOCAL_SETTINGS.brushSettings
     localSettings.brushPresets =
       saved.brushPresets ?? DEFAULT_LOCAL_SETTINGS.brushPresets
+    localSettings.gridSettings =
+      saved.gridSettings ?? DEFAULT_LOCAL_SETTINGS.gridSettings
   }
 
   function persistSettings() {

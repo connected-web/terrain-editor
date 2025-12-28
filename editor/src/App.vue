@@ -77,6 +77,7 @@
             :mask-view-mode="maskViewMode"
             :brush-settings="localSettings.brushSettings"
             :brush-presets="localSettings.brushPresets"
+            :grid-settings="localSettings.gridSettings"
             @update:filter-text="setAssetDialogFilter"
             @export-layer="layersApi.exportActiveLayerImage"
             @replace="handleLayerAssetReplace"
@@ -97,6 +98,7 @@
             @create-empty-mask="handleCreateEmptyMask"
             @update-brush-settings="(next) => { localSettings.brushSettings = next }"
             @update-brush-presets="(next) => { localSettings.brushPresets = next }"
+            @update-grid-settings="(next) => { localSettings.gridSettings = next }"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel

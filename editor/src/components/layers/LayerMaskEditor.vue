@@ -82,7 +82,7 @@
       :icon="activeCursorIcon"
       :opacity="brushOpacity"
       :show-brush-ring="!flatSampleActive && ['brush', 'erase', 'flat'].includes(toolMode)"
-      :icon-anchor="['select', 'grid', 'hand'].includes(toolMode) ? 'center' : 'offset'"
+      :icon-anchor="['select', 'grid', 'hand', 'transform'].includes(toolMode) ? 'center' : 'offset'"
       :anchor="flatSampleActive && toolMode !== 'fill' ? 'bottom-left' : 'center'"
       :sample-value="cursorSampleValue"
       :show-target-dot="toolMode === 'fill'"
@@ -219,6 +219,7 @@ const lastStrokePoint = ref<{ x: number; y: number } | null>(null)
 const selectionBounds = ref<{ minX: number; minY: number; maxX: number; maxY: number } | null>(null)
 const pasteFollowCursor = ref(false)
 const pasteLocked = ref(false)
+const pasteHover = ref(false)
 const brushSize = computed(() => Math.min(512, Math.max(1, props.brushSize ?? 32)))
 const brushOpacity = computed(() => Math.min(1, Math.max(0.01, props.brushOpacity ?? 1)))
 const brushSoftness = computed(() => Math.min(1, Math.max(0, props.brushSoftness ?? 0)))
@@ -353,8 +354,10 @@ const activeCursorIcon = computed(() => {
   switch (toolMode.value) {
     case 'grid':
       return 'border-all'
+    case 'transform':
+      return 'arrows-up-down-left-right'
     case 'select':
-      return 'crosshairs'
+      return pasteHover.value ? 'arrows-up-down-left-right' : 'crosshairs'
     case 'fill':
       return 'fill-drip'
     case 'erase':
@@ -882,6 +885,7 @@ function clearPasteOverlay() {
   pasteDragOffset.value = null
   pasteFollowCursor.value = false
   pasteLocked.value = false
+  pasteHover.value = false
   clearOverlay()
 }
 
@@ -1436,6 +1440,9 @@ function handlePointerDown(event: MouseEvent) {
   const rawPoint = canvasCoordsFromEvent(event)
   const freehandOverride = event.ctrlKey || event.metaKey
   const snapped = toolMode.value === 'select' && angleSnapEnabled.value ? rawPoint : snapPoint(rawPoint)
+  if (toolMode.value === 'transform' && selectionData.value && !pasteBuffer.value) {
+    beginPasteFromSelection()
+  }
   if (pasteFollowCursor.value && pasteBuffer.value && !pasteDragOffset.value) {
     pasteFollowCursor.value = false
     pasteLocked.value = true
@@ -2421,6 +2428,17 @@ function updateCursorPosition(event: PointerEvent | MouseEvent) {
   const coords = canvasCoordsFromEvent(event as MouseEvent)
   const snapped = snapPoint(coords)
   lastCanvasCoords.value = { x: snapped.x, y: snapped.y }
+  if (pasteBuffer.value && pastePosition.value && toolMode.value === 'select') {
+    const hoverX = snapped.x - pastePosition.value.x
+    const hoverY = snapped.y - pastePosition.value.y
+    pasteHover.value =
+      hoverX >= 0 &&
+      hoverY >= 0 &&
+      hoverX <= pasteBuffer.value.width &&
+      hoverY <= pasteBuffer.value.height
+  } else if (pasteHover.value) {
+    pasteHover.value = false
+  }
   debugCoords.value = coords
   if (snapEnabled.value && (Math.abs(coords.x - snapped.x) > 0.5 || Math.abs(coords.y - snapped.y) > 0.5)) {
     snapCoords.value = snapped
