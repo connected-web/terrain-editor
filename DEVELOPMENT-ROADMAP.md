@@ -43,6 +43,7 @@
 - ✅ Asset dialogs
 - ✅ Project persistence + storage helpers
 - ✅ Workspace panel for metadata (title, author, size, sea level) with viewer remount
+- ✅ Capture-from-view thumbnails downscale to lightweight images
 - 💡 Unified workspace covering heightmap, theme, locations, masks, thumbnails
 - 💡 Layer editor + layers panel integration (shared layout, collapsible tools, dock-aware)
 

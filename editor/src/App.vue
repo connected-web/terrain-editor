@@ -1313,15 +1313,45 @@ async function captureThumbnailFromView() {
         updateStatus('Unable to capture thumbnail from the viewer.', 2000)
         return
       }
-      const fallbackFile = new File([fallbackBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+      const scaledFallback = await scaleThumbnailBlob(fallbackBlob)
+      const fallbackFile = new File([scaledFallback], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
       await replaceThumbnailFromFile(fallbackFile)
       return
     }
-    const file = new File([blob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
+    const scaledBlob = await scaleThumbnailBlob(blob)
+    const file = new File([scaledBlob], 'thumbnail.png', { type: 'image/png', lastModified: Date.now() })
     await replaceThumbnailFromFile(file)
   } finally {
     isCreatingThumbnail.value = false
   }
+}
+
+async function scaleThumbnailBlob(blob: Blob) {
+  const image = await createImageBitmap(blob).catch(() => null)
+  if (!image) return blob
+  const maxWidth = 320
+  const maxHeight = 180
+  const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height)
+  const targetWidth = Math.max(1, Math.round(image.width * scale))
+  const targetHeight = Math.max(1, Math.round(image.height * scale))
+  if (targetWidth === image.width && targetHeight === image.height) {
+    image.close?.()
+    return blob
+  }
+  const outputCanvas = document.createElement('canvas')
+  outputCanvas.width = targetWidth
+  outputCanvas.height = targetHeight
+  const context = outputCanvas.getContext('2d')
+  if (!context) {
+    image.close?.()
+    return blob
+  }
+  context.drawImage(image, 0, 0, targetWidth, targetHeight)
+  image.close?.()
+  const scaledBlob = await new Promise<Blob | null>((resolve) => outputCanvas.toBlob(resolve, 'image/png'))
+  if (scaledBlob) return scaledBlob
+  const fallbackDataUrl = outputCanvas.toDataURL('image/png')
+  return fetch(fallbackDataUrl).then((res) => res.blob()).catch(() => blob)
 }
 
 function handleModalAssetUpload() {
