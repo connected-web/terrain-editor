@@ -5,6 +5,7 @@ demos/viewer-ts/dist
 demos/viewer-ts/public/maps
 editor/dist
 editor/public/maps
+public/maps/*.wyn
 packages/terrain/dist
 packages/terrain/documentation
 test-results

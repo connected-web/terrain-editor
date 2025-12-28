@@ -1,46 +1,73 @@
 <template>
   <section class="hero">
-    <p class="muted">Connected Web Experiments</p>
-    <h1>Build, edit, and explore Wyn terrain files directly in the browser.</h1>
-    <p class="muted">
-      A collection of Three.js powered tools for building and navigating layered map topologies; sharable as <code>.wyn</code> archives.
-    </p>
-    <div class="cta-row">
-      <a class="button primary" :href="viewerTsUrl" target="_blank" rel="noreferrer">
-        Launch Viewer
-      </a>
-      <a class="button primary" :href="editorUrl" target="_blank" rel="noreferrer">
-        Launch Editor
-      </a>
-      <a
-        class="button secondary"
-        href="https://github.com/connected-web/terrain-editor"
-        target="_blank"
-        rel="noreferrer"
-      >
-        GitHub Project
-      </a>
+    <div class="hero__content">
+      <p class="muted">Connected Web Technology Forge</p>
+      <h1>Craft and tune Wyn terrain maps in a full 3D editor — right in the browser.</h1>
+      <p class="muted">
+        Three.js powered tooling for sculpting, masking, and touring layered map topologies, packaged as portable <code>.wyn</code> archives.
+      </p>
+      <div class="cta-row">
+        <a class="button primary" :href="viewerTsUrl" target="_blank" rel="noreferrer">
+          Launch Viewer
+        </a>
+        <a class="button primary" :href="editorUrl" target="_blank" rel="noreferrer">
+          Launch Editor
+        </a>
+        <a
+          class="button secondary"
+          href="https://github.com/connected-web/terrain-editor"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub Project
+        </a>
+      </div>
+    </div>
+    <div class="hero__media">
+      <img
+        src="/images/layer-editor-forest.png"
+        alt="Layer editor forest mask preview"
+        loading="lazy"
+      />
     </div>
   </section>
 
   <section class="section-card" id="demos">
     <h2>Interactive Demos</h2>
-    <p class="muted">The following demos showcase the terrain viewer package for its intended use cases.</p>
+    <p class="muted">Pick a map to open directly in the viewer or editor.</p>
     <div class="card-grid">
-      <article v-for="demo in demos" :key="demo.title" class="info-card">
-        <h3>{{ demo.title }}</h3>
-        <p class="muted spacer">{{ demo.description }}</p>
-        <a
-          v-if="demo.url"
-          class="button secondary"
-          :href="demo.url"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Demo
-        </a>
-        <div class="status-pill" :class="demo.available ? 'done' : 'todo'">
-          <span>{{ demo.available ? 'Available' : 'Coming soon' }}</span>
+      <article v-for="map in demoMaps" :key="map.id" class="info-card">
+        <div class="info-card__media">
+          <img
+            v-if="map.thumbnail"
+            :src="map.thumbnail"
+            :alt="`${map.title} preview`"
+            loading="lazy"
+          />
+          <div v-else class="info-card__media-placeholder">No thumbnail</div>
+        </div>
+        <h3>{{ map.title }}</h3>
+        <p class="muted spacer">{{ map.description }}</p>
+        <div class="info-card__actions">
+          <a
+            class="button secondary"
+            :href="buildViewerUrl(map.filename)"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Viewer
+          </a>
+          <a
+            class="button secondary"
+            :href="buildEditorUrl(map.filename)"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in Editor
+          </a>
+        </div>
+        <div class="status-pill" :class="map.status === 'available' ? 'done' : 'todo'">
+          <span>{{ map.status === 'available' ? 'Added' : 'Planned' }} · {{ map.date }}</span>
         </div>
       </article>
     </div>
@@ -49,7 +76,6 @@
   <section class="section-card" id="roadmap">
     <h2 class="row">
       <label class="spacer">Roadmap</label>
-      <code>Nov 2025</code>
     </h2>
     <div class="card-grid">
       <article class="info-card">
@@ -57,9 +83,7 @@
         <ul class="roadmap-list">
           <li v-for="item in viewerRoadmap" :key="item.label" class="roadmap-item">
             <span>{{ item.label }}</span>
-            <span class="status-pill" :class="item.done ? 'done' : 'todo'">
-              {{ item.done ? 'Done' : 'Next' }}
-            </span>
+            <span class="status-pill done">{{ item.date }}</span>
           </li>
         </ul>
       </article>
@@ -68,23 +92,31 @@
         <ul class="roadmap-list">
           <li v-for="item in editorRoadmap" :key="item.label" class="roadmap-item">
             <span>{{ item.label }}</span>
-            <span class="status-pill" :class="item.done ? 'done' : 'todo'">
-              {{ item.done ? 'Done' : 'Next' }}
-            </span>
+            <span class="status-pill done">{{ item.date }}</span>
           </li>
         </ul>
       </article>
     </div>
     <p class="muted spacer">
       See activity on the <a href="https://github.com/connected-web/terrain-editor" target="_blank" rel="noreferrer">GitHub project page</a> for the latest updates and upcoming features.
+      The detailed roadmap lives in <a href="https://github.com/connected-web/terrain-editor/blob/main/DEVELOPMENT-ROADMAP.md" target="_blank" rel="noreferrer">DEVELOPMENT-ROADMAP.md</a>.
     </p>
   </section>
 
 </template>
 
 <script setup lang="ts">
-type RoadmapItem = { label: string; done?: boolean }
-type DemoCard = { title: string; description: string; available: boolean; url?: string }
+import { ref } from 'vue'
+type RoadmapItem = { label: string; date: string }
+type DemoMap = {
+  id: string
+  title: string
+  description: string
+  filename: string
+  status: 'available' | 'planned'
+  date: string
+  thumbnail?: string | null
+}
 
 const devUrls =
   typeof window !== 'undefined' && import.meta.env.DEV
@@ -103,32 +135,37 @@ const devUrls =
 const viewerTsUrl = devUrls?.viewerTs ?? './viewer-js/'
 const editorUrl = devUrls?.editor ?? './editor/'
 
-const demos: DemoCard[] = [
-  {
-    title: 'Terrain Viewer',
-    description: 'Browser based harness that loads Wyn archives asynchronously and decodes with JSZip.',
-    available: true,
-    url: viewerTsUrl
-  },
-  {
-    title: 'Terrain Editor',
-    description: 'Full terrain editor for creating and modifying metadata and locations in existing Wyn archives.',
-    available: true,
-    url: editorUrl
+const demoMaps = ref<DemoMap[]>([])
+
+const buildViewerUrl = (filename: string) => `${viewerTsUrl}?map=${encodeURIComponent(filename)}`
+const buildEditorUrl = (filename: string) => `${editorUrl}?map=${encodeURIComponent(filename)}`
+
+async function loadDemoMaps() {
+  try {
+    const response = await fetch('./maps/registry.json')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = (await response.json()) as { maps: DemoMap[] }
+    demoMaps.value = data.maps ?? []
+  } catch (err) {
+    console.error('Failed to load demo map registry', err)
   }
-]
+}
+
+if (typeof window !== 'undefined') {
+  void loadDemoMaps()
+}
 
 const viewerRoadmap: RoadmapItem[] = [
-  { label: 'Self-contained Three.js renderer', done: true },
-  { label: 'TS based viewer and .wyn loader', done: true },
-  { label: 'Popout and full screen modes', done: true },
-  { label: 'Location and layer UX polish', done: true }
+  { label: 'Self-contained Three.js renderer', date: 'Nov 2025' },
+  { label: 'TS based viewer and .wyn loader', date: 'Nov 2025' },
+  { label: 'Popout and full screen modes', date: 'Nov 2025' },
+  { label: 'Location and layer UX polish', date: 'Nov 2025' }
 ]
 
 const editorRoadmap: RoadmapItem[] = [
-  { label: 'Editor skeleton with basic viewer', done: true },
-  { label: 'Wyn import/export pipeline', done: false },
-  { label: 'Layer + mask editing tools', done: false },
-  { label: 'Height + location workflows', done: false }
+  { label: 'Editor skeleton with basic viewer', date: 'Nov 2025' },
+  { label: 'Wyn import/export pipeline', date: 'Dec 2025' },
+  { label: 'Layer + mask editing tools', date: 'Dec 2025' },
+  { label: 'Height + location workflows', date: 'Dec 2025' }
 ]
 </script>

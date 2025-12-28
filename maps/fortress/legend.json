@@ -1,0 +1,1 @@
+{"size":[512,512],"heightmap":"heightmap.png","topology":"heightmap.png","sea_level":0.57,"biomes":{"grass":{"label":"Grass","mask":"layers/grass.png","rgb":[129,162,131]},"stone_walls":{"label":"Stone Walls","mask":"layers/stone_walls.png","rgb":[148,148,148]}},"overlays":{}}

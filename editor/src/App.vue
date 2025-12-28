@@ -53,7 +53,10 @@
           :thumbnail-url="thumbnailPreviewUrl"
           :has-thumbnail="hasThumbnailAsset"
           :is-creating-thumbnail="isCreatingThumbnail"
-          @load-sample="loadSample"
+          :sample-maps="sampleMaps"
+          :sample-map-id="sampleMapId"
+          @select-sample="(id) => { sampleMapId = id }"
+          @load-sample="loadSampleMapById"
           @load-map="triggerFileSelect"
           @start-new="startNewMap()"
           @export-archive="exportArchive"
@@ -699,6 +702,7 @@ function closeModalAssetPicker() {
 const {
   loadArchiveFromBytes,
   loadArchiveFromFile: loadArchiveFromFileInternal,
+  loadArchiveFromUrl,
   loadSampleArchive
 } = useArchiveLoader({
   projectStore,
@@ -719,7 +723,44 @@ const {
   getSampleArchiveUrl: archiveUrl
 })
 
-const loadSample = loadSampleArchive
+type DemoMapEntry = {
+  id: string
+  title: string
+  description: string
+  filename: string
+  status: 'available' | 'planned'
+  date: string
+  thumbnail?: string | null
+}
+
+const sampleMaps = ref<DemoMapEntry[]>([])
+const sampleMapId = ref<string | null>(null)
+
+function getPublicMapUrl(filename: string) {
+  return new URL(`../../maps/${filename}`, import.meta.url).toString()
+}
+
+async function loadSampleRegistry() {
+  try {
+    const response = await fetch(new URL('../../maps/registry.json', import.meta.url).toString())
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = (await response.json()) as { maps?: DemoMapEntry[] }
+    sampleMaps.value = data.maps ?? []
+    const firstAvailable = sampleMaps.value.find((entry) => entry.status === 'available')
+    sampleMapId.value = firstAvailable?.id ?? sampleMaps.value[0]?.id ?? null
+  } catch (err) {
+    console.warn('Failed to load sample map registry', err)
+  }
+}
+
+async function loadSampleMapById(id?: string | null) {
+  const mapId = id ?? sampleMapId.value
+  const entry = sampleMaps.value.find((item) => item.id === mapId)
+  if (!entry || entry.status !== 'available') return
+  await loadSampleArchive(getPublicMapUrl(entry.filename), entry.title)
+}
+
+const loadSample = () => loadSampleMapById()
 const loadArchiveFromFile = loadArchiveFromFileInternal
 
 type GlobalConfirmState = {
@@ -1467,10 +1508,17 @@ onMounted(() => {
   window.addEventListener('dragover', handleWindowDragEvent, true)
   window.addEventListener('drop', handleWindowDragEvent, true)
   loadLocalSettings()
+  void loadSampleRegistry()
 
   // Check for autoload parameter
   const params = new URLSearchParams(window.location.search)
   const autoload = params.get('autoload')
+  const mapParam = params.get('map')
+
+  if (mapParam) {
+    void loadSampleArchive(getPublicMapUrl(mapParam), mapParam)
+    return
+  }
 
   if (autoload === 'sample') {
     // Auto-load the sample map for demos/tests

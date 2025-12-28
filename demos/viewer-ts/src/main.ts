@@ -40,6 +40,11 @@ const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[dat
 const tabPanels = Array.from(document.querySelectorAll<HTMLElement>('[data-panel]'))
 
 function resolveArchivePath() {
+  const params = new URLSearchParams(window.location.search)
+  const mapParam = params.get('map')
+  if (mapParam) {
+    return new URL(`/maps/${mapParam}`, window.location.href).toString()
+  }
   return new URL('../maps/wynnal-terrain.wyn', window.location.href).toString()
 }
 

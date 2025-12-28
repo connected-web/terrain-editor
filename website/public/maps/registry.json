@@ -1,0 +1,40 @@
+{
+  "maps": [
+    {
+      "id": "wynnal",
+      "title": "Wynnal",
+      "description": "Original demo terrain with biomes and overlays.",
+      "filename": "wynnal-terrain.wyn",
+      "status": "available",
+      "date": "Nov 2025",
+      "thumbnail": "maps/thumbnails/wynnal.png"
+    },
+    {
+      "id": "british-isles",
+      "title": "British Isles",
+      "description": "Heightmap-derived terrain with cities and mountain markers.",
+      "filename": "british-isles-terrain.wyn",
+      "status": "available",
+      "date": "Dec 2025",
+      "thumbnail": "maps/thumbnails/british-isles.png"
+    },
+    {
+      "id": "fortress",
+      "title": "Fortress",
+      "description": "Stylized fortress sample terrain.",
+      "filename": "fortress.wyn",
+      "status": "available",
+      "date": "Nov 2025",
+      "thumbnail": "maps/thumbnails/fortress.png"
+    },
+    {
+      "id": "north-america",
+      "title": "North America",
+      "description": "Planned large-scale sample terrain.",
+      "filename": "north-america-terrain.wyn",
+      "status": "planned",
+      "date": "Jan 2026",
+      "thumbnail": null
+    }
+  ]
+}

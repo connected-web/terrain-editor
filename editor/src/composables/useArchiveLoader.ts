@@ -87,17 +87,22 @@ export function useArchiveLoader(options: ArchiveStoreOptions) {
     }
   }
 
-  async function loadSampleArchive() {
+  async function loadArchiveFromUrl(url: string, label: string, loadOptions: LoadArchiveOptions = {}) {
     try {
-      options.updateStatus('Downloading sample archive…')
-      const response = await fetch(options.getSampleArchiveUrl())
+      options.updateStatus(`Downloading ${label}…`)
+      const response = await fetch(url)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const buffer = await response.arrayBuffer()
-      await loadArchiveFromBytes(buffer, 'sample archive')
+      await loadArchiveFromBytes(buffer, label, loadOptions)
     } catch (err) {
       console.error(err)
-      options.updateStatus('Failed to download sample archive.')
+      options.updateStatus(`Failed to download ${label}.`)
     }
+  }
+
+  async function loadSampleArchive(url?: string, label: string = 'sample archive') {
+    const sampleUrl = url ?? options.getSampleArchiveUrl()
+    await loadArchiveFromUrl(sampleUrl, label)
   }
 
   async function loadArchiveFromFile(file: File) {
@@ -113,6 +118,7 @@ export function useArchiveLoader(options: ArchiveStoreOptions) {
   return {
     loadArchiveFromBytes,
     loadArchiveFromFile,
+    loadArchiveFromUrl,
     loadSampleArchive
   }
 }

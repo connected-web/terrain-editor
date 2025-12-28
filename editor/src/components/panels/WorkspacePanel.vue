@@ -21,14 +21,28 @@
         >
           <Icon icon="file-circle-plus">Create empty project</Icon>
         </button>
-        <button
-          type="button"
-          class="pill-button"
-          aria-label="Workspace panel: load sample map"
-          @click="$emit('load-sample')"
-        >
-          <Icon icon="mountain-sun">Load sample map</Icon>
-        </button>
+        <div class="workspace-panel__sample-row">
+          <label class="workspace-panel__sample-label">
+            <span>Sample map</span>
+            <select
+              :value="sampleMapId ?? ''"
+              @change="$emit('select-sample', ($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="entry in sampleMaps" :key="entry.id" :value="entry.id" :disabled="entry.status !== 'available'">
+                {{ entry.title }} · {{ entry.date }}{{ entry.status !== 'available' ? ' (planned)' : '' }}
+              </option>
+            </select>
+          </label>
+          <button
+            type="button"
+            class="pill-button"
+            aria-label="Workspace panel: load sample map"
+            :disabled="!sampleMapId"
+            @click="$emit('load-sample', sampleMapId)"
+          >
+            <Icon icon="mountain-sun">Load sample map</Icon>
+          </button>
+        </div>
         <button
           type="button"
           class="pill-button pill-button--ghost"
@@ -144,12 +158,15 @@ defineProps<{
   thumbnailUrl?: string
   hasThumbnail?: boolean
   isCreatingThumbnail?: boolean
+  sampleMaps: Array<{ id: string; title: string; date: string; status: 'available' | 'planned' }>
+  sampleMapId?: string | null
 }>()
 
 const { workspaceForm, actions: workspaceActions } = useWorkspaceModel()
 
 defineEmits<{
-  'load-sample': []
+  'load-sample': [id?: string | null]
+  'select-sample': [id: string]
   'load-map': []
   'start-new': []
   'export-archive': []
@@ -190,6 +207,27 @@ defineEmits<{
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.workspace-panel__sample-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.workspace-panel__sample-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.workspace-panel__sample-label select {
+  background: rgba(6, 8, 10, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: inherit;
+  padding: 0.35rem 0.6rem;
 }
 
 .workspace-form__range {
