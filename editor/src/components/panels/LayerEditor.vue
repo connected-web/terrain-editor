@@ -2811,7 +2811,6 @@ function clamp(value: number, min: number, max: number) {
 
 
 .layer-editor__section {
-  margin-top: 0.6rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -2866,6 +2865,12 @@ function clamp(value: number, min: number, max: number) {
   border-radius: 8px;
   padding: 0.35rem 0.5rem;
   color: inherit;
+}
+
+.layer-editor__properties-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .layer-editor__segment {
