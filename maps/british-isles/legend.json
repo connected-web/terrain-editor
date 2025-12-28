@@ -1,1 +1,1 @@
-{"size":[512,768],"sea_level":0.6395,"heightmap":"layers/heightmap.png","topology":"layers/heightmap.png","biomes":{},"overlays":{"water":{"mask":"layers/water_mask.png","rgb":[34,92,124],"label":"Water"}}}
+{"size":[512,768],"sea_level":0.6395,"heightmap":"layers/heightmap.png","topology":"layers/heightmap.png","biomes":{"land":{"label":"Land","mask":"layers/land.png","rgb":[33,115,39]}},"overlays":{"water":{"mask":"layers/water_mask.png","rgb":[34,92,124],"label":"Water"}}}
