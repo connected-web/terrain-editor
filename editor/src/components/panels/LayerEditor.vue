@@ -92,8 +92,14 @@
               >
                 <Icon icon="trash" /> Delete layer
               </button>
-              <button type="button" class="layer-editor__overflow-menu--disabled" disabled title="Snap grid coming soon">
-                <Icon icon="border-all" /> Snap (soon)
+              <button type="button" title="Toggle view grid" @click="toggleGridView()">
+                <Icon icon="border-all" /> View grid: {{ gridEnabled ? 'On' : 'Off' }}
+              </button>
+              <button type="button" title="Toggle grid snap" @click="toggleGridSnap()">
+                <Icon icon="magnet" /> Grid snap: {{ snapEnabled ? 'On' : 'Off' }}
+              </button>
+              <button type="button" title="Toggle angle snap" @click="toggleAngleSnap()">
+                <Icon icon="compass-drafting" /> Angle snap: {{ angleSnapEnabled ? 'On' : 'Off' }}
               </button>
             </div>
           </div>
@@ -2176,6 +2182,21 @@ function handleHistoryChange(payload: { canUndo: boolean; canRedo: boolean; undo
 
 function toggleOverflowMenu(force?: boolean) {
   showOverflowMenu.value = typeof force === 'boolean' ? force : !showOverflowMenu.value
+}
+
+function toggleGridView() {
+  gridEnabled.value = !gridEnabled.value
+  toggleOverflowMenu(false)
+}
+
+function toggleGridSnap() {
+  snapEnabled.value = !snapEnabled.value
+  toggleOverflowMenu(false)
+}
+
+function toggleAngleSnap() {
+  angleSnapEnabled.value = !angleSnapEnabled.value
+  toggleOverflowMenu(false)
 }
 
 function handleDocumentClick(event: MouseEvent) {
