@@ -28,6 +28,7 @@
               :value="sampleMapId ?? ''"
               @change="$emit('select-sample', ($event.target as HTMLSelectElement).value)"
             >
+              <option value="">Select sample map to load…</option>
               <option v-for="entry in sampleMaps" :key="entry.id" :value="entry.id" :disabled="entry.status !== 'available'">
                 {{ entry.title }} · {{ entry.date }}{{ entry.status !== 'available' ? ' (planned)' : '' }}
               </option>

@@ -737,12 +737,12 @@ const sampleMaps = ref<DemoMapEntry[]>([])
 const sampleMapId = ref<string | null>(null)
 
 function getPublicMapUrl(filename: string) {
-  return new URL(`../../maps/${filename}`, import.meta.url).toString()
+  return new URL(`/maps/${filename}`, window.location.origin).toString()
 }
 
 async function loadSampleRegistry() {
   try {
-    const response = await fetch(new URL('../../maps/registry.json', import.meta.url).toString())
+    const response = await fetch(new URL('/maps/registry.json', window.location.origin).toString())
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const data = (await response.json()) as { maps?: DemoMapEntry[] }
     sampleMaps.value = data.maps ?? []

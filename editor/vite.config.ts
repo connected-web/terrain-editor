@@ -4,6 +4,7 @@ import path from 'node:path'
 
 export default defineConfig({
   base: './',
+  publicDir: path.resolve(__dirname, '../public'),
   plugins: [vue()],
   resolve: {
     alias: {
