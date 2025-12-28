@@ -2343,14 +2343,14 @@ function clamp(value: number, min: number, max: number) {
 
 <style scoped>
 .layer-editor {
-  --layer-editor-left-gap: 3.5rem;
+  --layer-editor-left-gap: 3rem;
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
-  padding: 1rem;
+  padding: 0.6rem;
   padding-left: var(--layer-editor-left-gap);
 }
 
@@ -2360,9 +2360,9 @@ function clamp(value: number, min: number, max: number) {
   z-index: auto;
   display: flex;
   justify-content: flex-start;
-  padding: 1rem;
-  padding-left: max(2.5rem, 3vw);
-  padding-right: max(1.5rem, 2vw);
+  padding: 0.6rem;
+  padding-left: max(2rem, 2vw);
+  padding-right: max(1rem, 2vw);
   pointer-events: auto;
   width: 100%;
   height: 100%;
@@ -2373,10 +2373,10 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   flex-direction: column;
   margin: 0;
-  width: min(1400px, calc(100vw - var(--layer-editor-left-gap) - 2rem));
-  height: calc(100vh - 2rem);
+  width: min(1400px, calc(100vw - var(--layer-editor-left-gap) - 1.2rem));
+  height: calc(100vh - 1.2rem);
   background: rgba(5, 8, 17, 0.96);
-  border-radius: 20px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: auto;
   overflow: hidden;
@@ -2393,23 +2393,19 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
+  padding: 0.6rem 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
 .layer-editor__header-left {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .layer-editor__eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  opacity: 0.6;
+  display: none;
 }
 
 .layer-editor__title-row {
@@ -2434,8 +2430,8 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__badge {
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  padding: 0.2rem 0.8rem;
+  border-radius: 8px;
+  padding: 0.15rem 0.55rem;
   font-size: 0.75rem;
   text-transform: uppercase;
 }
@@ -2456,7 +2452,7 @@ function clamp(value: number, min: number, max: number) {
   right: 0;
   background: rgba(8, 12, 24, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 0.4rem 0;
   display: flex;
   flex-direction: column;
@@ -2515,10 +2511,10 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__layers {
   border-right: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0.9rem 0.75rem 0.75rem;
+  padding: 0.6rem 0.5rem 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
   min-height: 0;
 }
 
@@ -2538,7 +2534,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 .layer-editor__layers-add {
-  padding: 0.25rem 0.55rem;
+  padding: 0.2rem 0.4rem;
   font-size: 0.85rem;
 }
 
@@ -2550,10 +2546,10 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__tools {
   border-right: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0.75rem;
+  padding: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
   overflow-y: auto;
   align-items: center;
   min-height: 0;
@@ -2567,13 +2563,13 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.25rem;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  padding: 0.25rem 0.35rem;
   text-transform: none;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
-  min-height: 56px;
+  min-height: 46px;
 }
 
 .layer-editor__tool-button svg {
@@ -2598,7 +2594,7 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__canvas {
   position: relative;
-  padding: 0.75rem;
+  padding: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -2615,10 +2611,10 @@ function clamp(value: number, min: number, max: number) {
 
 .layer-editor__properties {
   border-left: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 0.55rem;
+  padding: 0.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
   overflow-y: auto;
   min-height: 0;
 }

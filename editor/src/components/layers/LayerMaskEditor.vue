@@ -2552,7 +2552,7 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 .layer-mask-editor {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
   height: 100%;
   position: relative;
 }
@@ -2560,10 +2560,10 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 .layer-mask-editor__viewport {
   flex: 1;
   overflow: auto;
-  border-radius: 12px;
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.04);
   background-color: #000;
-  padding: 0.5rem;
+  padding: 0;
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -2676,8 +2676,8 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 .layer-mask-editor__canvas-surface {
   position: relative;
   border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 14px;
-  padding: 0.25rem;
+  border-radius: 0;
+  padding: 0;
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.35);
   background: rgba(0, 0, 0, 0.8);
   min-width: 1px;

@@ -235,8 +235,8 @@ function isTailDropActive(kind: LayerSectionKey) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding-right: 0.4rem;
-  scrollbar-gutter: stable both-edges;
+  padding: 0.15rem 0.8rem 0.2rem 0.1rem;
+  scrollbar-gutter: stable;
 }
 
 .layer-list__scroll::-webkit-scrollbar {
@@ -382,4 +382,3 @@ function isTailDropActive(kind: LayerSectionKey) {
   background: rgba(247, 201, 72, 0.12);
 }
 </style>
-

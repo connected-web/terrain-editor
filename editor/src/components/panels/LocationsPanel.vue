@@ -4,8 +4,15 @@
       <div class="panel-card__header-main">
         <Icon icon="location-dot">Locations</Icon>
       </div>
-      <button class="pill-button pill-button--ghost" @click="addLocation" :disabled="!hasLegend">
-        <Icon icon="plus">Add location</Icon>
+      <button
+        class="pill-button pill-button--ghost pill-button--icon"
+        type="button"
+        title="Add location"
+        aria-label="Add location"
+        @click="addLocation"
+        :disabled="!hasLegend"
+      >
+        <Icon icon="plus" />
       </button>
     </header>
     <div class="locations-panel__selector">
@@ -37,6 +44,15 @@
       @drop="$emit('drop', $event)"
     >
       <article class="locations-panel__item">
+        <label class="locations-panel__field">
+          <span>Name</span>
+          <input
+            type="text"
+            v-model="activeLocation.name"
+            @blur="commitLocations"
+            placeholder="Location name"
+          />
+        </label>
         <div class="locations-panel__preview">
           <div
             class="locations-panel__icon button"
@@ -47,36 +63,37 @@
             <span v-if="!getIconPreview(activeLocation.icon)">{{ activeLocation.name?.[0] ?? '?' }}</span>
           </div>
           <div class="locations-panel__preview-actions">
-            <button type="button" class="pill-button" @click="$emit('open-icon-picker', activeLocation)">
-              <Icon icon="images">Choose icon</Icon>
+            <button
+              type="button"
+              class="pill-button pill-button--icon"
+              title="Choose icon"
+              aria-label="Choose icon"
+              @click="$emit('open-icon-picker', activeLocation)"
+            >
+              <Icon icon="images" />
             </button>
             <button
               type="button"
-              class="pill-button pill-button--ghost"
+              class="pill-button pill-button--ghost pill-button--icon"
+              title="Clear icon"
+              aria-label="Clear icon"
               @click="$emit('clear-icon', activeLocation)"
               :disabled="!activeLocation.icon"
             >
-              <Icon icon="ban">Clear icon</Icon>
+              <Icon icon="ban" />
             </button>
             <button
               type="button"
-              class="pill-button pill-button--ghost"
+              class="pill-button pill-button--ghost pill-button--icon"
+              title="Focus camera"
+              aria-label="Focus camera"
               @click="focusCameraOnActiveLocation"
               :disabled="!activeLocation.view || isCameraFocusedOnActiveLocation"
             >
-              <Icon :icon="isCameraFocusedOnActiveLocation ? 'camera' : 'camera-rotate'">Focus camera</Icon>
+              <Icon :icon="isCameraFocusedOnActiveLocation ? 'camera' : 'camera-rotate'" />
             </button>
           </div>
         </div>
-        <label class="locations-panel__field">
-          <span>Name</span>
-          <input
-            type="text"
-            v-model="activeLocation.name"
-            @blur="commitLocations"
-            placeholder="Location name"
-          />
-        </label>
         <label class="locations-panel__field">
           <span>Description</span>
           <textarea
@@ -86,19 +103,14 @@
             rows="3"
           />
         </label>
-        <label class="locations-panel__field">
-          <span>Icon reference</span>
-          <input
-            type="text"
-            v-model="activeLocation.icon"
-            @blur="commitLocations"
-            placeholder="e.g. icons/castle.png"
-          />
-        </label>
         <div class="row">
           <h4>Position</h4>
           <span class="spacer"></span>
-          <button type="button" class="pill-button pill-button--ghost" @click="startPlacement(activeLocation)">
+          <button
+            type="button"
+            class="pill-button pill-button--ghost"
+            @click="startPlacement(activeLocation)"
+          >
             <Icon icon="crosshairs">Pick on map</Icon>
           </button>
         </div>
@@ -189,7 +201,11 @@
         </label>
         <h4>Danger</h4>
         <div class="row left">
-          <button type="button" class="pill-button pill-button--danger" @click="removeLocation(activeLocation)">
+          <button
+            type="button"
+            class="pill-button pill-button--danger"
+            @click="removeLocation(activeLocation)"
+          >
             <Icon icon="trash">Remove location</Icon>
           </button>
           <span class="spacer"></span>
