@@ -136,6 +136,6 @@
 - ✅ Sample `.wyn` unpacking via `npm run unpackmap`
 - ✅ Additional curated sample terrains for testing editor flows
   - ✅ Fortress Sample Map
-  - 💡 British Isles Sample Map
+  - ✅ British Isles Sample Map
   - 💡 North America Sample Map
   - 💡 Welsh Moutains Sample Map
