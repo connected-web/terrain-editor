@@ -3,6 +3,7 @@
 ## Terrain Editor Package
 
 ### Core Infrastructure
+
 - ✅ Expose a single viewer container
 - ✅ Connect the shared overlay helper
 - ✅ Load `.wyn` archives through loader utilities
@@ -12,13 +13,15 @@
 - ✅ Export `.wyn` and refresh local snapshot
 
 ### Tooling & Workflow
+
 - ✅ `npm run build:lib`
 - ✅ `npm run build:viewer` / `npm run build:editor`
 - ✅ `npm run dev:all`
 - ✅ `.wyn` sample regeneration with `npm run packmap`
-- 💡 Run heavy tests only when necessary
+- ✅ Run heavy tests only when necessary
 
 ### Guardrails & Architecture
+
 - 💡 Maintain theme schema backward compatibility
 - 💡 Always destroy `TerrainHandle` and call `dataset.cleanup()` on unload
 - 💡 Require hosts to use shared overlay/popup helpers
@@ -26,11 +29,13 @@
 - 💡 Avoid leaking object URLs (dispose preview caches)
 
 ### Export Enhancements
+
 - 💡 Export “JSON only” (`legend.json`, `locations.json`, `theme.json`)
 
 ## Website
 
 ### Hosting & Presentation
+
 - ✅ GitHub Pages hosting
 - 💡 More editor-facing documentation pages
 - 💡 Release notes and changelog section
@@ -38,6 +43,7 @@
 ## Editor
 
 ### Workspace & Panels
+
 - ✅ 3D viewer
 - ✅ Multi-panel dock + toolbar
 - ✅ Asset dialogs
@@ -48,12 +54,14 @@
 - 💡 Layer editor + layers panel integration (shared layout, collapsible tools, dock-aware)
 
 ### Locations & Theme
+
 - ✅ Locations tool: list, inspector, drag/drop uploads, asset picker, pick-on-map
 - ✅ Theme editor: label + stem styling, hover/focus variants, reset-to-default
 - ✅ Marker rendering: icon aspect ratio, optional border, zoom-reactive stems, placement waits for click
 - 💡 Icon picker for brushes and locations based on FontAwesome Free icon set
 
 ### Layers & Masks
+
 - ✅ Mask editing persists and remounts correctly
 - ✅ Biome colour editing updates viewer without reload
 - ✅ Toolbar-integrated colour picker
@@ -90,31 +98,31 @@
 - ✅ Selection tool (rect + fill, persistent across layers)
 - ✅ Advanced onion-skin controls
 - ✅ Grid snap + measurement settings for mask tools
-- 💡 Line tool for masks
-- 💡 Rectangle tool for masks
+- ✅ Rectangle tool for masks
 - ✅ Copy/paste selections (PNG clipboard compatible)
 - ✅ Flip/rotate selections + paste previews
 - 💡 Geometry layer + snapping (circles/lines/paths as paint guides)
 - 💡 Transform tool interactions (translate/scale/rotate selections)
-- 💡 Canvas viewport polish: remove nested scrollbars, auto fit/center, configurable background
 
 ### Heightmap & Sculpting
+
 - 💡 Point-based heightmap editor (with JSON/PNG export)
-- 💡 Expanded greyscale topology editor with undo/redo
+- ✅ Expanded greyscale topology editor with undo/redo
 - 💡 Define command history + data contracts for sculpting, rivers, etc., with deterministic pack/unpack
 - 💡 River polyline authoring that respects slope + widening rules
-- 💡 High-level sculpting workflow (to pair with future topology editing)
 
 ## Viewer
 
 ### Interaction
+
 - ✅ Smooth scroll behavior (no jitter)
 - ✅ Layer editor wrapper must remain pointer-transparent
 - ✅ Cleanup of spacing/borders in layer toolbar + workspace UI
-- 💡 Camera recentering responding to dock + toolbar layout changes
-- 💡 Zoom/pan calibration and cursor-to-world accuracy
+- ✅ Zoom/pan calibration and cursor-to-world accuracy
+- ✅ Camera recentering responding to dock + toolbar layout changes
 
 ### Feature Backlog
+
 - 💡 Make embed mode the default output
 - 💡 Full pop-out and fullscreen controls via host helper
 - 💡 Configuration hooks for host apps (theme overrides, UI toggles, analytics)
@@ -123,6 +131,11 @@
 ## Sample Maps
 
 ### Assets & Pipelines
+
 - ✅ Sample `.wyn` packaging via `npm run packmap`
 - ✅ Sample `.wyn` unpacking via `npm run unpackmap`
-- 💡 Additional curated sample terrains for testing editor flows
+- ✅ Additional curated sample terrains for testing editor flows
+  - ✅ Fortress Sample Map
+  - 💡 British Isles Sample Map
+  - 💡 North America Sample Map
+  - 💡 Welsh Moutains Sample Map
