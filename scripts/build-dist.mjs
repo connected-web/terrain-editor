@@ -18,6 +18,7 @@ const demos = [
   { dir: 'editor', target: 'editor' }
 ]
 
+run('node ./scripts/sync-version.mjs')
 run('npm run build:lib')
 
 demos.forEach((demo) => {

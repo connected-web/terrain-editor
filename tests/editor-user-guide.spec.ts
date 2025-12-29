@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
+import { getShortVersion } from './utils'
 
 /**
  * Add debug=PLAYWRIGHT parameter to a URL
@@ -96,7 +97,7 @@ test.describe('Terrain Editor : Navigation', () => {
   test('🟦 Terrain Editor : Navigation › editor loads and shows export button', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('', 'River Delta')))
     await expect(
-      page.getByRole('heading', { name: 'Terrain Editor' })
+      page.getByRole('heading', { name: `Terrain Editor ${getShortVersion()}` })
     ).toBeVisible()
 
     await waitForMapReady(page)

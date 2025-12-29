@@ -2,8 +2,7 @@
   <header class="row header">
     <div class="brand">
       <div class="editor-icon"></div>
-      <h1>Terrain Editor</h1>
-      <span class="version-tag">v{{ version }}</span>
+      <h1>Terrain Editor v{{ version }}</h1>
     </div>
     <nav class="primary-nav">
       <a href="./">Home</a>
@@ -19,7 +18,5 @@
 </template>
 
 <script lang="ts" setup>
-import { version as appVersion } from '../../package.json'
-
-const version = String(appVersion).split('.').slice(0, 2).join('.')
+const version = __APP_VERSION__
 </script>

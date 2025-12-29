@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Page, TestInfo } from '@playwright/test'
 
@@ -23,4 +23,14 @@ export async function captureScreenshot(page: Page, testInfo: TestInfo, name: st
     contentType: 'image/jpeg'
   })
   return filePath
+}
+
+let cachedShortVersion: string | null = null
+
+export function getShortVersion() {
+  if (cachedShortVersion) return cachedShortVersion
+  const pkgPath = path.join(process.cwd(), 'package.json')
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+  cachedShortVersion = String(pkg.version).split('.').slice(0, 2).join('.')
+  return cachedShortVersion
 }

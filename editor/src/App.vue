@@ -1,6 +1,6 @@
 <template>
   <div class="editor-shell" ref="editorRoot">
-    <h1 class="sr-only">Terrain Editor</h1>
+    <h1 class="sr-only">Terrain Editor {{ version }}</h1>
     <div class="editor-layout">
       <EditorViewer
         ref="viewerShell"
@@ -261,6 +261,8 @@ import {
   resetStemState as resetStemStateHelper,
   stemShapeOptions
 } from './utils/theme'
+
+const version = __APP_VERSION__
 import { useTheme } from './composables/useTheme'
 import { buildIconPath, buildLayerMaskPath } from './utils/assets'
 import { ensureLocationId } from './utils/locations'

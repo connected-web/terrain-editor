@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
 import { setTimeout as wait } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -71,10 +71,18 @@ function runCommand(command, args) {
   })
 }
 
+function getShortVersion() {
+  const pkgPath = path.join(repoRoot, 'package.json')
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+  return String(pkg.version).split('.').slice(0, 2).join('.')
+}
+
+const version = getShortVersion()
+
 const CONTENT_CHECKS = new Map([
   ['/', '<title>Terrain Editor - Connected Web</title>'],
-  ['/viewer-js/', 'Terrain Viewer Demo'],
-  ['/editor/', 'Terrain Editor'],
+  ['/viewer-js/', `Terrain Viewer (${version}) Demo`],
+  ['/editor/', `Terrain Editor ${version}`],
   ['/maps/wynnal-terrain.wyn', 'PK']
 ])
 

@@ -12,6 +12,7 @@ import {
   videoNameFromTest,
   waitForMapReady
 } from './video-utils'
+import { getShortVersion } from './utils'
 
 process.env.RECORD_VIDEO = '1'
 
@@ -22,7 +23,9 @@ test.describe('Terrain Editor : User Guide Features', () => {
     test.setTimeout(1_800_000)
 
     await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
-    await expect(page.getByRole('heading', { name: 'Terrain Editor' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: `Terrain Editor ${getShortVersion()}` })
+    ).toBeVisible()
     await rescaleUI(page)
 
     await waitForMapReady(page)
