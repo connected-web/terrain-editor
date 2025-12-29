@@ -12,6 +12,22 @@ export default defineConfig({
         {
           src: 'assets/**/*',
           dest: 'assets'
+        },
+        {
+          src: '../USER-GUIDE.md',
+          dest: 'docs'
+        },
+        {
+          src: '../documentation/WYN-FILE-FORMAT.md',
+          dest: 'docs'
+        },
+        {
+          src: '../documentation/images/**/*',
+          dest: 'docs/images'
+        },
+        {
+          src: '../documentation/animations/**/*',
+          dest: 'docs/animations'
         }
       ]
     })

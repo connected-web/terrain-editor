@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { cpSync, mkdirSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -37,4 +37,17 @@ demos.forEach((demo) => {
 
 const mapsDir = join(distDir, 'maps')
 mkdirSync(mapsDir, { recursive: true })
-cpSync(join(repoRoot, 'maps/wynnal-terrain.wyn'), join(mapsDir, 'wynnal-terrain.wyn'))
+
+const publicMapsDir = join(repoRoot, 'public', 'maps')
+try {
+  cpSync(publicMapsDir, mapsDir, { recursive: true })
+} catch (err) {
+  // Ignore missing public maps in environments without local samples.
+}
+
+const sourceMapsDir = join(repoRoot, 'maps')
+readdirSync(sourceMapsDir)
+  .filter((entry) => entry.endsWith('.wyn'))
+  .forEach((entry) => {
+    cpSync(join(sourceMapsDir, entry), join(mapsDir, entry))
+  })

@@ -355,6 +355,40 @@ main {
   border-bottom: none;
 }
 
+.markdown-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 1.5rem;
+}
+
+.markdown-content pre {
+  background: rgba(0, 0, 0, 0.35);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.markdown-content code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.1rem 0.3rem;
+  border-radius: 6px;
+}
+
+.markdown-content ul {
+  padding-left: 1.2rem;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 .editor-layout {
   display: grid;
   gap: var(--spacing-xl);

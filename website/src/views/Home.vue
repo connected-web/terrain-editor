@@ -107,10 +107,21 @@
     </p>
   </section>
 
+  <section class="section-card" id="user-guide">
+    <h2>User Guide</h2>
+    <div class="markdown-content" v-html="userGuideHtml"></div>
+  </section>
+
+  <section class="section-card" id="wyn-file-format">
+    <h2>Wyn File Format</h2>
+    <div class="markdown-content" v-html="wynFormatHtml"></div>
+  </section>
+
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { marked } from 'marked'
 type RoadmapItem = { label: string; date: string }
 type DemoMap = {
   id: string
@@ -140,6 +151,8 @@ const viewerTsUrl = devUrls?.viewerTs ?? './viewer-js/'
 const editorUrl = devUrls?.editor ?? './editor/'
 
 const demoMaps = ref<DemoMap[]>([])
+const userGuideHtml = ref('')
+const wynFormatHtml = ref('')
 
 const buildViewerUrl = (filename: string) => `${viewerTsUrl}?map=${encodeURIComponent(filename)}`
 const buildEditorUrl = (filename: string) => `${editorUrl}?map=${encodeURIComponent(filename)}`
@@ -155,21 +168,45 @@ async function loadDemoMaps() {
   }
 }
 
-if (typeof window !== 'undefined') {
-  void loadDemoMaps()
+async function loadMarkdownDocs() {
+  try {
+    const [userGuide, wynFormat] = await Promise.all([
+      fetch('./docs/USER-GUIDE.md'),
+      fetch('./docs/WYN-FILE-FORMAT.md')
+    ])
+    const normalizeDocImages = (content: string) =>
+      content
+        .replace(/documentation\/images\//g, 'docs/images/')
+        .replace(/documentation\/animations\//g, 'docs/animations/')
+    if (userGuide.ok) {
+      const text = await userGuide.text()
+      userGuideHtml.value = marked.parse(normalizeDocImages(text))
+    }
+    if (wynFormat.ok) {
+      const text = await wynFormat.text()
+      wynFormatHtml.value = marked.parse(normalizeDocImages(text))
+    }
+  } catch (err) {
+    console.error('Failed to load documentation markdown', err)
+  }
 }
 
+onMounted(() => {
+  void loadDemoMaps()
+  void loadMarkdownDocs()
+})
+
 const viewerRoadmap: RoadmapItem[] = [
-  { label: 'Self-contained Three.js renderer', date: 'Nov 2025' },
-  { label: 'TS based viewer and .wyn loader', date: 'Nov 2025' },
-  { label: 'Popout and full screen modes', date: 'Nov 2025' },
-  { label: 'Location and layer UX polish', date: 'Nov 2025' }
+  { label: 'Smooth scroll behavior', date: 'Nov 2025' },
+  { label: 'Pointer-transparent layer editor wrapper', date: 'Nov 2025' },
+  { label: 'Workspace + toolbar layout cleanup', date: 'Nov 2025' },
+  { label: 'Viewer render scale presets', date: 'Dec 2025' }
 ]
 
 const editorRoadmap: RoadmapItem[] = [
-  { label: 'Editor skeleton with basic viewer', date: 'Nov 2025' },
-  { label: 'Wyn import/export pipeline', date: 'Dec 2025' },
+  { label: 'Project persistence + storage helpers', date: 'Nov 2025' },
   { label: 'Layer + mask editing tools', date: 'Dec 2025' },
-  { label: 'Height + location workflows', date: 'Dec 2025' }
+  { label: 'Height + location workflows', date: 'Dec 2025' },
+  { label: 'Sample map pipelines + registry', date: 'Dec 2025' }
 ]
 </script>

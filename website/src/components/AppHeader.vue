@@ -9,6 +9,8 @@
       <a href="./">Home</a>
       <a href="#demos">Demos</a>
       <a href="#roadmap">Roadmap</a>
+      <a href="#user-guide">User Guide</a>
+      <a href="#wyn-file-format">Wyn File Format</a>
       <a href="https://github.com/connected-web/terrain-editor" target="_blank" rel="noreferrer">
         GitHub
       </a>
