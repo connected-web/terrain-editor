@@ -29,7 +29,16 @@ export function addDebugParam(url: string, debugValue = 'PLAYWRIGHT'): string {
 }
 
 export async function waitForMapReady(page: Page, timeout = 60_000) {
-  await expect(page.getByText('Map ready.', { exact: true })).toBeVisible({ timeout })
+  await page.waitForFunction(
+    () => {
+      const viewer = (window as any).__terrainViewer
+      if (!viewer || typeof viewer.getRenderResolution !== 'function') return false
+      const res = viewer.getRenderResolution()
+      return Boolean(res && res.width > 0 && res.height > 0)
+    },
+    null,
+    { timeout }
+  )
 }
 
 export async function rescaleUI(page: Page, scale = 0.7, dockHeight?: string) {

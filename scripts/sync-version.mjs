@@ -23,23 +23,28 @@ function normalizeTag(tagName) {
 }
 
 async function fetchLatestVersion() {
-  const response = await fetch(releaseUrl, {
-    headers: {
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': 'terrain-editor-build'
+  try {
+    const response = await fetch(releaseUrl, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'terrain-editor-build'
+      }
+    })
+    if (!response.ok) {
+      console.warn(`[sync-version] Failed to fetch release: ${response.status}`)
+      return null
     }
-  })
-  if (!response.ok) {
-    console.warn(`[sync-version] Failed to fetch release: ${response.status}`)
+    const data = await response.json()
+    const version = normalizeTag(data.tag_name)
+    if (!version) {
+      console.warn('[sync-version] Release tag missing or not a semver string.')
+      return null
+    }
+    return version
+  } catch (err) {
+    console.warn('[sync-version] Skipping remote version sync (network error).')
     return null
   }
-  const data = await response.json()
-  const version = normalizeTag(data.tag_name)
-  if (!version) {
-    console.warn('[sync-version] Release tag missing or not a semver string.')
-    return null
-  }
-  return version
 }
 
 async function run() {
@@ -57,6 +62,4 @@ async function run() {
   console.log(`[sync-version] Updated package.json to ${latest}`)
 }
 
-run().catch((err) => {
-  console.warn('[sync-version] Unexpected error:', err)
-})
+run()

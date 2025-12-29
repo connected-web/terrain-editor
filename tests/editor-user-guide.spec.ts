@@ -23,9 +23,16 @@ function editorUrl(params: string, location?: string): string {
  * The viewer emits lifecycle events and shows "Map ready." when rendering is complete.
  */
 async function waitForMapReady(page: Page) {
-  await expect(
-    page.getByText('Map ready.', { exact: true })
-  ).toBeVisible({ timeout: 60_000 })
+  await page.waitForFunction(
+    () => {
+      const viewer = (window as any).__terrainViewer
+      if (!viewer || typeof viewer.getRenderResolution !== 'function') return false
+      const res = viewer.getRenderResolution()
+      return Boolean(res && res.width > 0 && res.height > 0)
+    },
+    null,
+    { timeout: 60_000 }
+  )
 }
 
 async function ensurePanelDockCollapsed(page: Page) {
@@ -118,10 +125,11 @@ test.describe('Terrain Editor : Navigation', () => {
     })
     await page.goto(addDebugParam('/editor/'))
 
-    const sampleSelect = page.getByLabel('Sample map')
+    const sampleSelect = page.getByRole('combobox', { name: /sample map/i })
     await expect(sampleSelect).toBeVisible()
-    await expect(page.locator('option[value="wynnal"]')).toBeVisible()
+    await expect(sampleSelect.locator('option')).toHaveCount(5)
     await sampleSelect.selectOption('wynnal')
+    await expect(sampleSelect).toHaveValue('wynnal')
 
     const loadButton = page.getByRole('button', { name: 'Workspace panel: load sample map' })
     await expect(loadButton).toBeEnabled()
