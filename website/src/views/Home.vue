@@ -108,12 +108,10 @@
   </section>
 
   <section class="section-card" id="user-guide">
-    <h2>User Guide</h2>
     <div class="markdown-content" v-html="userGuideHtml"></div>
   </section>
 
   <section class="section-card" id="wyn-file-format">
-    <h2>Wyn File Format</h2>
     <div class="markdown-content" v-html="wynFormatHtml"></div>
   </section>
 
@@ -210,3 +208,9 @@ const editorRoadmap: RoadmapItem[] = [
   { label: 'Sample map pipelines + registry', date: 'Dec 2025' }
 ]
 </script>
+
+<style scoped>
+.markdown-content *:first-child {
+  margin-top: 0;
+}
+</style>
