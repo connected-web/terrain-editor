@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -24,10 +25,23 @@ function normalizeTag(tagName) {
 
 async function fetchLatestVersion() {
   try {
+    const ghVersion = execSync(
+      'gh api repos/connected-web/terrain-editor/releases/latest --jq .tag_name',
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim()
+    const ghNormalized = normalizeTag(ghVersion)
+    if (ghNormalized) return ghNormalized
+  } catch (err) {
+    // Fall back to fetch when gh is unavailable.
+  }
+
+  try {
+    const token = process.env.GITHUB_TOKEN
     const response = await fetch(releaseUrl, {
       headers: {
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'terrain-editor-build'
+        'User-Agent': 'terrain-editor-build',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       }
     })
     if (!response.ok) {
