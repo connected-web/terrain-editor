@@ -8,7 +8,7 @@ async function waitForStatus(page: Page, text: string | RegExp | readonly (strin
 
 test.describe('Terrain Viewer : Basic interactions', () => {
   test('viewer loads sample terrain', async ({ page }, testInfo) => {
-    await page.goto('/viewer-js/')
+    await page.goto('/viewer-js/?map=wynnal-terrain.wyn')
     const version = getShortVersion()
     await expect(page.getByRole('heading', { name: `Terrain Viewer (${version}) Demo` })).toBeVisible()
     await waitForStatus(page, 'Terrain loaded')

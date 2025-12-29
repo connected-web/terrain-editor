@@ -15,7 +15,7 @@ function addDebugParam(url: string): string {
 function editorUrl(params: string, location?: string): string {
   const trimmed = params ? (params.startsWith('&') ? params : `&${params}`) : ''
   const locationParam = location ? `&location=${encodeURIComponent(location)}` : ''
-  return `/editor/?autoload=sample${trimmed}${locationParam}`
+  return `/editor/?map=wynnal-terrain.wyn${trimmed}${locationParam}`
 }
 
 /**
@@ -111,6 +111,25 @@ test.describe('Terrain Editor : Navigation', () => {
     await captureDocumentationScreenshot(page, 'editor-home')
   })
 
+  test('🟦 Terrain Editor : Navigation › sample map dropdown loads a map', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    await page.goto(addDebugParam('/editor/'))
+
+    const sampleSelect = page.getByLabel('Sample map')
+    await expect(sampleSelect).toBeVisible()
+    await expect(page.locator('option[value="wynnal"]')).toBeVisible()
+    await sampleSelect.selectOption('wynnal')
+
+    const loadButton = page.getByRole('button', { name: 'Workspace panel: load sample map' })
+    await expect(loadButton).toBeEnabled()
+    await loadButton.click()
+
+    await waitForMapReady(page)
+  })
+
   test('🟩 Terrain Editor : Navigation › workspace panel shows metadata form', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=workspace', 'Cradle Lake')))
     await waitForMapReady(page)
@@ -163,7 +182,7 @@ test.describe('Terrain Editor : Navigation', () => {
   })
 
   test('🟧 Terrain Editor : Navigation › location selection via URL parameter', async ({ page }) => {
-    await page.goto(addDebugParam('/editor/?autoload=sample&panel=locations&location=castle'))
+    await page.goto(addDebugParam('/editor/?map=wynnal-terrain.wyn&panel=locations&location=castle'))
     await waitForMapReady(page)
 
     const locationSelector = page.locator('.locations-panel__selector-button')
@@ -187,7 +206,7 @@ test.describe('Terrain Editor : Navigation', () => {
   test('🟥 Terrain Editor : Navigation › layer editor forest biome view', async ({ page }) => {
     await page.goto(
       addDebugParam(
-        '/editor/?autoload=sample&panel=layers&layer=biome%3Aforest&layers=LS%3AOVVVVVOHVVVVV%3ACL&leo=1.200%2C0.5037%2C0.6555'
+        '/editor/?map=wynnal-terrain.wyn&panel=layers&layer=biome%3Aforest&layers=LS%3AOVVVVVOHVVVVV%3ACL&leo=1.200%2C0.5037%2C0.6555'
       )
     )
     await waitForMapReady(page)

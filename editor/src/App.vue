@@ -756,6 +756,9 @@ async function loadSampleRegistry() {
 }
 
 async function loadSampleMapById(id?: string | null) {
+  if (!sampleMaps.value.length) {
+    await loadSampleRegistry()
+  }
   const mapId = id ?? sampleMapId.value
   const entry = sampleMaps.value.find((item) => item.id === mapId)
   if (!entry || entry.status !== 'available') return
@@ -1524,7 +1527,7 @@ onMounted(() => {
 
   if (autoload === 'sample') {
     // Auto-load the sample map for demos/tests
-    void loadSample()
+    void loadSampleMapById()
     return
   }
 
