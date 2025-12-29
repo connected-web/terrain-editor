@@ -22,7 +22,9 @@ test.describe('Terrain Editor : User Guide Features', () => {
   test('looping location demo capture', async ({ page }, testInfo) => {
     test.setTimeout(1_800_000)
 
-    await page.goto(addDebugParam('/editor/?map=wynnal-terrain.wyn&panel=locations&location=castle'))
+    await page.goto(
+      addDebugParam('/editor/?map=wynnal-terrain.wyn&renderScale=max&panel=locations&location=castle')
+    )
     await expect(
       page.getByRole('heading', { name: `Terrain Editor ${getShortVersion()}` })
     ).toBeVisible()

@@ -15,7 +15,7 @@ function addDebugParam(url: string): string {
 function editorUrl(params: string, location?: string): string {
   const trimmed = params ? (params.startsWith('&') ? params : `&${params}`) : ''
   const locationParam = location ? `&location=${encodeURIComponent(location)}` : ''
-  return `/editor/?map=wynnal-terrain.wyn${trimmed}${locationParam}`
+  return `/editor/?map=wynnal-terrain.wyn&renderScale=max${trimmed}${locationParam}`
 }
 
 /**
@@ -61,6 +61,13 @@ async function openLayerEditorForLayer(page: Page, label: string) {
   await expect(titleInput).toBeVisible()
   const currentValue = (await titleInput.inputValue()).trim()
   expect(currentValue.toLowerCase()).toBe(label.toLowerCase())
+
+  const dock = page.locator('.panel-dock').first()
+  await expect(dock).not.toHaveClass(/panel-dock--collapsed/)
+  await page.waitForFunction(() => {
+    const el = document.querySelector('.panel-dock') as HTMLElement | null
+    return Boolean(el && el.offsetWidth >= 320)
+  })
   return editor
 }
 
@@ -123,7 +130,7 @@ test.describe('Terrain Editor : Navigation', () => {
       localStorage.clear()
       sessionStorage.clear()
     })
-    await page.goto(addDebugParam('/editor/'))
+    await page.goto(addDebugParam('/editor/?renderScale=max'))
 
     const sampleSelect = page.getByRole('combobox', { name: /sample map/i })
     await expect(sampleSelect).toBeVisible()

@@ -1519,6 +1519,15 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   const autoload = params.get('autoload')
   const mapParam = params.get('map')
+  const renderScaleParam = params.get('renderScale')
+
+  if (renderScaleParam) {
+    const normalized = renderScaleParam.toLowerCase()
+    const allowed = ['auto', 'very-low', 'low', 'medium', 'high', 'max'] as const
+    if (allowed.includes(normalized as (typeof allowed)[number])) {
+      localSettings.renderScaleMode = normalized as (typeof allowed)[number]
+    }
+  }
 
   if (mapParam) {
     void loadSampleArchive(getPublicMapUrl(mapParam), mapParam)

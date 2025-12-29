@@ -8,7 +8,7 @@ function addDebugParam(url: string): string {
 
 function editorUrl(params: string): string {
   const trimmed = params ? (params.startsWith('&') ? params : `&${params}`) : ''
-  return `/editor/?autoload=sample${trimmed}`
+  return `/editor/?map=wynnal-terrain.wyn&renderScale=max${trimmed}`
 }
 
 async function waitForMapReady(page: Page) {
