@@ -116,57 +116,91 @@
       </header>
 
       <div v-if="activeLayer" class="layer-editor__content">
-        <div class="layer-editor__grid">
+        <div
+          class="layer-editor__grid"
+          :class="{
+            'layer-editor__grid--with-list': hasLayerList,
+            'layer-editor__grid--collapse-left': leftCollapsed,
+            'layer-editor__grid--collapse-right': rightCollapsed,
+            'layer-editor__grid--collapse-both': leftCollapsed && rightCollapsed
+          }"
+        >
           <aside
             v-if="hasLayerList"
             class="layer-editor__layers"
+            :class="{ 'layer-editor__layers--collapsed': leftCollapsed }"
           >
-            <div class="layer-editor__layers-header">
-              <div class="layer-editor__layers-title">
-                <Icon icon="layer-group" aria-hidden="true" />
-                <span>Layers</span>
+            <template v-if="!leftCollapsed">
+              <div class="layer-editor__layers-header">
+                <div class="layer-editor__layers-title">
+                  <Icon icon="layer-group" aria-hidden="true" />
+                  <span>Layers</span>
+                </div>
+                <div class="layer-editor__layers-header-actions">
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost layer-editor__layers-add"
+                    title="Add layer"
+                    @click="handleLayerAdd"
+                  >
+                    <Icon icon="plus" />
+                  </button>
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost layer-editor__panel-toggle"
+                    :aria-pressed="panelState.leftPinned"
+                    title="Pin layers panel"
+                    @click="toggleLeftPin"
+                  >
+                    <Icon icon="thumbtack" />
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                class="pill-button pill-button--ghost layer-editor__layers-add"
-                title="Add layer"
-                @click="handleLayerAdd"
-              >
-                <Icon icon="plus" />
-              </button>
-            </div>
-            <LayerList
-              :sections="layerSections"
-              :color-to-css="colorToCss"
-              :active-id="props.activeLayer?.id ?? null"
-              :section-hints="sectionHints"
-              @open-layer="attemptLayerSelection"
-              @toggle-layer="toggleLayerVisibility"
-              @toggle-onion="toggleLayerOnion"
-              @reorder-layer="emit('reorder-layer', $event)"
-            />
-            <div class="layer-editor__layers-actions">
-              <button
-                type="button"
-                class="pill-button pill-button--ghost"
-                title="Toggle biomes"
-                @click="toggleGroupVisibility('biome')"
-              >
-                <Icon icon="adjust" />
-                {{ biomesFullyVisible ? 'Hide biomes' : 'Show biomes' }}
-              </button>
-              <button
-                type="button"
-                class="pill-button pill-button--ghost"
-                title="Toggle overlays"
-                @click="toggleGroupVisibility('overlay')"
-              >
-                <Icon icon="layer-group" />
-                {{ overlaysFullyVisible ? 'Hide overlays' : 'Show overlays' }}
-              </button>
-            </div>
+              <LayerList
+                :sections="layerSections"
+                :color-to-css="colorToCss"
+                :active-id="props.activeLayer?.id ?? null"
+                :section-hints="sectionHints"
+                @open-layer="attemptLayerSelection"
+                @toggle-layer="toggleLayerVisibility"
+                @toggle-onion="toggleLayerOnion"
+                @reorder-layer="emit('reorder-layer', $event)"
+              />
+              <div class="layer-editor__layers-actions">
+                <button
+                  type="button"
+                  class="pill-button pill-button--ghost"
+                  title="Toggle biomes"
+                  @click="toggleGroupVisibility('biome')"
+                >
+                  <Icon icon="adjust" />
+                  {{ biomesFullyVisible ? 'Hide biomes' : 'Show biomes' }}
+                </button>
+                <button
+                  type="button"
+                  class="pill-button pill-button--ghost"
+                  title="Toggle overlays"
+                  @click="toggleGroupVisibility('overlay')"
+                >
+                  <Icon icon="layer-group" />
+                  {{ overlaysFullyVisible ? 'Hide overlays' : 'Show overlays' }}
+                </button>
+              </div>
+            </template>
           </aside>
           <aside class="layer-editor__tools">
+            <div class="layer-editor__tools-toggles">
+              <button
+                type="button"
+                class="pill-button pill-button--ghost layer-editor__panel-toggle"
+                :aria-pressed="!leftCollapsed"
+                title="Toggle layers panel"
+                @click="toggleLeftPanel"
+              >
+                <Icon icon="layer-group" />
+                <Icon :icon="leftCollapsed ? 'chevron-right' : 'chevron-left'" />
+              </button>
+            </div>
             <button
               v-for="tool in toolPalette"
               :key="tool.id"
@@ -186,13 +220,23 @@
             </button>
           </aside>
 
-        <div
-          class="layer-editor__canvas"
-          @dragenter.prevent="handleLayerDragEnter"
-          @dragover.prevent="handleLayerDragOver"
-          @dragleave.prevent="handleLayerDragLeave"
-          @drop.prevent="handleLayerDrop"
-        >
+          <div
+            class="layer-editor__canvas"
+            @dragenter.prevent="handleLayerDragEnter"
+            @dragover.prevent="handleLayerDragOver"
+            @dragleave.prevent="handleLayerDragLeave"
+            @drop.prevent="handleLayerDrop"
+          >
+            <button
+              v-if="rightCollapsed"
+              type="button"
+              class="pill-button pill-button--ghost layer-editor__canvas-toggle layer-editor__canvas-toggle--right"
+              title="Expand tools panel"
+              @click="toggleRightPanel"
+            >
+              <Icon icon="sliders" />
+              <Icon icon="chevron-left" />
+            </button>
             <LayerMaskEditor
               v-if="maskUrl"
               ref="maskEditorRef"
@@ -254,8 +298,34 @@
             </div>
           </div>
 
-          <aside class="layer-editor__properties">
+          <aside
+            class="layer-editor__properties"
+            :class="{ 'layer-editor__properties--collapsed': rightCollapsed }"
+          >
             <div class="layer-editor__properties-body">
+              <div class="layer-editor__properties-top">
+                <span class="layer-editor__properties-title">Tool Settings</span>
+                <div class="layer-editor__properties-actions">
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost layer-editor__panel-toggle"
+                    :aria-pressed="panelState.rightPinned"
+                    title="Pin tools panel"
+                    @click="toggleRightPin"
+                  >
+                    <Icon icon="thumbtack" />
+                  </button>
+                  <button
+                    type="button"
+                    class="pill-button pill-button--ghost layer-editor__panel-toggle"
+                    :aria-pressed="!rightCollapsed"
+                    title="Collapse tools panel"
+                    @click="toggleRightPanel"
+                  >
+                    <Icon icon="chevron-right" />
+                  </button>
+                </div>
+              </div>
               <div class="layer-editor__section">
                 <button
                   type="button"
@@ -869,6 +939,12 @@ const props = defineProps<{
     snapSize: number
     angleSnapEnabled: boolean
   } | null
+  panelState?: {
+    leftCollapsed: boolean
+    rightCollapsed: boolean
+    leftPinned: boolean
+    rightPinned: boolean
+  }
 }>()
 
 const emit = defineEmits<{
@@ -904,10 +980,108 @@ const emit = defineEmits<{
     snapSize: number
     angleSnapEnabled: boolean
   }): void
+  (ev: 'update-panel-state', payload: {
+    leftCollapsed: boolean
+    rightCollapsed: boolean
+    leftPinned: boolean
+    rightPinned: boolean
+  }): void
 }>()
 
 const layerName = ref('')
 const inlineMode = computed(() => Boolean(props.inline))
+const hasLayerList = computed(() => (props.layerEntries?.length ?? 0) > 0)
+const panelState = computed(() => ({
+  leftCollapsed: props.panelState?.leftCollapsed ?? false,
+  rightCollapsed: props.panelState?.rightCollapsed ?? false,
+  leftPinned: props.panelState?.leftPinned ?? false,
+  rightPinned: props.panelState?.rightPinned ?? false
+}))
+const isCompactViewport = ref(false)
+
+function updatePanelState(next: Partial<{
+  leftCollapsed: boolean
+  rightCollapsed: boolean
+  leftPinned: boolean
+  rightPinned: boolean
+}>) {
+  emit('update-panel-state', {
+    leftCollapsed: next.leftCollapsed ?? panelState.value.leftCollapsed,
+    rightCollapsed: next.rightCollapsed ?? panelState.value.rightCollapsed,
+    leftPinned: next.leftPinned ?? panelState.value.leftPinned,
+    rightPinned: next.rightPinned ?? panelState.value.rightPinned
+  })
+}
+
+const leftCollapsed = computed(
+  () =>
+    hasLayerList.value &&
+    (panelState.value.leftCollapsed || (isCompactViewport.value && !panelState.value.leftPinned))
+)
+const rightCollapsed = computed(
+  () => panelState.value.rightCollapsed || (isCompactViewport.value && !panelState.value.rightPinned)
+)
+
+function toggleLeftPanel() {
+  if (leftCollapsed.value) {
+    updatePanelState({
+      leftCollapsed: false,
+      leftPinned: isCompactViewport.value ? true : panelState.value.leftPinned
+    })
+  } else {
+    updatePanelState({ leftCollapsed: true, leftPinned: false })
+  }
+}
+
+function toggleRightPanel() {
+  if (rightCollapsed.value) {
+    updatePanelState({
+      rightCollapsed: false,
+      rightPinned: isCompactViewport.value ? true : panelState.value.rightPinned
+    })
+  } else {
+    updatePanelState({ rightCollapsed: true, rightPinned: false })
+  }
+}
+
+function toggleLeftPin() {
+  const next = !panelState.value.leftPinned
+  updatePanelState({ leftPinned: next, leftCollapsed: next ? false : panelState.value.leftCollapsed })
+}
+
+function toggleRightPin() {
+  const next = !panelState.value.rightPinned
+  updatePanelState({ rightPinned: next, rightCollapsed: next ? false : panelState.value.rightCollapsed })
+}
+
+function scheduleCanvasRefit() {
+  if (!maskEditorRef.value) return
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fitCanvasView()
+    })
+  })
+}
+
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  const media = window.matchMedia('(max-width: 1200px)')
+  const handleChange = (event: MediaQueryListEvent | MediaQueryList) => {
+    isCompactViewport.value = event.matches
+  }
+  handleChange(media)
+  if ('addEventListener' in media) {
+    media.addEventListener('change', handleChange)
+    onBeforeUnmount(() => media.removeEventListener('change', handleChange))
+  } else {
+    media.addListener(handleChange)
+    onBeforeUnmount(() => media.removeListener(handleChange))
+  }
+})
+
+watch([leftCollapsed, rightCollapsed], () => {
+  scheduleCanvasRefit()
+})
 watch(
   () => props.activeLayer,
   (next) => {
@@ -954,7 +1128,6 @@ const maskDirty = computed(() => Boolean(props.activeLayer && historyState.value
 const showOverflowMenu = ref(false)
 const overflowMenuRef = ref<HTMLElement | null>(null)
 const overflowButtonRef = ref<HTMLButtonElement | null>(null)
-const hasLayerList = computed(() => (props.layerEntries?.length ?? 0) > 0)
 const layerList = computed(() => props.layerEntries ?? [])
 const colorToCss = computed(
   () =>
@@ -2536,17 +2709,13 @@ function clamp(value: number, min: number, max: number) {
 }
 
 .layer-editor__grid {
-  display: grid;
-  grid-template-columns: 130px minmax(0, 1fr) 260px;
+  display: flex;
   flex: 1;
   min-height: 0;
   min-width: 0;
   width: 100%;
   height: 100%;
-}
-
-.layer-editor--with-list .layer-editor__grid {
-  grid-template-columns: 280px 80px minmax(0, 1fr) 260px;
+  position: relative;
 }
 
 .layer-editor__layers {
@@ -2555,13 +2724,24 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  flex: 0 0 280px;
   min-height: 0;
+}
+
+.layer-editor__layers--collapsed {
+  display: none;
 }
 
 .layer-editor__layers-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.layer-editor__layers-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .layer-editor__layers-title {
@@ -2592,7 +2772,15 @@ function clamp(value: number, min: number, max: number) {
   gap: 0.25rem;
   overflow-y: auto;
   align-items: center;
+  flex: 0 0 80px;
   min-height: 0;
+}
+
+.layer-editor__tools-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
 .layer-editor__tool-button {
@@ -2639,6 +2827,26 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.layer-editor__edge-toggles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  z-index: 5;
+}
+
+.layer-editor__edge-toggle {
+  pointer-events: auto;
+  background: rgba(8, 12, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.35rem 0.55rem;
 }
 
 .layer-editor__canvas :deep(.layer-mask-editor) {
@@ -2656,7 +2864,49 @@ function clamp(value: number, min: number, max: number) {
   flex-direction: column;
   gap: 0.4rem;
   overflow-y: auto;
+  flex: 0 0 260px;
   min-height: 0;
+}
+
+.layer-editor__properties--collapsed {
+  display: none;
+}
+
+.layer-editor__properties-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.layer-editor__properties-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+
+.layer-editor__properties-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-direction: row;
+}
+
+.layer-editor__panel-toggle {
+  padding: 0.25rem 0.4rem;
+}
+
+.layer-editor__canvas-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 6;
+  background: rgba(8, 12, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .layer-editor__properties-header {
@@ -2949,12 +3199,6 @@ function clamp(value: number, min: number, max: number) {
   padding: 0.15rem;
 }
 
-.layer-editor__properties-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 .layer-editor__status {
   display: flex;
   justify-content: space-between;
@@ -2993,8 +3237,16 @@ function clamp(value: number, min: number, max: number) {
     padding-left: 1rem;
   }
 
-  .layer-editor__grid {
-    grid-template-columns: 160px minmax(0, 1fr) 220px;
+  .layer-editor__layers {
+    flex-basis: 220px;
+  }
+
+  .layer-editor__tools {
+    flex-basis: 72px;
+  }
+
+  .layer-editor__properties {
+    flex-basis: 220px;
   }
 }
 </style>

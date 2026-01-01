@@ -51,11 +51,26 @@ async function ensurePanelDockCollapsed(page: Page) {
 }
 
 async function openLayerEditorForLayer(page: Page, label: string) {
-  const pill = page.getByRole('button', { name: new RegExp(label, 'i') }).first()
-  await expect(pill).toBeVisible({ timeout: 30_000 })
-  await pill.click()
-
   const editor = page.locator('.layer-editor').first()
+  const editorVisible = await editor.isVisible().catch(() => false)
+  if (!editorVisible) {
+    const layersNav = page.getByRole('button', { name: 'Layers' }).first()
+    await expect(layersNav).toBeVisible({ timeout: 30_000 })
+    await layersNav.click()
+
+    const layersPanel = page.locator('.panel-card').filter({
+      has: page.getByText('Layers', { exact: true })
+    }).first()
+    await expect(layersPanel).toBeVisible({ timeout: 30_000 })
+    const pill = layersPanel.getByRole('button', { name: new RegExp(label, 'i') }).first()
+    await expect(pill).toBeVisible({ timeout: 30_000 })
+    await pill.click()
+  } else {
+    const pill = page.getByRole('button', { name: new RegExp(label, 'i') }).first()
+    await expect(pill).toBeVisible({ timeout: 30_000 })
+    await pill.click()
+  }
+
   await expect(editor).toBeVisible({ timeout: 30_000 })
   const titleInput = editor.locator('.layer-editor__title-input')
   await expect(titleInput).toBeVisible()

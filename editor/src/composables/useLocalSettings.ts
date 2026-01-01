@@ -38,6 +38,10 @@ export type LocalSettings = {
   cameraTracking: boolean
   openLocationsOnSelect: boolean
   renderScaleMode: RenderScaleMode
+  layerEditorLeftCollapsed: boolean
+  layerEditorRightCollapsed: boolean
+  layerEditorLeftPinned: boolean
+  layerEditorRightPinned: boolean
   brushSettings: BrushSettings | null
   brushPresets: BrushPreset[]
   gridSettings: {
@@ -56,6 +60,10 @@ export const DEFAULT_LOCAL_SETTINGS: LocalSettings = {
   cameraTracking: true,
   openLocationsOnSelect: true,
   renderScaleMode: 'auto',
+  layerEditorLeftCollapsed: false,
+  layerEditorRightCollapsed: false,
+  layerEditorLeftPinned: false,
+  layerEditorRightPinned: false,
   brushSettings: null,
   brushPresets: [],
   gridSettings: {
@@ -80,8 +88,16 @@ export function useLocalSettings() {
       saved.cameraTracking ?? DEFAULT_LOCAL_SETTINGS.cameraTracking
     localSettings.openLocationsOnSelect =
       saved.openLocationsOnSelect ?? DEFAULT_LOCAL_SETTINGS.openLocationsOnSelect
-    localSettings.renderScaleMode =
-      saved.renderScaleMode ?? DEFAULT_LOCAL_SETTINGS.renderScaleMode
+  localSettings.renderScaleMode =
+    saved.renderScaleMode ?? DEFAULT_LOCAL_SETTINGS.renderScaleMode
+  localSettings.layerEditorLeftCollapsed =
+    saved.layerEditorLeftCollapsed ?? DEFAULT_LOCAL_SETTINGS.layerEditorLeftCollapsed
+  localSettings.layerEditorRightCollapsed =
+    saved.layerEditorRightCollapsed ?? DEFAULT_LOCAL_SETTINGS.layerEditorRightCollapsed
+  localSettings.layerEditorLeftPinned =
+    saved.layerEditorLeftPinned ?? DEFAULT_LOCAL_SETTINGS.layerEditorLeftPinned
+  localSettings.layerEditorRightPinned =
+    saved.layerEditorRightPinned ?? DEFAULT_LOCAL_SETTINGS.layerEditorRightPinned
     localSettings.brushSettings =
       saved.brushSettings ?? DEFAULT_LOCAL_SETTINGS.brushSettings
     localSettings.brushPresets =

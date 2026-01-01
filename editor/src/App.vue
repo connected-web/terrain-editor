@@ -81,12 +81,13 @@
             :brush-settings="localSettings.brushSettings"
             :brush-presets="localSettings.brushPresets"
             :grid-settings="localSettings.gridSettings"
+            :panel-state="layerEditorPanelState"
             @update:filter-text="setAssetDialogFilter"
             @export-layer="layersApi.exportActiveLayerImage"
             @replace="handleLayerAssetReplace"
             @update-colour="handleLayerColourUpdate"
             @update-layer-name="handleLayerNameUpdate"
-            @open-layer-editor="layersApi.openLayerEditor"
+            @open-layer-editor="openLayerEditor"
             @toggle-layer="toggleLayer"
             @set-all="setAllLayers"
             @toggle-onion="toggleOnionLayer"
@@ -102,13 +103,14 @@
             @update-brush-settings="(next) => { localSettings.brushSettings = next }"
             @update-brush-presets="(next) => { localSettings.brushPresets = next }"
             @update-grid-settings="(next) => { localSettings.gridSettings = next }"
+            @update-panel-state="updateLayerEditorPanelState"
             @close="layersApi.closeLayerEditor()"
           />
           <LayersPanel
             v-else
             :layer-entries="layerEntriesWithOnion"
             :color-to-css="rgb"
-            @open-layer-editor="layersApi.openLayerEditor"
+            @open-layer-editor="openLayerEditor"
             @toggle-layer="toggleLayer"
             @set-all="setAllLayers"
             @toggle-onion="toggleOnionLayer"
@@ -437,6 +439,12 @@ const resolvedLayerViewStateForUrl = computed(() => {
 })
 const onionLayerState = reactive<Record<string, boolean>>({})
 const maskViewMode = ref<'grayscale' | 'color'>('grayscale')
+const layerEditorPanelState = computed(() => ({
+  leftCollapsed: localSettings.layerEditorLeftCollapsed,
+  rightCollapsed: localSettings.layerEditorRightCollapsed,
+  leftPinned: localSettings.layerEditorLeftPinned,
+  rightPinned: localSettings.layerEditorRightPinned
+}))
 const layerEntriesWithOnion = computed(() =>
   Array.isArray(layersApi.layerEntries.value)
     ? layersApi.layerEntries.value.map(entry => ({
@@ -463,6 +471,18 @@ function setOnionLayerState(id: string, enabled: boolean) {
 }
 function handleMaskViewChange(mode: 'grayscale' | 'color') {
   maskViewMode.value = mode
+}
+
+function updateLayerEditorPanelState(next: {
+  leftCollapsed: boolean
+  rightCollapsed: boolean
+  leftPinned: boolean
+  rightPinned: boolean
+}) {
+  localSettings.layerEditorLeftCollapsed = next.leftCollapsed
+  localSettings.layerEditorRightCollapsed = next.rightCollapsed
+  localSettings.layerEditorLeftPinned = next.leftPinned
+  localSettings.layerEditorRightPinned = next.rightPinned
 }
 watch(
   () => (layersApi.layerEntries.value ?? []).map((entry) => entry.id),
@@ -578,7 +598,7 @@ useUrlState({
   isDockCollapsed,
   layerEditorOpen: layersApi.layerEditorOpen,
   layerEditorSelectedLayerId: layersApi.layerEditorSelectedLayerId,
-  openLayerEditor: layersApi.openLayerEditor,
+  openLayerEditor,
   layerEntries: layerEntriesWithOnion,
   layerBrowserStore,
   cameraViewState: locationsApi.cameraViewState,
@@ -975,6 +995,12 @@ function toggleDock() {
 
 function setActivePanel(panel: DockPanel) {
   activeDockPanel.value = panel
+}
+
+function openLayerEditor(id: string) {
+  activeDockPanel.value = 'layers'
+  isDockCollapsed.value = false
+  layersApi.openLayerEditor(id)
 }
 
 function handleLocationSelect(id: string) {
