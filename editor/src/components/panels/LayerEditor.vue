@@ -2009,12 +2009,28 @@ function handleMaskReady() {
   const pendingState = props.pendingViewState ?? null
   maskEditorRef.value.suspendViewTracking()
   if (pendingState) {
+    const centerAtOrigin =
+      typeof pendingState.centerX === 'number' &&
+      typeof pendingState.centerY === 'number' &&
+      pendingState.centerX <= 0.01 &&
+      pendingState.centerY <= 0.01
     const shouldAutoFit =
-      pendingState.zoom <= 1 &&
-      pendingState.centerX <= 0.05 &&
-      pendingState.centerY <= 0.05
+      centerAtOrigin ||
+      (pendingState.zoom <= 1 &&
+        pendingState.centerX <= 0.05 &&
+        pendingState.centerY <= 0.05)
     if (shouldAutoFit) {
       fitCanvasView()
+      const postFitState = maskEditorRef.value.getViewState()
+      if (postFitState.centerX <= 0.01 && postFitState.centerY <= 0.01) {
+        setTimeout(() => {
+          if (!maskEditorRef.value) return
+          const nextState = maskEditorRef.value.getViewState()
+          if (nextState.centerX <= 0.01 && nextState.centerY <= 0.01) {
+            fitCanvasView()
+          }
+        }, 50)
+      }
       if (currentId) {
         const viewState = maskEditorRef.value.getViewState()
         viewStateCache.set(currentId, viewState)
@@ -2037,6 +2053,16 @@ function handleMaskReady() {
       emit('view-state-change', { id: currentId, state: cachedState })
     } else {
       fitCanvasView()
+      const postFitState = maskEditorRef.value.getViewState()
+      if (postFitState.centerX <= 0.01 && postFitState.centerY <= 0.01) {
+        setTimeout(() => {
+          if (!maskEditorRef.value) return
+          const nextState = maskEditorRef.value.getViewState()
+          if (nextState.centerX <= 0.01 && nextState.centerY <= 0.01) {
+            fitCanvasView()
+          }
+        }, 50)
+      }
     }
   }
   maskEditorRef.value.resumeViewTracking()
@@ -2364,15 +2390,12 @@ function clamp(value: number, min: number, max: number) {
 
 <style scoped>
 .layer-editor {
-  --layer-editor-left-gap: 3rem;
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
-  padding: 0.6rem;
-  padding-left: var(--layer-editor-left-gap);
 }
 
 .layer-editor--inline {
@@ -2381,9 +2404,6 @@ function clamp(value: number, min: number, max: number) {
   z-index: auto;
   display: flex;
   justify-content: flex-start;
-  padding: 0.6rem;
-  padding-left: max(2rem, 2vw);
-  padding-right: max(1rem, 2vw);
   pointer-events: auto;
   width: 100%;
   height: 100%;
@@ -2394,7 +2414,7 @@ function clamp(value: number, min: number, max: number) {
   display: flex;
   flex-direction: column;
   margin: 0;
-  width: min(1400px, calc(100vw - var(--layer-editor-left-gap) - 1.2rem));
+  width: 100%;
   height: calc(100vh - 1.2rem);
   background: rgba(5, 8, 17, 0.96);
   border-radius: 10px;
@@ -2404,7 +2424,6 @@ function clamp(value: number, min: number, max: number) {
 }
 
 .layer-editor--inline .layer-editor__panel {
-  width: min(1400px, 100%);
   height: 100%;
   max-height: 100%;
   margin: 0 auto;
@@ -2971,7 +2990,6 @@ function clamp(value: number, min: number, max: number) {
 
 @media (max-width: 1100px) {
   .layer-editor {
-    --layer-editor-left-gap: 1rem;
     padding-left: 1rem;
   }
 

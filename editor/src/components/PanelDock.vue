@@ -63,7 +63,6 @@ defineExpose({
   width: min(45%, 420px);
   min-width: 300px;
   max-width: 50%;
-  transition: width 0.2s ease;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
   height: 100vh;
@@ -107,7 +106,6 @@ defineExpose({
   color: inherit;
   cursor: pointer;
   z-index: 700;
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .panel-dock__toggle:hover {

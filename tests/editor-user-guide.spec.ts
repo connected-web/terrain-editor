@@ -213,6 +213,23 @@ test.describe('Terrain Editor : Navigation', () => {
 
     const editor = await openLayerEditorForLayer(page, 'Height Map')
     await expect(editor.locator('.layer-editor__badge')).toContainText(/height/i)
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('.layer-editor') as HTMLElement | null
+      if (!panel) return false
+      const width = panel.offsetWidth
+      const height = panel.offsetHeight
+      return width >= 520 && height >= 500
+    })
+    const fitButton = page.getByRole('button', { name: 'Fit' }).first()
+    await fitButton.click()
+    await page.waitForFunction(() => {
+      const viewport = document.querySelector('.layer-mask-editor__viewport') as HTMLElement | null
+      if (!viewport) return false
+      if (viewport.scrollWidth <= viewport.clientWidth && viewport.scrollHeight <= viewport.clientHeight) {
+        return true
+      }
+      return viewport.scrollLeft > 0 || viewport.scrollTop > 0
+    })
     await page.waitForTimeout(750)
 
     await captureDocumentationScreenshot(page, 'layer-editor-height-map')

@@ -116,7 +116,11 @@ function parseInitialState(): InitialRouteState {
       const zoom = Number.isFinite(zoomRaw) ? zoomRaw : 1
       const centerX = Number.isFinite(centerXRaw) ? centerXRaw : 0.5
       const centerY = Number.isFinite(centerYRaw) ? centerYRaw : 0.5
-      layerViewState = { zoom, centerX, centerY }
+      if (centerX <= 0.001 && centerY <= 0.001) {
+        layerViewState = null
+      } else {
+        layerViewState = { zoom, centerX, centerY }
+      }
     }
   }
   const locationId = params.get('location')

@@ -388,10 +388,15 @@ const displaySize = computed(() => ({
 }))
 const viewportSize = ref({ width: 0, height: 0 })
 const currentViewState = ref<ViewState>({ zoom: 1, centerX: 0.5, centerY: 0.5 })
-const viewportPadding = computed(() => ({
-  x: viewportSize.value.width / 2,
-  y: viewportSize.value.height / 2
-}))
+
+function computeViewportPadding(width: number, height: number) {
+  return {
+    x: width / 2,
+    y: height / 2
+  }
+}
+
+const viewportPadding = computed(() => computeViewportPadding(viewportSize.value.width, viewportSize.value.height))
 const totalCanvasSize = computed(() => ({
   width: displaySize.value.width + viewportPadding.value.x * 2,
   height: displaySize.value.height + viewportPadding.value.y * 2
@@ -422,10 +427,10 @@ function clampZoom(value: number) {
 }
 
 function getPaddingOffsets() {
-  return {
-    x: viewportPadding.value.x,
-    y: viewportPadding.value.y
-  }
+  const viewport = viewportRef.value
+  const width = viewportSize.value.width || viewport?.clientWidth || 0
+  const height = viewportSize.value.height || viewport?.clientHeight || 0
+  return computeViewportPadding(width, height)
 }
 
 function isViewportReady(target = viewportRef.value) {
@@ -2125,27 +2130,46 @@ function fitView() {
   const viewport = viewportRef.value
   const { width, height } = canvasDimensions.value
   if (!viewport || !width || !height) {
-    zoom.value = 1
-    emit('zoom-change', zoom.value)
+    if (viewport) {
+      requestAnimationFrame(() => fitView())
+    } else {
+      zoom.value = 1
+      emit('zoom-change', zoom.value)
+    }
     return
   }
-  const availableWidth = Math.max(1, viewport.clientWidth)
-  const availableHeight = Math.max(1, viewport.clientHeight)
-  const scaleX = availableWidth / width
-  const scaleY = availableHeight / height
-  const target = clampZoom(Math.min(scaleX, scaleY))
-  zoom.value = target
-  const displayWidth = width * target
-  const displayHeight = height * target
-  const { x: paddingX, y: paddingY } = getPaddingOffsets()
-  const centerLeft = paddingX + displayWidth / 2 - viewport.clientWidth / 2
-  const centerTop = paddingY + displayHeight / 2 - viewport.clientHeight / 2
-  viewport.scrollLeft = Math.max(0, centerLeft)
-  viewport.scrollTop = Math.max(0, centerTop)
-  emit('zoom-change', zoom.value)
-  viewInitialized = true
-  suppressViewStateEmits = false
-  emitViewStateChange({ force: true })
+  if (viewport.clientWidth === 0 || viewport.clientHeight === 0) {
+    requestAnimationFrame(() => fitView())
+    return
+  }
+  const applyFit = (emitZoom: boolean) => {
+    const availableWidth = Math.max(1, viewport.clientWidth)
+    const availableHeight = Math.max(1, viewport.clientHeight)
+    const scaleX = availableWidth / width
+    const scaleY = availableHeight / height
+    const target = clampZoom(Math.min(scaleX, scaleY))
+    zoom.value = target
+    const displayWidth = width * target
+    const displayHeight = height * target
+    const { x: paddingX, y: paddingY } = getPaddingOffsets()
+    const centerLeft = paddingX + displayWidth / 2 - viewport.clientWidth / 2
+    const centerTop = paddingY + displayHeight / 2 - viewport.clientHeight / 2
+    viewport.scrollLeft = Math.max(0, centerLeft)
+    viewport.scrollTop = Math.max(0, centerTop)
+    emit('cursor-move', { x: width / 2, y: height / 2 })
+    if (emitZoom) {
+      emit('zoom-change', zoom.value)
+      viewInitialized = true
+      suppressViewStateEmits = false
+      emitViewStateChange({ force: true })
+    }
+  }
+
+  applyFit(true)
+  requestAnimationFrame(() => {
+    if (!viewportRef.value) return
+    applyNormalizedViewState({ zoom: zoom.value, centerX: 0.5, centerY: 0.5 }, false)
+  })
 }
 
 function setZoom(value: number) {
@@ -2197,6 +2221,7 @@ function applyNormalizedViewState(target: ViewState, emitChange: boolean) {
   const targetTop = paddingY + target.centerY * displayHeight - viewport.clientHeight / 2
   viewport.scrollLeft = Math.max(0, targetLeft)
   viewport.scrollTop = Math.max(0, targetTop)
+  emit('cursor-move', { x: width * target.centerX, y: height * target.centerY })
   if (!emitChange) {
     currentViewState.value = target
   }
