@@ -18,5 +18,5 @@
 </template>
 
 <script lang="ts" setup>
-const version = __APP_VERSION__
+const version = __APP_VERSION_FULL__
 </script>

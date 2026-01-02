@@ -26,7 +26,7 @@ test.describe('Terrain Editor : User Guide Features', () => {
       addDebugParam('/editor/?map=wynnal-terrain.wyn&renderScale=max&panel=locations&location=castle')
     )
     await expect(
-      page.getByRole('heading', { name: `Terrain Editor ${getShortVersion()}` })
+      page.getByRole('heading', { name: `Terrain Editor v${getShortVersion()}` })
     ).toBeVisible()
     await rescaleUI(page)
 

@@ -31,6 +31,6 @@ export function getShortVersion() {
   if (cachedShortVersion) return cachedShortVersion
   const pkgPath = path.join(process.cwd(), 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-  cachedShortVersion = String(pkg.version).split('.').slice(0, 2).join('.')
+  cachedShortVersion = String(pkg.version)
   return cachedShortVersion
 }

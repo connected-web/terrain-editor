@@ -1,6 +1,6 @@
 <template>
   <div class="editor-shell" ref="editorRoot">
-    <h1 class="sr-only">Terrain Editor {{ version }}</h1>
+    <h1 class="sr-only">Terrain Editor v{{ version }}</h1>
     <div class="editor-layout">
       <EditorViewer
         ref="viewerShell"
@@ -264,7 +264,7 @@ import {
   stemShapeOptions
 } from './utils/theme'
 
-const version = __APP_VERSION__
+const version = __APP_VERSION_FULL__
 import { useTheme } from './composables/useTheme'
 import { buildIconPath, buildLayerMaskPath } from './utils/assets'
 import { ensureLocationId } from './utils/locations'
@@ -759,12 +759,14 @@ const sampleMaps = ref<DemoMapEntry[]>([])
 const sampleMapId = ref<string | null>(null)
 
 function getPublicMapUrl(filename: string) {
-  return new URL(`/maps/${filename}`, window.location.origin).toString()
+  const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+  return new URL(`maps/${filename}`, baseUrl).toString()
 }
 
 async function loadSampleRegistry() {
   try {
-    const response = await fetch(new URL('/maps/registry.json', window.location.origin).toString())
+    const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+    const response = await fetch(new URL('maps/registry.json', baseUrl).toString())
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const data = (await response.json()) as { maps?: DemoMapEntry[] }
     sampleMaps.value = data.maps ?? []

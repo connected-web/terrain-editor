@@ -44,7 +44,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run preview:dist',
     url: `http://127.0.0.1:${previewPort}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 180_000,
     env: { PREVIEW_PORT: String(previewPort) }
   }

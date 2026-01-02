@@ -128,7 +128,7 @@ test.describe('Terrain Editor : Navigation', () => {
   test('🟦 Terrain Editor : Navigation › editor loads and shows export button', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('', 'River Delta')))
     await expect(
-      page.getByRole('heading', { name: `Terrain Editor ${getShortVersion()}` })
+      page.getByRole('heading', { name: `Terrain Editor v${getShortVersion()}` })
     ).toBeVisible()
 
     await waitForMapReady(page)
