@@ -26,9 +26,11 @@ async function waitForMapReady(page: Page) {
   await page.waitForFunction(
     () => {
       const viewer = (window as any).__terrainViewer
-      if (!viewer || typeof viewer.getRenderResolution !== 'function') return false
-      const res = viewer.getRenderResolution()
-      return Boolean(res && res.width > 0 && res.height > 0)
+      if (viewer && typeof viewer.getRenderResolution === 'function') {
+        const res = viewer.getRenderResolution()
+        if (res && res.width > 0 && res.height > 0) return true
+      }
+      return Boolean(document.body?.textContent?.includes('Map ready.'))
     },
     null,
     { timeout: 60_000 }
@@ -225,6 +227,16 @@ test.describe('Terrain Editor : Navigation', () => {
   test('🟥 Terrain Editor : Navigation › layer editor height map view', async ({ page }) => {
     await page.goto(addDebugParam(editorUrl('panel=layers', 'Mountain Rune Spur')))
     await waitForMapReady(page)
+
+    // Debug: Listen to console errors
+    page.on('console', msg => {
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        console.log(`Browser ${msg.type()}: ${msg.text()}`)
+      }
+    })
+    page.on('pageerror', err => {
+      console.log('Page error:', err.message)
+    })
 
     const editor = await openLayerEditorForLayer(page, 'Height Map')
     await expect(editor.locator('.layer-editor__badge')).toContainText(/height/i)

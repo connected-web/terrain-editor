@@ -2126,22 +2126,39 @@ function handleViewportWheel(event: WheelEvent) {
   updateCursorPosition(event)
 }
 
+let fitViewRetries = 0
+const MAX_FIT_RETRIES = 60 // ~1 second at 60fps
+
 function fitView() {
   const viewport = viewportRef.value
   const { width, height } = canvasDimensions.value
   if (!viewport || !width || !height) {
-    if (viewport) {
+    if (viewport && fitViewRetries < MAX_FIT_RETRIES) {
+      fitViewRetries++
       requestAnimationFrame(() => fitView())
     } else {
+      fitViewRetries = 0
       zoom.value = 1
       emit('zoom-change', zoom.value)
+      viewInitialized = true
+      suppressViewStateEmits = false
     }
     return
   }
   if (viewport.clientWidth === 0 || viewport.clientHeight === 0) {
-    requestAnimationFrame(() => fitView())
+    if (fitViewRetries < MAX_FIT_RETRIES) {
+      fitViewRetries++
+      requestAnimationFrame(() => fitView())
+    } else {
+      fitViewRetries = 0
+      zoom.value = 1
+      emit('zoom-change', zoom.value)
+      viewInitialized = true
+      suppressViewStateEmits = false
+    }
     return
   }
+  fitViewRetries = 0
   const applyFit = (emitZoom: boolean) => {
     const availableWidth = Math.max(1, viewport.clientWidth)
     const availableHeight = Math.max(1, viewport.clientHeight)

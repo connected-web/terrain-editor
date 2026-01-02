@@ -991,6 +991,7 @@ const emit = defineEmits<{
 const layerName = ref('')
 const inlineMode = computed(() => Boolean(props.inline))
 const hasLayerList = computed(() => (props.layerEntries?.length ?? 0) > 0)
+const hasLayerListValue = () => (props.layerEntries?.length ?? 0) > 0
 const panelState = computed(() => ({
   leftCollapsed: props.panelState?.leftCollapsed ?? false,
   rightCollapsed: props.panelState?.rightCollapsed ?? false,
@@ -1015,7 +1016,7 @@ function updatePanelState(next: Partial<{
 
 const leftCollapsed = computed(
   () =>
-    hasLayerList.value &&
+    hasLayerListValue() &&
     (panelState.value.leftCollapsed || (isCompactViewport.value && !panelState.value.leftPinned))
 )
 const rightCollapsed = computed(
@@ -1195,6 +1196,24 @@ const pinnedValues = reactive({
 })
 const lastBrushSettingsSignature = ref('')
 const customPresets = ref<StoredBrushPreset[]>([])
+
+function setMaskUrl(url: string | null, ownsUrl: boolean) {
+  if (maskUrlOwned.value && maskObjectUrl.value) {
+    URL.revokeObjectURL(maskObjectUrl.value)
+  }
+  maskObjectUrl.value = url
+  maskUrlOwned.value = ownsUrl
+}
+
+async function preloadUrl(url: string) {
+  await new Promise<void>((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Failed to load mask preview'))
+    img.src = url
+  })
+}
 
 const strokeToolTarget = computed<'brush' | 'erase' | 'flat'>(() => {
   if (activeTool.value === 'erase') return 'erase'
@@ -2042,24 +2061,6 @@ watch(
   },
   { immediate: true }
 )
-
-function setMaskUrl(url: string | null, ownsUrl: boolean) {
-  if (maskUrlOwned.value && maskObjectUrl.value) {
-    URL.revokeObjectURL(maskObjectUrl.value)
-  }
-  maskObjectUrl.value = url
-  maskUrlOwned.value = ownsUrl
-}
-
-async function preloadUrl(url: string) {
-  await new Promise<void>((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve()
-    img.onerror = () => reject(new Error('Failed to load mask preview'))
-    img.src = url
-  })
-}
 
 async function resolveMaskSource(path: string | null) {
   if (!path) {
