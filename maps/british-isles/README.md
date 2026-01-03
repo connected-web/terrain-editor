@@ -85,6 +85,7 @@ Standard lon/lat coordinates were sourced via Nominatim (OpenStreetMap) searches
 | Scotland | Scotland, UK | -4.114052 | 56.786111 | Nominatim (OSM) |
 | Wales | Wales, UK | -3.738930 | 52.292812 | Nominatim (OSM) |
 | Ireland | Ireland | -7.979460 | 52.865196 | Nominatim (OSM) |
+| Northern Ireland | GADM v4.1 (GBR level 1 centroid) | -6.692771 | 54.609304 | GADM v4.1 |
 
 ## Generated Files
 
@@ -92,12 +93,14 @@ Standard lon/lat coordinates were sourced via Nominatim (OpenStreetMap) searches
 - `layers/land.png` from Natural Earth land polygons, rasterized in AEQD
 - `layers/water_mask.png` is the inverse of `land.png`
 - `layers/wales_mask.png`, `layers/england_mask.png`, `layers/scotland_mask.png`, `layers/ireland_mask.png`
+  - `layers/northern_ireland_mask.png`
   - From GADM borders, rasterized in AEQD and clipped to land
   - Opacity baked into mask values:
     - Wales 75%
     - England 50%
     - Scotland 60%
     - Ireland 70%
+    - Northern Ireland 70%
 
 ## Location Markers
 
