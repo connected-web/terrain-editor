@@ -46,6 +46,9 @@ This map uses an explicit projected bounding box to map lon/lat to pixels. The p
   - `y_min = min(sampled_y)`, `y_max = max(sampled_y)`
 - Build the affine transform for the 1024x1536 canvas:
   - `transform = from_bounds(x_min, y_min, x_max, y_max, width=1024, height=1536)`
+- Sampled AEQD bounds (meters) from the 60-point edge sweep:
+  - `x_min = -657715.3360`, `x_max = 329482.2298`
+  - `y_min = -556285.4508`, `y_max = 866776.9170`
 
 Pixel orientation:
 
@@ -54,6 +57,34 @@ Pixel orientation:
 - Rasterio's `from_bounds` creates a north-up transform (negative Y pixel size).
 
 If you need to compute new pixel locations from lon/lat, use the same AEQD projection and the `x_min/x_max/y_min/y_max` derived from the sampled bounds above to build the same affine transform, then map projected coordinates into pixel space.
+
+## Location Coordinate Sources
+
+Standard lon/lat coordinates were sourced via Nominatim (OpenStreetMap) searches on 2026-01-03, then projected into AEQD and mapped into the 1024x1536 pixel space using the transform above.
+
+| Location | Query | Lon | Lat | Source |
+| --- | --- | --- | --- | --- |
+| London | London, England, UK | -0.127765 | 51.507446 | Nominatim (OSM) |
+| Edinburgh | Edinburgh, Scotland, UK | -3.188375 | 55.953346 | Nominatim (OSM) |
+| Glasgow | Glasgow, Scotland, UK | -4.250169 | 55.861155 | Nominatim (OSM) |
+| Dublin | Dublin, Ireland | -6.260559 | 53.349379 | Nominatim (OSM) |
+| Belfast | Belfast, Northern Ireland, UK | -5.927710 | 54.597580 | Nominatim (OSM) |
+| Cardiff | Cardiff, Wales, UK | -3.179193 | 51.481655 | Nominatim (OSM) |
+| Manchester | Manchester, England, UK | -2.245115 | 53.479489 | Nominatim (OSM) |
+| Birmingham | Birmingham, England, UK | -1.902691 | 52.479699 | Nominatim (OSM) |
+| Liverpool | Liverpool, England, UK | -2.991680 | 53.407199 | Nominatim (OSM) |
+| Bristol | Bristol, England, UK | -2.597298 | 51.453802 | Nominatim (OSM) |
+| Newcastle | Newcastle upon Tyne, England, UK | -1.613157 | 54.973847 | Nominatim (OSM) |
+| Leeds | Leeds, England, UK | -1.543794 | 53.797418 | Nominatim (OSM) |
+| Ben Nevis | Ben Nevis, Scotland, UK | -5.003526 | 56.796858 | Nominatim (OSM) |
+| Cairn Gorm | Cairn Gorm, Scotland, UK | -3.644486 | 57.116769 | Nominatim (OSM) |
+| Yr Wyddfa | Yr Wyddfa (Snowdon), Wales, UK | -4.130588 | 52.926542 | Nominatim (OSM) |
+| Scafell Pike | Scafell Pike, England, UK | -3.211654 | 54.454259 | Nominatim (OSM) |
+| Slieve Donard | Slieve Donard, Northern Ireland, UK | -5.920961 | 54.180222 | Nominatim (OSM) |
+| England | England, UK | -1.264906 | 52.531021 | Nominatim (OSM) |
+| Scotland | Scotland, UK | -4.114052 | 56.786111 | Nominatim (OSM) |
+| Wales | Wales, UK | -3.738930 | 52.292812 | Nominatim (OSM) |
+| Ireland | Ireland | -7.979460 | 52.865196 | Nominatim (OSM) |
 
 ## Generated Files
 
