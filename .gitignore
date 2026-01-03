@@ -12,3 +12,4 @@ test-results
 .devservers.json
 documentation/renders
 .DS_Store
+tmp/
