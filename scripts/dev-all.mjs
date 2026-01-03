@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execSync, spawn } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -14,6 +14,7 @@ const services = [
   { name: 'editor', script: ['run', 'dev:editor'] },
   { name: 'website', script: ['run', 'dev:website'] }
 ]
+const portsToClear = [4173, 4175, 4176]
 
 async function killRecordedPids() {
   try {
@@ -41,11 +42,62 @@ async function killRecordedPids() {
   }
 }
 
+function readListeningPids(port) {
+  try {
+    const output = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, {
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+      .toString()
+      .trim()
+    if (!output) return []
+    return output
+      .split('\n')
+      .map((value) => Number.parseInt(value, 10))
+      .filter((pid) => Number.isFinite(pid))
+  } catch (err) {
+    return []
+  }
+}
+
+function readProcessCwd(pid) {
+  try {
+    const output = execSync(`lsof -a -p ${pid} -d cwd -Fn`, {
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+      .toString()
+      .trim()
+    const lines = output.split('\n')
+    const cwdLine = lines.find((line) => line.startsWith('n'))
+    return cwdLine ? cwdLine.slice(1) : null
+  } catch (err) {
+    return null
+  }
+}
+
+async function killPortConflicts() {
+  for (const port of portsToClear) {
+    const pids = readListeningPids(port)
+    for (const pid of pids) {
+      const cwd = readProcessCwd(pid)
+      if (!cwd || !cwd.startsWith(repoRoot)) continue
+      try {
+        process.kill(pid, 'SIGTERM')
+        console.log(`[dev:all] Freed port ${port} by stopping PID ${pid} (${cwd})`)
+      } catch (err) {
+        if (err && err.code !== 'ESRCH') {
+          console.warn(`[dev:all] Failed to stop PID ${pid} on port ${port}:`, err.message)
+        }
+      }
+    }
+  }
+}
+
 const children = []
 let shuttingDown = false
 
 async function start() {
   await killRecordedPids()
+  await killPortConflicts()
 
   for (const service of services) {
     const child = spawn(npmCmd, service.script, {
