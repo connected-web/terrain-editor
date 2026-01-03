@@ -35,6 +35,26 @@ Formulas:
 
 Current sea level (`legend.json`): `0.1365`.
 
+## Projection Mapping Details (for relocating locations)
+
+This map uses an explicit projected bounding box to map lon/lat to pixels. The pipeline used to derive the projected extent is:
+
+- Project the geographic bounds (lon -11.0..2.5, lat 49.0..61.5) into AEQD.
+- Sample the boundary grid (60 points along each edge) to capture the max extent after projection.
+- Compute projected bbox:
+  - `x_min = min(sampled_x)`, `x_max = max(sampled_x)`
+  - `y_min = min(sampled_y)`, `y_max = max(sampled_y)`
+- Build the affine transform for the 1024x1536 canvas:
+  - `transform = from_bounds(x_min, y_min, x_max, y_max, width=1024, height=1536)`
+
+Pixel orientation:
+
+- Pixel (0,0) is the top-left of the canvas.
+- X increases to the right, Y increases downward.
+- Rasterio's `from_bounds` creates a north-up transform (negative Y pixel size).
+
+If you need to compute new pixel locations from lon/lat, use the same AEQD projection and the `x_min/x_max/y_min/y_max` derived from the sampled bounds above to build the same affine transform, then map projected coordinates into pixel space.
+
 ## Generated Files
 
 - `layers/heightmap.png` combined from SRTMGL3 (land) and SRTM15Plus (sea)
@@ -52,6 +72,7 @@ Current sea level (`legend.json`): `0.1365`.
 
 - Country markers are placed at the centroid of each country mask.
 - Existing city/mountain markers remain scaled for the 1024x1536 canvas.
+- All location markers currently have `showBorder: false` in `locations.json`.
 
 ## Commands Used
 
@@ -73,4 +94,3 @@ cd maps/british-isles && zip -r ../british-isles-terrain.wyn legend.json locatio
 - OpenTopography requires an API key for downloads.
 - Set it in your shell as `OPENTOPO_KEY` and use it in the download URLs.
 - Do not commit API keys to the repo.
-
