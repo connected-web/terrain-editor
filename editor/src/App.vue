@@ -295,6 +295,7 @@ import { useLayerEditor } from './composables/useLayerEditor'
 import { useUrlState } from './composables/useUrlState'
 import { buildScratchDataset } from './utils/scratchDataset'
 import { createSolidImageData, createTransparentImageData } from './utils/imageFactory'
+import { validateOverlayLayers } from './utils/legendValidation'
 
 type LayerViewState = {
   zoom: number
@@ -936,6 +937,15 @@ function downloadBlob(filename: string, blob: Blob) {
 async function exportArchive() {
   const snapshot = projectStore.getSnapshot()
   if (!snapshot.legend) return
+  const overlayValidation = validateOverlayLayers(snapshot.legend, snapshot.files)
+  if (overlayValidation.errors.length) {
+    console.warn('Overlay validation errors:', overlayValidation)
+    updateStatus('Fix overlay entries before exporting.')
+    return
+  }
+  if (overlayValidation.warnings.length) {
+    console.warn('Overlay validation warnings:', overlayValidation)
+  }
   try {
     updateStatus('Building archive…')
     const blob = await buildWynArchive(snapshot)

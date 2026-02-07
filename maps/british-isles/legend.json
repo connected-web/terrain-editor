@@ -19,6 +19,10 @@
     }
   },
   "overlays": {
+    "satellite": {
+      "rgba": "layers/satellite-texture.png",
+      "label": "Satellite"
+    },
     "water": {
       "mask": "layers/water_mask.png",
       "rgb": [

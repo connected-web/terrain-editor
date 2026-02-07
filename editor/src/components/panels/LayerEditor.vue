@@ -201,23 +201,25 @@
                 <Icon :icon="leftCollapsed ? 'chevron-right' : 'chevron-left'" />
               </button>
             </div>
-            <button
-              v-for="tool in toolPalette"
-              :key="tool.id"
-              type="button"
-              class="layer-editor__tool-button"
-              :class="{
-                'layer-editor__tool-button--active': tool.id === activeTool,
-                'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
-              }"
-              :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
-              :title="`${tool.label} (${tool.shortcut})`"
-              @click="selectTool(tool.id)"
-            >
-              <Icon :icon="tool.icon" aria-hidden="true" />
-              <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
-              <span class="sr-only">{{ tool.label }}</span>
-            </button>
+            <template v-if="!isTextureOverlay">
+              <button
+                v-for="tool in toolPalette"
+                :key="tool.id"
+                type="button"
+                class="layer-editor__tool-button"
+                :class="{
+                  'layer-editor__tool-button--active': tool.id === activeTool,
+                  'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
+                }"
+                :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
+                :title="`${tool.label} (${tool.shortcut})`"
+                @click="selectTool(tool.id)"
+              >
+                <Icon :icon="tool.icon" aria-hidden="true" />
+                <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
+                <span class="sr-only">{{ tool.label }}</span>
+              </button>
+            </template>
           </aside>
 
           <div
@@ -338,12 +340,27 @@
                   title="Toggle tool settings"
                   @click="toolSettingsOpen = !toolSettingsOpen"
                 >
-                  <span class="layer-editor__section-title">{{ currentTool.label }} ({{ currentTool.shortcut }})</span>
-                  <Icon icon="circle-info" :title="currentTool.description" />
+                  <span class="layer-editor__section-title">
+                    {{ isTextureOverlay ? 'Texture layer' : `${currentTool.label} (${currentTool.shortcut})` }}
+                  </span>
+                  <Icon v-if="!isTextureOverlay" icon="circle-info" :title="currentTool.description" />
                   <Icon :icon="toolSettingsOpen ? 'chevron-up' : 'chevron-down'" />
                 </button>
                 <div v-if="toolSettingsOpen" class="layer-editor__section-body">
-                  <template v-if="activeTool === 'grid'">
+                  <template v-if="isTextureOverlay">
+                    <div class="layer-editor__texture-help">
+                      <p><strong>Texture layers can’t be edited yet.</strong></p>
+                      <p>Upload or select an RGBA asset from the layer’s assets dialog.</p>
+                      <button
+                        type="button"
+                        class="pill-button"
+                        @click="props.activeLayer && emit('open-assets', { id: props.activeLayer.id })"
+                      >
+                        <Icon icon="image" /> Open assets
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else-if="activeTool === 'grid'">
                     <div class="layer-editor__control-stack">
                       <label class="layer-editor__field">
                         <span>Grid</span>
@@ -3335,6 +3352,17 @@ function clamp(value: number, min: number, max: number) {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
+}
+
+.layer-editor__texture-help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.layer-editor__texture-help p {
+  margin: 0;
 }
 
 .layer-editor__texture {

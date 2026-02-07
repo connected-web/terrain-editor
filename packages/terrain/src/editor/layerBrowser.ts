@@ -7,6 +7,7 @@ export type LayerBrowserEntry = {
   mask?: string
   rgba?: string
   color: [number, number, number]
+  icon?: string
   visible: boolean
 }
 
@@ -58,6 +59,7 @@ function buildEntries(legend: TerrainLegend | undefined, visibility: VisibilityM
     const id = makeLayerId('overlay', key)
     const color =
       'rgb' in layer && Array.isArray(layer.rgb) ? layer.rgb : ([255, 255, 255] as [number, number, number])
+    const icon = 'rgba' in layer ? 'image' : undefined
     entries.push({
       id,
       kind: 'overlay',
@@ -65,6 +67,7 @@ function buildEntries(legend: TerrainLegend | undefined, visibility: VisibilityM
       mask: 'mask' in layer ? layer.mask : undefined,
       rgba: 'rgba' in layer ? layer.rgba : undefined,
       color,
+      icon,
       visible: visibility.get(id) ?? true
     })
   }
