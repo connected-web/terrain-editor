@@ -156,7 +156,7 @@ To make construction of the map files and terrain easier, a browser based editor
 #### Workspace features
 
 - **Panel dock + toolbar** – a single docked column hosts workspace/layers/theme/locations panels, while the shared toolbar injects context-aware UI actions (load, export, open panel). Collapsing the dock hides toolbar labels so the viewer keeps its footprint.
-- **Workspace panel** – edit project title, author, width, height, and sea level with validation. Legend changes remount the viewer immediately so the mesh always matches the declared resolution.
+- **Workspace panel** – edit project title, author, width, height, sea level, and height scale with validation. Legend changes remount the viewer immediately so the mesh always matches the declared resolution.
 - **Locations panel** – browse locations, select one to edit, upload or drag/drop icon assets, toggle label borders, and click “Pick on map” to place a marker interactively. The asset dialog handles caching + replacement for shared icons.
 - **Theme panel** – tweak marker text/background/border colors, border thickness, opacity, stem colors/opacity, and even the stem geometry shape. Hover/focus overrides and reset buttons keep experimentation safe.
 - **Marker rendering** – icons preserve their aspect ratios, optional label borders, and responsive scaling (about 50% smaller by default), while stems change width as you zoom and location creation now waits for a map click before committing.

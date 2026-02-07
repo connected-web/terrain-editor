@@ -141,6 +141,7 @@ export type TerrainHandle = {
   getViewState: () => LocationViewState
   setTheme: (overrides?: TerrainThemeOverrides) => void
   setSeaLevel: (level: number) => void
+  setHeightScale: (scale: number) => void
   invalidateIconTextures: (paths?: string[]) => void
   invalidateLayerMasks: (paths?: string[]) => void
   // Frame capture API for deterministic rendering
@@ -169,6 +170,7 @@ export type LegendLayer = {
 export type TerrainLegend = {
   size: [number, number]
   sea_level?: number
+  height_scale?: number
   heightmap: string
   topology?: string
   biomes: Record<string, LegendLayer>
@@ -832,6 +834,7 @@ export async function initTerrainViewer(
       onCameraMove: () => {},
       setTheme: () => {},
       setSeaLevel: () => {},
+      setHeightScale: () => {},
       invalidateIconTextures: () => {},
       invalidateLayerMasks: () => {},
       enableFrameCaptureMode: () => ({ fps: 30 }),
@@ -929,7 +932,7 @@ export async function initTerrainViewer(
     return uvToWorld(u, v, heightSampler, currentHeightScale, seaLevel, terrainDimensions)
   }
 
-  const heightScale = options.heightScale ?? HEIGHT_SCALE_DEFAULT
+  const heightScale = options.heightScale ?? legend.height_scale ?? HEIGHT_SCALE_DEFAULT
   let currentHeightScale = heightScale
   const waterPercent = THREE.MathUtils.clamp(
     options.waterLevelPercent ?? WATER_PERCENT_DEFAULT,
@@ -1409,6 +1412,32 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
     markerTheme = resolvedTheme.locationMarkers
     stemRadius = computeStemRadius(markerTheme.stem)
+    setLocationMarkers(currentLocations, currentFocusId)
+  }
+
+  function applyHeightScaleUpdate(nextHeightScale: number) {
+    if (!heightSampler) {
+      return
+    }
+    const prevHeightScale = currentHeightScale
+    const nextScale = Math.max(0, nextHeightScale)
+    currentHeightScale = nextScale
+    legend.height_scale = nextScale
+    dataset.legend.height_scale = nextScale
+    const stats = applyHeightField(terrainGeometry, heightSampler, {
+      seaLevel,
+      heightScale: currentHeightScale
+    })
+    terrainHeightRange = { min: stats.minY, max: stats.maxY }
+    terrainGeometry.attributes.position.needsUpdate = true
+    terrainGeometry.computeVertexNormals()
+    rebuildRimMesh()
+    rebuildOceanMesh()
+    if (Number.isFinite(prevHeightScale) && prevHeightScale > 0) {
+      const factor = nextScale / prevHeightScale
+      controls.target.y *= factor
+      camera.position.y *= factor
+    }
     setLocationMarkers(currentLocations, currentFocusId)
   }
 
@@ -1972,6 +2001,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     },
     setTheme: applyThemeUpdate,
     setSeaLevel: applySeaLevelUpdate,
+    setHeightScale: applyHeightScaleUpdate,
     invalidateIconTextures: (paths?: string[]) => {
       invalidateIconCache(paths)
       setLocationMarkers(currentLocations, currentFocusId)

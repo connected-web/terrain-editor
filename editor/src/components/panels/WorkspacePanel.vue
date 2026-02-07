@@ -110,8 +110,28 @@
           />
         </div>
       </label>
+      <label class="workspace-form__field">
+        <span>Height scale</span>
+        <div class="workspace-form__range">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            v-model.number="workspaceForm.heightScale"
+            @input="workspaceActions.applyHeightScale()"
+          />
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            v-model.number="workspaceForm.heightScale"
+            @change="workspaceActions.applyHeightScale()"
+          />
+        </div>
+      </label>
       <p class="workspace-form__hint">
-        Map size is used when validating layer imports. Sea level adjusts how water layers are rendered.
+        Map size is used when validating layer imports. Sea level and height scale control terrain elevation.
       </p>
       <div class="workspace-form__thumbnail">
         <div class="workspace-form__thumbnail-preview">

@@ -15,7 +15,7 @@ Single-column dock hosts Workspace, Layers, Theme, Locations, and Settings panel
 ![Terrain Editor home with dock and toolbar](documentation/images/editor-home.png)
 
 ### Workspace Panel
-Launch a new project, reopen an existing `.wyn`, or load the bundled Wynnal sample without leaving the dock. Once a map is active the form exposes project title, author, pixel dimensions, and sea level sliders. Changing the size remounts the viewer instantly so the canvas always matches the declared resolution. The Export button keeps a deterministic `.wyn` snapshot a click away.
+Launch a new project, reopen an existing `.wyn`, or load the bundled Wynnal sample without leaving the dock. Once a map is active the form exposes project title, author, pixel dimensions, sea level, and height scale sliders. Changing the size remounts the viewer instantly so the canvas always matches the declared resolution. The Export button keeps a deterministic `.wyn` snapshot a click away.
 
 ![Workspace panel showing project metadata form](documentation/images/panel-workspace.png)
 

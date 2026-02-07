@@ -18,6 +18,7 @@ export type WorkspaceForm = {
   width: number
   height: number
   seaLevel: number
+  heightScale: number
 }
 
 export type WorkspaceActions = {
@@ -25,6 +26,7 @@ export type WorkspaceActions = {
   updateProjectAuthor: (value: string) => void
   applyMapSize: () => void
   applySeaLevel: () => void
+  applyHeightScale: () => void
 }
 
 type ProjectSnapshot = {
@@ -77,7 +79,8 @@ const workspaceForm = reactive<WorkspaceForm>({
   author: '',
   width: 512,
   height: 512,
-  seaLevel: 0
+  seaLevel: 0,
+  heightScale: 0.3
 })
 
 const defaultSnapshot: ProjectSnapshot = {
@@ -109,6 +112,7 @@ function syncWorkspaceFormFromSnapshot() {
   workspaceForm.width = snapshot.legend?.size?.[0] ?? 512
   workspaceForm.height = snapshot.legend?.size?.[1] ?? 512
   workspaceForm.seaLevel = snapshot.legend?.sea_level ?? 0
+  workspaceForm.heightScale = snapshot.legend?.height_scale ?? 0.3
 }
 
 function persistProject() {
@@ -168,6 +172,31 @@ function delayedApplySeaLevel(value: number) {
   }, 250)
 }
 
+let heightScaleDebounceHandle: number | null = null
+function applyHeightScale() {
+  const deps = ensureDependencies()
+  const legend = projectSnapshotRef.value.legend
+  if (!legend) return
+  const heightScale = clampNumber(Number(workspaceForm.heightScale), 0, 1)
+  workspaceForm.heightScale = heightScale
+  const nextLegend = { ...legend, height_scale: heightScale }
+  deps.projectStore.setLegend(nextLegend)
+  deps.layerBrowserStore.setLegend(nextLegend)
+  delayedApplyHeightScale(heightScale)
+  persistProject()
+}
+
+function delayedApplyHeightScale(value: number) {
+  if (heightScaleDebounceHandle !== null) {
+    window.clearTimeout(heightScaleDebounceHandle)
+  }
+  heightScaleDebounceHandle = window.setTimeout(() => {
+    heightScaleDebounceHandle = null
+    const deps = ensureDependencies()
+    deps.handle.value?.setHeightScale(value)
+  }, 250)
+}
+
 function createScratchLegendInternal(): TerrainLegend {
   const width = Math.max(1, Math.floor(workspaceForm.width) || 512)
   const height = Math.max(1, Math.floor(workspaceForm.height) || 512)
@@ -176,11 +205,17 @@ function createScratchLegendInternal(): TerrainLegend {
     -1,
     1
   )
+  const heightScale = clampNumber(
+    Number.isFinite(workspaceForm.heightScale) ? Number(workspaceForm.heightScale) : 0.3,
+    0,
+    1
+  )
   return {
     size: [width, height] as [number, number],
     heightmap: 'heightmap.png',
     topology: 'heightmap.png',
     sea_level: seaLevel,
+    height_scale: heightScale,
     biomes: {},
     overlays: {}
   }
@@ -245,7 +280,8 @@ const workspaceActions: WorkspaceActions = {
   updateProjectLabel,
   updateProjectAuthor,
   applyMapSize,
-  applySeaLevel
+  applySeaLevel,
+  applyHeightScale
 }
 
 export function initWorkspaceModel(options: WorkspaceDependencies) {

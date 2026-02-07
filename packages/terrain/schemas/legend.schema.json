@@ -17,6 +17,9 @@
     "sea_level": {
       "type": "number"
     },
+    "height_scale": {
+      "type": "number"
+    },
     "heightmap": {
       "type": "string"
     },

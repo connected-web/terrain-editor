@@ -906,6 +906,7 @@ async function startNewMap() {
   workspaceForm.width = scratchLegend.size[0]
   workspaceForm.height = scratchLegend.size[1]
   workspaceForm.seaLevel = scratchLegend.sea_level ?? 0
+  workspaceForm.heightScale = scratchLegend.height_scale ?? 0.3
   setActivePanel('workspace')
   isDockCollapsed.value = false
   await mountViewer({
