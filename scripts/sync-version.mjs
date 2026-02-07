@@ -62,6 +62,14 @@ async function fetchLatestVersion() {
 }
 
 async function run() {
+  if (process.env.CI && process.env.GITHUB_REF && process.env.GITHUB_REF !== 'refs/heads/main') {
+    console.log('[sync-version] Skipping version sync on non-main CI refs.')
+    return
+  }
+  if (process.env.SKIP_VERSION_SYNC === 'true') {
+    console.log('[sync-version] Skipping version sync (SKIP_VERSION_SYNC=true).')
+    return
+  }
   const latest = await fetchLatestVersion()
   if (!latest) return
 
