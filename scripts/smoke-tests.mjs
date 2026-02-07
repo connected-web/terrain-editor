@@ -74,7 +74,7 @@ function runCommand(command, args) {
 function getShortVersion() {
   const pkgPath = path.join(repoRoot, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-  return String(pkg.version).split('.').slice(0, 2).join('.')
+  return String(pkg.version)
 }
 
 const version = getShortVersion()
