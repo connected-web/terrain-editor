@@ -286,10 +286,18 @@
               @selection-change="handleSelectionChange"
               @paste-applied="handlePasteApplied"
             />
-            <div v-else-if="textureUrl" class="layer-editor__texture">
-              <img :src="textureUrl" alt="Overlay texture preview" />
-              <p>RGBA overlay texture (mask tools disabled).</p>
-            </div>
+            <LayerMaskEditor
+              v-else-if="textureUrl"
+              ref="maskEditorRef"
+              :src="textureUrl"
+              :show-grid="previewBackground === 'grid'"
+              :tool="'hand'"
+              :image-mode="'rgba'"
+              :read-only="true"
+              @zoom-change="handleZoomChange"
+              @view-change="handleMaskViewChange"
+              @ready="handleMaskReady"
+            />
             <div v-else class="layer-editor__placeholder">
               <p v-if="isTextureOverlay">No RGBA texture found for this overlay.</p>
               <p v-else>No mask image found for this layer.</p>
@@ -349,7 +357,6 @@
                 <div v-if="toolSettingsOpen" class="layer-editor__section-body">
                   <template v-if="isTextureOverlay">
                     <div class="layer-editor__texture-help">
-                      <p><strong>Texture layers can’t be edited yet.</strong></p>
                       <p>Upload or select an RGBA asset from the layer’s assets dialog.</p>
                       <button
                         type="button"
@@ -358,6 +365,9 @@
                       >
                         <Icon icon="image" /> Open assets
                       </button>
+                      <div class="layer-editor__texture-note">
+                        Terrain editor does not yet support RGBA image editing.
+                      </div>
                     </div>
                   </template>
                   <template v-else-if="activeTool === 'grid'">
@@ -1426,6 +1436,7 @@ const textureUrlOwned = ref(false)
 const textureSignature = ref<string | null>(null)
 let textureLoadToken = 0
 
+
 type OnionLayerSource = { id: string; color: [number, number, number]; src: string | null }
 const onionLayerSources = ref<OnionLayerSource[]>([])
 const onionCache = new Map<string, { path: string | null; url: string | null; owned: boolean }>()
@@ -2278,6 +2289,7 @@ function resetCanvas() {
 function applyCanvas() {
   maskEditorRef.value?.applyMask()
 }
+
 
 function handleMaskReady() {
   if (!maskEditorRef.value) return
@@ -3365,22 +3377,14 @@ function clamp(value: number, min: number, max: number) {
   margin: 0;
 }
 
-.layer-editor__texture {
-  padding: 1rem;
-  text-align: center;
-  opacity: 0.85;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
+.layer-editor__texture-note {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
 }
 
-.layer-editor__texture img {
-  max-width: 100%;
-  max-height: 100%;
-  border-radius: 12px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-}
 
 @media (max-width: 1100px) {
   .layer-editor {

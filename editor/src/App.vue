@@ -1380,6 +1380,18 @@ async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
   })
 }
 
+async function replaceLayerTextureFromFile(entry: LayerEntry, file: File) {
+  if (!entry.rgba) return
+  const data = await file.arrayBuffer()
+  await layerEditorHelpers.replaceLayerAsset({
+    path: entry.rgba,
+    data,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+}
+
 async function handleCreateEmptyMask(payload: { id: string }) {
   const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
   const legend = projectSnapshot.value?.legend
@@ -1472,11 +1484,16 @@ function handleModalAssetUpload() {
     const entry = picker.layerId
       ? layerEntriesWithOnion.value.find((layer) => layer.id === picker.layerId)
       : null
-    if (!entry?.mask) {
+    if (!entry?.mask && !entry?.rgba) {
       triggerLibraryUpload()
       return
     }
-    triggerLibraryUpload({ replacePath: entry.mask, originalName: entry.mask })
+    const targetPath = entry.rgba ?? entry.mask
+    if (!targetPath) {
+      triggerLibraryUpload()
+      return
+    }
+    triggerLibraryUpload({ replacePath: targetPath, originalName: targetPath })
     return
   }
   if (picker.mode === 'thumbnail') {
@@ -1488,11 +1505,15 @@ function handleModalAssetUpload() {
 
 function handleLayerFileReplace(payload: { id: string; file: File }) {
   const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
-  if (!entry || !entry.mask) return
+  if (!entry || (!entry.mask && !entry.rgba)) return
   requestConfirm(
     `Replace "${entry.label ?? entry.id}" with ${payload.file.name}?`,
     () => {
-      void replaceLayerAssetFromFile(entry, payload.file)
+      if (entry.rgba) {
+        void replaceLayerTextureFromFile(entry, payload.file)
+      } else {
+        void replaceLayerAssetFromFile(entry, payload.file)
+      }
     },
     { confirmLabel: 'Replace layer' }
   )
@@ -1508,11 +1529,15 @@ function handleAssetPanelSelect(path: string) {
     const targetId = picker.layerId
     if (!targetId) return
     const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
-    if (!entry || !entry.mask) return
+    if (!entry || (!entry.mask && !entry.rgba)) return
     requestConfirm(
       `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
       () => {
-        void replaceLayerAssetFromFile(entry, file)
+        if (entry.rgba) {
+          void replaceLayerTextureFromFile(entry, file)
+        } else {
+          void replaceLayerAssetFromFile(entry, file)
+        }
         closeModalAssetPicker()
       },
       { confirmLabel: 'Replace layer' }

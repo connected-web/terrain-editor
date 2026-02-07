@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-mask-editor" ref="editorRootRef">
+  <div class="layer-mask-editor" :class="{ 'layer-mask-editor--rgba': isRgbaMode }" ref="editorRootRef">
     <div
       class="layer-mask-editor__viewport"
       :class="viewportClasses"
@@ -139,6 +139,8 @@ type SelectionData = SelectionRect | SelectionMask
 const props = defineProps<{
   src: string | null
   showGrid?: boolean
+  readOnly?: boolean
+  imageMode?: 'mask' | 'rgba'
   valueMode?: 'mask' | 'heightmap'
   onionLayers?: OnionLayerOverlay[]
   tool?: string
@@ -201,8 +203,12 @@ const HISTORY_LIMIT = 25
 const canUndo = ref(false)
 const canRedo = ref(false)
 
+const isRgbaMode = computed(() => props.imageMode === 'rgba')
+
 const hasValidImage = computed(() => {
-  return Boolean(props.src && maskValues.value && maskValues.value.length)
+  if (!props.src) return false
+  if (isRgbaMode.value) return Boolean(image.value)
+  return Boolean(maskValues.value && maskValues.value.length)
 })
 
 const isDrawing = ref(false)
@@ -566,6 +572,15 @@ function loadImage () {
     const ctx = getContext()
     if (!ctx) return
     ctx.drawImage(img, 0, 0)
+    canvasDimensions.value = { width: img.width, height: img.height }
+    image.value = img
+    if (isRgbaMode.value) {
+      maskValues.value = new Float32Array(1)
+      initialMaskValues.value = new Float32Array(1)
+      renderGridOverlay()
+      emit('ready')
+      return
+    }
     const imageData = ctx.getImageData(0, 0, img.width, img.height)
     const values = new Float32Array(img.width * img.height)
     for (let i = 0; i < values.length; i++) {
@@ -573,8 +588,6 @@ function loadImage () {
     }
     maskValues.value = values
     initialMaskValues.value = new Float32Array(values)
-    canvasDimensions.value = { width: img.width, height: img.height }
-    image.value = img
     renderMaskCanvas()
     renderPreviewCanvas()
     renderGridOverlay()
@@ -592,6 +605,7 @@ function loadImage () {
 }
 
 function renderMaskCanvas() {
+  if (isRgbaMode.value) return
   const ctx = getContext()
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
@@ -610,6 +624,7 @@ function renderMaskCanvas() {
 }
 
 function renderPreviewCanvas() {
+  if (isRgbaMode.value) return
   const ctx = getContext('preview')
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
@@ -652,6 +667,7 @@ function renderGridOverlay() {
 }
 
 function renderColorPreviewCanvas() {
+  if (isRgbaMode.value) return
   const canvas = colorCanvasRef.value
   const values = maskValues.value
   const { width, height } = canvasDimensions.value
@@ -1439,6 +1455,7 @@ function drawStroke(fromX: number, fromY: number, toX: number, toY: number) {
 }
 
 function handlePointerDown(event: MouseEvent) {
+  if (props.readOnly) return
   if (panModeActive.value || event.button !== 0) return
   markUserViewportInteraction()
   if (toolMode.value === 'grid') return
@@ -1534,6 +1551,7 @@ function handlePointerDown(event: MouseEvent) {
 }
 
 function handlePointerMove(event: MouseEvent) {
+  if (props.readOnly) return
   if (panModeActive.value) return
   if (toolMode.value === 'select' && selectionStart.value) {
     const modifier = event.shiftKey ? 'add' : event.altKey || event.ctrlKey || event.metaKey ? 'subtract' : 'replace'
@@ -1610,6 +1628,7 @@ function handlePointerMove(event: MouseEvent) {
 }
 
 function handlePointerUp() {
+  if (props.readOnly) return
   if (pasteDragOffset.value) {
     pasteDragOffset.value = null
     return
@@ -2737,6 +2756,17 @@ function getOnionStyle(layer: OnionLayerOverlay) {
 }
 
 .layer-mask-editor__canvas--base {
+  opacity: 0;
+}
+
+.layer-mask-editor--rgba .layer-mask-editor__canvas--base {
+  opacity: 1;
+}
+
+.layer-mask-editor--rgba .layer-mask-editor__canvas--preview,
+.layer-mask-editor--rgba .layer-mask-editor__canvas--color,
+.layer-mask-editor--rgba .layer-mask-editor__canvas--overlay,
+.layer-mask-editor--rgba .layer-mask-editor__canvas--selection {
   opacity: 0;
 }
 
