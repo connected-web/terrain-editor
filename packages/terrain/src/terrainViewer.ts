@@ -161,11 +161,18 @@ export type RenderResolution = {
 
 type Resolvable<T> = T | Promise<T>
 
-export type LegendLayer = {
+export type MaskLegendLayer = {
   mask: string
   rgb: [number, number, number]
   label?: string
 }
+
+export type RgbaLegendLayer = {
+  rgba: string
+  label?: string
+}
+
+export type LegendLayer = MaskLegendLayer | RgbaLegendLayer
 
 export type TerrainLegend = {
   size: [number, number]
@@ -173,7 +180,7 @@ export type TerrainLegend = {
   height_scale?: number
   heightmap: string
   topology?: string
-  biomes: Record<string, LegendLayer>
+  biomes: Record<string, MaskLegendLayer>
   overlays: Record<string, LegendLayer>
 }
 
@@ -282,6 +289,10 @@ function hexFromRgb(rgb: [number, number, number]) {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
 }
 
+function isRgbaLayer(layer: LegendLayer): layer is RgbaLegendLayer {
+  return typeof (layer as RgbaLegendLayer).rgba === 'string'
+}
+
 async function composeLegendTexture(
   legendData: TerrainLegend,
   resolveAssetUrl: (path: string) => Resolvable<string>,
@@ -333,6 +344,18 @@ async function composeLegendTexture(
     ctx.drawImage(temp, 0, 0, width, height)
   }
 
+  async function drawRgbaLayer(textureFile: string, alpha = 1) {
+    let image: HTMLImageElement | null = null
+    try {
+      image = await loadLegendImage(textureFile, resolveAssetUrl, imageCache)
+    } catch (err) {
+      console.warn('[WynnalTerrain] Unable to load overlay texture', textureFile, err)
+      return
+    }
+    ctx.globalAlpha = alpha
+    ctx.drawImage(image, 0, 0, width, height)
+  }
+
   const activeBiomes = layerState?.biomes ?? {}
   for (const [name, biome] of Object.entries(legendData.biomes)) {
     if (layerState && activeBiomes[name] === false) continue
@@ -343,6 +366,14 @@ async function composeLegendTexture(
   for (const [name, overlay] of Object.entries(legendData.overlays)) {
     if (layerState && activeOverlays[name] === false) continue
     const alpha = DEFAULT_LAYER_ALPHA[name] ?? 1
+    if (isRgbaLayer(overlay)) {
+      await drawRgbaLayer(overlay.rgba, alpha)
+      continue
+    }
+    if (!overlay.mask || !overlay.rgb) {
+      console.warn('[WynnalTerrain] Overlay entry missing mask/rgb', name)
+      continue
+    }
     await drawLayer(overlay.mask, overlay.rgb as [number, number, number], alpha)
   }
 

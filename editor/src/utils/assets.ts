@@ -19,3 +19,9 @@ export function buildLayerMaskPath(name: string) {
   const base = normalized.replace(/\.[^.]+$/, '')
   return `layers/${base || 'layer'}.png`
 }
+
+export function buildLayerTexturePath(name: string) {
+  const normalized = normalizeAssetFileName(name)
+  const base = normalized.replace(/\.[^.]+$/, '')
+  return `layers/${base || 'layer'}-texture.png`
+}

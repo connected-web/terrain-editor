@@ -2,7 +2,6 @@ import { reactive, ref, type Ref } from 'vue'
 import type {
   LayerBrowserState,
   LayerToggleState,
-  LegendLayer,
   TerrainDataset,
   TerrainHandle,
   TerrainLegend,

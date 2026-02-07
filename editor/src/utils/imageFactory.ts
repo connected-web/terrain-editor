@@ -21,6 +21,22 @@ export function createSolidImageData(width: number, height: number, value: numbe
   }
 }
 
+export function createTransparentImageData(width: number, height: number): SolidImageData {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('Unable to create canvas context')
+  }
+  ctx.clearRect(0, 0, width, height)
+  const url = canvas.toDataURL('image/png')
+  return {
+    url,
+    buffer: dataUrlToArrayBuffer(url)
+  }
+}
+
 export function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
   const commaIndex = dataUrl.indexOf(',')
   const payload = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl

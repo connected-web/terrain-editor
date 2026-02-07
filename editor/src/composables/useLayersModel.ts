@@ -9,6 +9,7 @@ export type LayerEntry = {
   icon?: string
   color: [number, number, number]
   mask?: string
+  rgba?: string
   kind: 'biome' | 'overlay' | 'heightmap'
   onionEnabled?: boolean
 }

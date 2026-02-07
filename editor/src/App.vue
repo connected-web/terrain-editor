@@ -266,7 +266,7 @@ import {
 
 const version = __APP_VERSION_FULL__
 import { useTheme } from './composables/useTheme'
-import { buildIconPath, buildLayerMaskPath } from './utils/assets'
+import { buildIconPath, buildLayerMaskPath, buildLayerTexturePath } from './utils/assets'
 import { ensureLocationId } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
@@ -294,7 +294,7 @@ import { useIconPicker } from './composables/useIconPicker'
 import { useLayerEditor } from './composables/useLayerEditor'
 import { useUrlState } from './composables/useUrlState'
 import { buildScratchDataset } from './utils/scratchDataset'
-import { createSolidImageData } from './utils/imageFactory'
+import { createSolidImageData, createTransparentImageData } from './utils/imageFactory'
 
 type LayerViewState = {
   zoom: number
@@ -1088,7 +1088,12 @@ async function handleLibraryUpload(event: Event) {
   await importAsset()
 }
 
-async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'overlay'; color: [number, number, number] }) {
+async function handleCreateLayer(payload: {
+  label: string
+  kind: 'biome' | 'overlay'
+  color: [number, number, number]
+  overlayMode: 'mask' | 'rgba'
+}) {
   const snapshot = projectStore.getSnapshot()
   const legend = snapshot.legend
   if (!legend) {
@@ -1105,15 +1110,27 @@ async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'over
   while (group[key]) {
     key = `${baseKey}-${counter++}`
   }
-  const maskPath = buildLayerMaskPath(key)
   const [width, height] = legend.size ?? [512, 512]
-  const image = createSolidImageData(width, height, 0)
-  const file = new File([image.buffer], maskPath, { type: 'image/png' })
-  await replaceAssetWithFileHelper(maskPath, file)
-  const newLayer = {
-    label: baseLabel,
-    mask: maskPath,
-    rgb: payload.color
+  let newLayer: Record<string, unknown>
+  if (payload.kind === 'overlay' && payload.overlayMode === 'rgba') {
+    const texturePath = buildLayerTexturePath(key)
+    const image = createTransparentImageData(width, height)
+    const file = new File([image.buffer], texturePath, { type: 'image/png' })
+    await replaceAssetWithFileHelper(texturePath, file)
+    newLayer = {
+      label: baseLabel,
+      rgba: texturePath
+    }
+  } else {
+    const maskPath = buildLayerMaskPath(key)
+    const image = createSolidImageData(width, height, 0)
+    const file = new File([image.buffer], maskPath, { type: 'image/png' })
+    await replaceAssetWithFileHelper(maskPath, file)
+    newLayer = {
+      label: baseLabel,
+      mask: maskPath,
+      rgb: payload.color
+    }
   }
   const nextLegend = {
     ...legend,

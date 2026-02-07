@@ -284,8 +284,13 @@
               @selection-change="handleSelectionChange"
               @paste-applied="handlePasteApplied"
             />
+            <div v-else-if="textureUrl" class="layer-editor__texture">
+              <img :src="textureUrl" alt="Overlay texture preview" />
+              <p>RGBA overlay texture (mask tools disabled).</p>
+            </div>
             <div v-else class="layer-editor__placeholder">
-              <p>No mask image found for this layer.</p>
+              <p v-if="isTextureOverlay">No RGBA texture found for this overlay.</p>
+              <p v-else>No mask image found for this layer.</p>
               <button
                 v-if="props.activeLayer?.mask"
                 type="button"
@@ -1205,6 +1210,14 @@ function setMaskUrl(url: string | null, ownsUrl: boolean) {
   maskUrlOwned.value = ownsUrl
 }
 
+function setTextureUrl(url: string | null, ownsUrl: boolean) {
+  if (textureUrlOwned.value && textureObjectUrl.value) {
+    URL.revokeObjectURL(textureObjectUrl.value)
+  }
+  textureObjectUrl.value = url
+  textureUrlOwned.value = ownsUrl
+}
+
 async function preloadUrl(url: string) {
   await new Promise<void>((resolve, reject) => {
     const img = new Image()
@@ -1381,10 +1394,20 @@ const activeMaskAsset = computed(() => {
   return props.assets.find((entry) => entry.path === props.activeLayer?.mask) ?? null
 })
 
+const activeTextureAsset = computed(() => {
+  if (!props.activeLayer?.rgba) return null
+  return props.assets.find((entry) => entry.path === props.activeLayer?.rgba) ?? null
+})
+
 const maskObjectUrl = ref<string | null>(null)
 const maskUrlOwned = ref(false)
 const maskSignature = ref<string | null>(null)
 let maskLoadToken = 0
+
+const textureObjectUrl = ref<string | null>(null)
+const textureUrlOwned = ref(false)
+const textureSignature = ref<string | null>(null)
+let textureLoadToken = 0
 
 type OnionLayerSource = { id: string; color: [number, number, number]; src: string | null }
 const onionLayerSources = ref<OnionLayerSource[]>([])
@@ -1417,10 +1440,14 @@ watch(activeTool, (next) => {
   }
 })
 
+const isTextureOverlay = computed(
+  () => props.activeLayer?.kind === 'overlay' && Boolean(props.activeLayer?.rgba)
+)
+
 const toolPalette = computed(() =>
   TOOL_PALETTE.map((tool) => ({
     ...tool,
-    disabled: tool.disabled
+    disabled: tool.disabled || isTextureOverlay.value
   }))
 )
 const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
@@ -1468,6 +1495,7 @@ const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === 
 const layerKindLabel = computed(() => {
   if (!props.activeLayer) return ''
   if (props.activeLayer.kind === 'heightmap') return 'Heightmap'
+  if (isTextureOverlay.value) return 'Overlay Texture'
   return 'Mask'
 })
 const layerColourHex = computed(() => {
@@ -2062,6 +2090,74 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => {
+    const asset = activeTextureAsset.value
+    const path = props.activeLayer?.rgba ?? null
+    return {
+      path,
+      assetSignature: asset
+        ? `${asset.path}:${asset.lastModified ?? 0}:${asset.data?.byteLength ?? 0}`
+        : null,
+      hasAssetData: Boolean(asset?.data?.byteLength),
+      asset
+    }
+  },
+  async ({ path, assetSignature, hasAssetData, asset }) => {
+    const requestId = ++textureLoadToken
+    if (!path) {
+      setTextureUrl(null, false)
+      textureSignature.value = null
+      return
+    }
+
+    if (hasAssetData && assetSignature === textureSignature.value && textureObjectUrl.value) {
+      return
+    }
+
+    if (hasAssetData && asset?.data) {
+      const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
+      const url = URL.createObjectURL(blob)
+      try {
+        await preloadUrl(url)
+        if (textureLoadToken === requestId) {
+          setTextureUrl(url, true)
+          textureSignature.value = assetSignature
+        } else {
+          URL.revokeObjectURL(url)
+        }
+      } catch {
+        URL.revokeObjectURL(url)
+      }
+      return
+    }
+
+    const datasetUrl =
+      (props.dataset ? await Promise.resolve(props.dataset.resolveAssetUrl(path)).catch(() => null) : null) ??
+      (props.getPreview ? props.getPreview(path) : '')
+    if (!datasetUrl) {
+      if (textureLoadToken === requestId) {
+        setTextureUrl(null, false)
+        textureSignature.value = null
+      }
+      return
+    }
+    try {
+      await preloadUrl(datasetUrl)
+      if (textureLoadToken === requestId) {
+        setTextureUrl(datasetUrl, false)
+        textureSignature.value = `preview:${path}`
+      }
+    } catch {
+      if (textureLoadToken === requestId) {
+        setTextureUrl(null, false)
+        textureSignature.value = null
+      }
+    }
+  },
+  { immediate: true }
+)
+
 async function resolveMaskSource(path: string | null) {
   if (!path) {
     return { url: null, owned: false }
@@ -2093,6 +2189,7 @@ async function resolveMaskSource(path: string | null) {
 }
 
 const maskUrl = computed(() => maskObjectUrl.value)
+const textureUrl = computed(() => textureObjectUrl.value)
 
 function handleColourChange(event: Event) {
   const input = event.target as HTMLInputElement | null
@@ -2509,6 +2606,11 @@ onBeforeUnmount(() => {
   }
   maskObjectUrl.value = null
   maskSignature.value = null
+  if (textureUrlOwned.value && textureObjectUrl.value) {
+    URL.revokeObjectURL(textureObjectUrl.value)
+  }
+  textureObjectUrl.value = null
+  textureSignature.value = null
   onionCache.forEach((entry) => {
     if (entry.owned && entry.url) {
       URL.revokeObjectURL(entry.url)
@@ -2527,7 +2629,9 @@ watch(
   { flush: 'sync' }
 )
 
-const supportsColourPicker = computed(() => props.activeLayer?.kind !== 'heightmap')
+const supportsColourPicker = computed(
+  () => props.activeLayer?.kind !== 'heightmap' && !isTextureOverlay.value
+)
 
 watch(
   () => props.pendingViewState,
@@ -3231,6 +3335,23 @@ function clamp(value: number, min: number, max: number) {
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
+}
+
+.layer-editor__texture {
+  padding: 1rem;
+  text-align: center;
+  opacity: 0.85;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.layer-editor__texture img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
 @media (max-width: 1100px) {

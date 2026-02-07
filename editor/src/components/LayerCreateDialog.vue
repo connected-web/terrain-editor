@@ -19,9 +19,16 @@
             <option value="overlay">Overlay</option>
           </select>
         </label>
+        <label v-if="form.kind === 'overlay'">
+          <span>Overlay mode</span>
+          <select v-model="form.overlayMode">
+            <option value="mask">Mask (grayscale)</option>
+            <option value="rgba">Texture (RGBA)</option>
+          </select>
+        </label>
         <label>
           <span>Layer colour</span>
-          <input type="color" v-model="form.color" />
+          <input type="color" v-model="form.color" :disabled="form.kind === 'overlay' && form.overlayMode === 'rgba'" />
         </label>
         <footer class="layer-create-dialog__actions">
           <button type="button" class="pill-button pill-button--ghost" @click="$emit('cancel')">
@@ -41,14 +48,20 @@ import { reactive } from 'vue'
 import Icon from './Icon.vue'
 
 const emit = defineEmits<{
-  create: [{ label: string; kind: 'biome' | 'overlay'; color: [number, number, number] }]
+  create: [{
+    label: string
+    kind: 'biome' | 'overlay'
+    color: [number, number, number]
+    overlayMode: 'mask' | 'rgba'
+  }]
   cancel: []
 }>()
 
 const form = reactive({
   label: 'New Layer',
   kind: 'biome' as 'biome' | 'overlay',
-  color: '#ffffff'
+  color: '#ffffff',
+  overlayMode: 'mask' as 'mask' | 'rgba'
 })
 
 function handleSubmit() {
@@ -60,7 +73,8 @@ function handleSubmit() {
   emit('create', {
     label: form.label.trim() || 'New Layer',
     kind: form.kind,
-    color: rgb
+    color: rgb,
+    overlayMode: form.overlayMode
   })
 }
 </script>
