@@ -95,7 +95,13 @@ async function captureDocumentationScreenshot(page: Page, slug: string) {
   await page.waitForTimeout(750)
 
   const outputPath = path.join(outputDir, `${slug}.png`)
-  await page.screenshot({ path: outputPath, fullPage: true })
+  if (slug.startsWith('layer-editor-')) {
+    const editor = page.locator('.layer-editor').first()
+    await expect(editor).toBeVisible()
+    await editor.screenshot({ path: outputPath })
+  } else {
+    await page.screenshot({ path: outputPath, fullPage: true })
+  }
 
   console.log(`📸 Saved documentation screenshot: ${outputPath}`)
 }
