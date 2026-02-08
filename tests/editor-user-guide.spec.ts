@@ -120,6 +120,22 @@ async function captureDocumentationScreenshot(page: Page, slug: string) {
       clip: box,
       animations: 'disabled'
     })
+  } else if (slug.startsWith('panel-')) {
+    const panel = page.locator('.panel-dock').first()
+    await expect(panel).toBeVisible()
+    await panel.evaluate((node) =>
+      node.scrollIntoView({ block: 'start', inline: 'nearest' })
+    )
+    await page.waitForTimeout(200)
+    const box = await panel.boundingBox()
+    if (!box) {
+      throw new Error('Panel dock bounding box not found for screenshot')
+    }
+    await page.screenshot({
+      path: outputPath,
+      clip: box,
+      animations: 'disabled'
+    })
   } else {
     // Full-page screenshots can hang in CI when layout is animating or scrolls.
     // Stick to the current viewport for stability.
