@@ -92,15 +92,36 @@ async function captureDocumentationScreenshot(page: Page, slug: string) {
   const outputDir = path.join(process.cwd(), 'documentation', 'images')
   fs.mkdirSync(outputDir, { recursive: true })
 
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    `
+  })
   await page.waitForTimeout(750)
 
   const outputPath = path.join(outputDir, `${slug}.png`)
   if (slug.startsWith('layer-editor-')) {
     const editor = page.locator('.layer-editor').first()
     await expect(editor).toBeVisible()
-    await editor.screenshot({ path: outputPath })
+    await editor.evaluate((node) =>
+      node.scrollIntoView({ block: 'start', inline: 'nearest' })
+    )
+    await page.waitForTimeout(200)
+    const box = await editor.boundingBox()
+    if (!box) {
+      throw new Error('Layer editor bounding box not found for screenshot')
+    }
+    await page.screenshot({
+      path: outputPath,
+      clip: box,
+      animations: 'disabled'
+    })
   } else {
-    await page.screenshot({ path: outputPath, fullPage: true })
+    await page.screenshot({ path: outputPath, fullPage: true, animations: 'disabled' })
   }
 
   console.log(`📸 Saved documentation screenshot: ${outputPath}`)
