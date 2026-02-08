@@ -30,6 +30,7 @@ async function disableMotion(page: Page) {
       *, *::before, *::after {
         transition: none !important;
         animation: none !important;
+        scroll-behavior: auto !important;
       }
     `
   })
@@ -38,8 +39,18 @@ async function disableMotion(page: Page) {
 async function openLayerEditorForLayer(page: Page, label: string) {
   const pill = page.getByRole('button', { name: new RegExp(label, 'i') }).first()
   await expect(pill).toBeVisible({ timeout: 30_000 })
-  await pill.scrollIntoViewIfNeeded()
-  await pill.click()
+  await page.evaluate((targetLabel) => {
+    const scroll = document.querySelector('.layer-list__scroll') as HTMLElement | null
+    if (!scroll) return
+    const buttons = Array.from(scroll.querySelectorAll('button'))
+    const target = buttons.find((btn) => btn.textContent?.toLowerCase().includes(targetLabel.toLowerCase()))
+    if (target) {
+      const rect = target.getBoundingClientRect()
+      const scrollRect = scroll.getBoundingClientRect()
+      scroll.scrollTop += rect.top - scrollRect.top - 24
+    }
+  }, label)
+  await pill.click({ force: true })
 
   const editor = page.locator('.layer-editor').first()
   await expect(editor).toBeVisible({ timeout: 30_000 })

@@ -121,7 +121,9 @@ async function captureDocumentationScreenshot(page: Page, slug: string) {
       animations: 'disabled'
     })
   } else {
-    await page.screenshot({ path: outputPath, fullPage: true, animations: 'disabled' })
+    // Full-page screenshots can hang in CI when layout is animating or scrolls.
+    // Stick to the current viewport for stability.
+    await page.screenshot({ path: outputPath, animations: 'disabled' })
   }
 
   console.log(`📸 Saved documentation screenshot: ${outputPath}`)
