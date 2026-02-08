@@ -15,7 +15,7 @@ function addDebugParam(url: string): string {
 function editorUrl(params: string, location?: string): string {
   const trimmed = params ? (params.startsWith('&') ? params : `&${params}`) : ''
   const locationParam = location ? `&location=${encodeURIComponent(location)}` : ''
-  return `/editor/?map=wynnal-terrain.wyn&renderScale=max${trimmed}${locationParam}`
+  return `/editor/?map=wynnal-terrain.wyn&renderScale=medium${trimmed}${locationParam}`
 }
 
 /**
@@ -192,7 +192,7 @@ test.describe('Terrain Editor : Navigation', () => {
       localStorage.clear()
       sessionStorage.clear()
     })
-    await page.goto(addDebugParam('/editor/?renderScale=max'))
+    await page.goto(addDebugParam('/editor/?renderScale=medium'))
 
     const sampleSelect = page.getByRole('combobox', { name: /sample map/i })
     await expect(sampleSelect).toBeVisible()
