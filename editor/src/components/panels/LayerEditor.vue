@@ -201,23 +201,25 @@
                 <Icon :icon="leftCollapsed ? 'chevron-right' : 'chevron-left'" />
               </button>
             </div>
-            <button
-              v-for="tool in toolPalette"
-              :key="tool.id"
-              type="button"
-              class="layer-editor__tool-button"
-              :class="{
-                'layer-editor__tool-button--active': tool.id === activeTool,
-                'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
-              }"
-              :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
-              :title="`${tool.label} (${tool.shortcut})`"
-              @click="selectTool(tool.id)"
-            >
-              <Icon :icon="tool.icon" aria-hidden="true" />
-              <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
-              <span class="sr-only">{{ tool.label }}</span>
-            </button>
+            <template v-if="!isTextureOverlay">
+              <button
+                v-for="tool in toolPalette"
+                :key="tool.id"
+                type="button"
+                class="layer-editor__tool-button"
+                :class="{
+                  'layer-editor__tool-button--active': tool.id === activeTool,
+                  'layer-editor__tool-button--disabled': tool.disabled || (tool.onlyHeightmap && !isHeightmap)
+                }"
+                :disabled="tool.disabled || (tool.onlyHeightmap && !isHeightmap)"
+                :title="`${tool.label} (${tool.shortcut})`"
+                @click="selectTool(tool.id)"
+              >
+                <Icon :icon="tool.icon" aria-hidden="true" />
+                <span class="layer-editor__tool-shortcut">{{ tool.shortcut }}</span>
+                <span class="sr-only">{{ tool.label }}</span>
+              </button>
+            </template>
           </aside>
 
           <div
@@ -284,8 +286,21 @@
               @selection-change="handleSelectionChange"
               @paste-applied="handlePasteApplied"
             />
+            <LayerMaskEditor
+              v-else-if="textureUrl"
+              ref="maskEditorRef"
+              :src="textureUrl"
+              :show-grid="previewBackground === 'grid'"
+              :tool="'hand'"
+              :image-mode="'rgba'"
+              :read-only="true"
+              @zoom-change="handleZoomChange"
+              @view-change="handleMaskViewChange"
+              @ready="handleMaskReady"
+            />
             <div v-else class="layer-editor__placeholder">
-              <p>No mask image found for this layer.</p>
+              <p v-if="isTextureOverlay">No RGBA texture found for this overlay.</p>
+              <p v-else>No mask image found for this layer.</p>
               <button
                 v-if="props.activeLayer?.mask"
                 type="button"
@@ -333,12 +348,29 @@
                   title="Toggle tool settings"
                   @click="toolSettingsOpen = !toolSettingsOpen"
                 >
-                  <span class="layer-editor__section-title">{{ currentTool.label }} ({{ currentTool.shortcut }})</span>
-                  <Icon icon="circle-info" :title="currentTool.description" />
+                  <span class="layer-editor__section-title">
+                    {{ isTextureOverlay ? 'Texture layer' : `${currentTool.label} (${currentTool.shortcut})` }}
+                  </span>
+                  <Icon v-if="!isTextureOverlay" icon="circle-info" :title="currentTool.description" />
                   <Icon :icon="toolSettingsOpen ? 'chevron-up' : 'chevron-down'" />
                 </button>
                 <div v-if="toolSettingsOpen" class="layer-editor__section-body">
-                  <template v-if="activeTool === 'grid'">
+                  <template v-if="isTextureOverlay">
+                    <div class="layer-editor__texture-help">
+                      <p>Upload or select an RGBA asset from the layer’s assets dialog.</p>
+                      <button
+                        type="button"
+                        class="pill-button"
+                        @click="props.activeLayer && emit('open-assets', { id: props.activeLayer.id })"
+                      >
+                        <Icon icon="image" /> Open assets
+                      </button>
+                      <div class="layer-editor__texture-note">
+                        Terrain editor does not yet support RGBA image editing.
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else-if="activeTool === 'grid'">
                     <div class="layer-editor__control-stack">
                       <label class="layer-editor__field">
                         <span>Grid</span>
@@ -1205,6 +1237,14 @@ function setMaskUrl(url: string | null, ownsUrl: boolean) {
   maskUrlOwned.value = ownsUrl
 }
 
+function setTextureUrl(url: string | null, ownsUrl: boolean) {
+  if (textureUrlOwned.value && textureObjectUrl.value) {
+    URL.revokeObjectURL(textureObjectUrl.value)
+  }
+  textureObjectUrl.value = url
+  textureUrlOwned.value = ownsUrl
+}
+
 async function preloadUrl(url: string) {
   await new Promise<void>((resolve, reject) => {
     const img = new Image()
@@ -1381,10 +1421,21 @@ const activeMaskAsset = computed(() => {
   return props.assets.find((entry) => entry.path === props.activeLayer?.mask) ?? null
 })
 
+const activeTextureAsset = computed(() => {
+  if (!props.activeLayer?.rgba) return null
+  return props.assets.find((entry) => entry.path === props.activeLayer?.rgba) ?? null
+})
+
 const maskObjectUrl = ref<string | null>(null)
 const maskUrlOwned = ref(false)
 const maskSignature = ref<string | null>(null)
 let maskLoadToken = 0
+
+const textureObjectUrl = ref<string | null>(null)
+const textureUrlOwned = ref(false)
+const textureSignature = ref<string | null>(null)
+let textureLoadToken = 0
+
 
 type OnionLayerSource = { id: string; color: [number, number, number]; src: string | null }
 const onionLayerSources = ref<OnionLayerSource[]>([])
@@ -1417,10 +1468,14 @@ watch(activeTool, (next) => {
   }
 })
 
+const isTextureOverlay = computed(
+  () => props.activeLayer?.kind === 'overlay' && Boolean(props.activeLayer?.rgba)
+)
+
 const toolPalette = computed(() =>
   TOOL_PALETTE.map((tool) => ({
     ...tool,
-    disabled: tool.disabled
+    disabled: tool.disabled || isTextureOverlay.value
   }))
 )
 const toolShortcutMap = new Map(TOOL_PALETTE.map((tool) => [tool.shortcut.toLowerCase(), tool.id]))
@@ -1468,6 +1523,7 @@ const currentTool = computed(() => toolPalette.value.find((tool) => tool.id === 
 const layerKindLabel = computed(() => {
   if (!props.activeLayer) return ''
   if (props.activeLayer.kind === 'heightmap') return 'Heightmap'
+  if (isTextureOverlay.value) return 'Overlay Texture'
   return 'Mask'
 })
 const layerColourHex = computed(() => {
@@ -2062,6 +2118,74 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => {
+    const asset = activeTextureAsset.value
+    const path = props.activeLayer?.rgba ?? null
+    return {
+      path,
+      assetSignature: asset
+        ? `${asset.path}:${asset.lastModified ?? 0}:${asset.data?.byteLength ?? 0}`
+        : null,
+      hasAssetData: Boolean(asset?.data?.byteLength),
+      asset
+    }
+  },
+  async ({ path, assetSignature, hasAssetData, asset }) => {
+    const requestId = ++textureLoadToken
+    if (!path) {
+      setTextureUrl(null, false)
+      textureSignature.value = null
+      return
+    }
+
+    if (hasAssetData && assetSignature === textureSignature.value && textureObjectUrl.value) {
+      return
+    }
+
+    if (hasAssetData && asset?.data) {
+      const blob = new Blob([asset.data], { type: asset.type ?? 'image/png' })
+      const url = URL.createObjectURL(blob)
+      try {
+        await preloadUrl(url)
+        if (textureLoadToken === requestId) {
+          setTextureUrl(url, true)
+          textureSignature.value = assetSignature
+        } else {
+          URL.revokeObjectURL(url)
+        }
+      } catch {
+        URL.revokeObjectURL(url)
+      }
+      return
+    }
+
+    const datasetUrl =
+      (props.dataset ? await Promise.resolve(props.dataset.resolveAssetUrl(path)).catch(() => null) : null) ??
+      (props.getPreview ? props.getPreview(path) : '')
+    if (!datasetUrl) {
+      if (textureLoadToken === requestId) {
+        setTextureUrl(null, false)
+        textureSignature.value = null
+      }
+      return
+    }
+    try {
+      await preloadUrl(datasetUrl)
+      if (textureLoadToken === requestId) {
+        setTextureUrl(datasetUrl, false)
+        textureSignature.value = `preview:${path}`
+      }
+    } catch {
+      if (textureLoadToken === requestId) {
+        setTextureUrl(null, false)
+        textureSignature.value = null
+      }
+    }
+  },
+  { immediate: true }
+)
+
 async function resolveMaskSource(path: string | null) {
   if (!path) {
     return { url: null, owned: false }
@@ -2093,6 +2217,7 @@ async function resolveMaskSource(path: string | null) {
 }
 
 const maskUrl = computed(() => maskObjectUrl.value)
+const textureUrl = computed(() => textureObjectUrl.value)
 
 function handleColourChange(event: Event) {
   const input = event.target as HTMLInputElement | null
@@ -2164,6 +2289,7 @@ function resetCanvas() {
 function applyCanvas() {
   maskEditorRef.value?.applyMask()
 }
+
 
 function handleMaskReady() {
   if (!maskEditorRef.value) return
@@ -2509,6 +2635,11 @@ onBeforeUnmount(() => {
   }
   maskObjectUrl.value = null
   maskSignature.value = null
+  if (textureUrlOwned.value && textureObjectUrl.value) {
+    URL.revokeObjectURL(textureObjectUrl.value)
+  }
+  textureObjectUrl.value = null
+  textureSignature.value = null
   onionCache.forEach((entry) => {
     if (entry.owned && entry.url) {
       URL.revokeObjectURL(entry.url)
@@ -2527,7 +2658,9 @@ watch(
   { flush: 'sync' }
 )
 
-const supportsColourPicker = computed(() => props.activeLayer?.kind !== 'heightmap')
+const supportsColourPicker = computed(
+  () => props.activeLayer?.kind !== 'heightmap' && !isTextureOverlay.value
+)
 
 watch(
   () => props.pendingViewState,
@@ -3232,6 +3365,26 @@ function clamp(value: number, min: number, max: number) {
   align-items: center;
   gap: 0.75rem;
 }
+
+.layer-editor__texture-help {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.layer-editor__texture-help p {
+  margin: 0;
+}
+
+.layer-editor__texture-note {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+}
+
 
 @media (max-width: 1100px) {
   .layer-editor {

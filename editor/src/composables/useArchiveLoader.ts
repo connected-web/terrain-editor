@@ -6,6 +6,7 @@ import {
   type ViewerOverlayLoadingState
 } from '@connected-web/terrain-editor'
 import { arrayBufferToBase64 } from '../utils/storage'
+import { validateOverlayLayers } from '../utils/legendValidation'
 
 type ProjectStore = {
   loadFromArchive: (payload: {
@@ -71,6 +72,11 @@ export function useArchiveLoader(options: ArchiveStoreOptions) {
           label: archiveLabel
         }
       })
+      const overlayValidation = validateOverlayLayers(archive.legend, archive.files)
+      if (overlayValidation.errors.length || overlayValidation.warnings.length) {
+        console.warn('Overlay validation issues:', overlayValidation)
+        options.updateStatus(`Loaded ${archiveLabel} with overlay warnings.`)
+      }
       await options.mountViewer()
       // Note: Status is now managed by viewer lifecycle events (onLifecycleChange)
       // The viewer will show "Map ready." when fully loaded and stabilized

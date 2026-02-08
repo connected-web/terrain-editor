@@ -12,10 +12,10 @@
     {
       "id": "british-isles",
       "title": "British Isles",
-      "description": "Heightmap-derived terrain with cities and mountain markers.",
+      "description": "Heightmap-derived terrain with cities, mountain markers, and a satellite overlay texture.",
       "filename": "british-isles-terrain.wyn",
       "status": "available",
-      "date": "2026-01-04 00:14",
+      "date": "2026-02-07 22:17",
       "thumbnail": "maps/thumbnails/british-isles.png"
     },
     {

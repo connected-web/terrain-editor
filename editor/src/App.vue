@@ -266,7 +266,7 @@ import {
 
 const version = __APP_VERSION_FULL__
 import { useTheme } from './composables/useTheme'
-import { buildIconPath, buildLayerMaskPath } from './utils/assets'
+import { buildIconPath, buildLayerMaskPath, buildLayerTexturePath } from './utils/assets'
 import { ensureLocationId } from './utils/locations'
 import { useAssetLibrary } from './composables/useAssetLibrary'
 import { useLocalSettings } from './composables/useLocalSettings'
@@ -294,7 +294,8 @@ import { useIconPicker } from './composables/useIconPicker'
 import { useLayerEditor } from './composables/useLayerEditor'
 import { useUrlState } from './composables/useUrlState'
 import { buildScratchDataset } from './utils/scratchDataset'
-import { createSolidImageData } from './utils/imageFactory'
+import { createSolidImageData, createTransparentImageData } from './utils/imageFactory'
+import { validateOverlayLayers } from './utils/legendValidation'
 
 type LayerViewState = {
   zoom: number
@@ -936,6 +937,15 @@ function downloadBlob(filename: string, blob: Blob) {
 async function exportArchive() {
   const snapshot = projectStore.getSnapshot()
   if (!snapshot.legend) return
+  const overlayValidation = validateOverlayLayers(snapshot.legend, snapshot.files)
+  if (overlayValidation.errors.length) {
+    console.warn('Overlay validation errors:', overlayValidation)
+    updateStatus('Fix overlay entries before exporting.')
+    return
+  }
+  if (overlayValidation.warnings.length) {
+    console.warn('Overlay validation warnings:', overlayValidation)
+  }
   try {
     updateStatus('Building archive…')
     const blob = await buildWynArchive(snapshot)
@@ -1088,7 +1098,12 @@ async function handleLibraryUpload(event: Event) {
   await importAsset()
 }
 
-async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'overlay'; color: [number, number, number] }) {
+async function handleCreateLayer(payload: {
+  label: string
+  kind: 'biome' | 'overlay'
+  color: [number, number, number]
+  overlayMode: 'mask' | 'rgba'
+}) {
   const snapshot = projectStore.getSnapshot()
   const legend = snapshot.legend
   if (!legend) {
@@ -1105,15 +1120,27 @@ async function handleCreateLayer(payload: { label: string; kind: 'biome' | 'over
   while (group[key]) {
     key = `${baseKey}-${counter++}`
   }
-  const maskPath = buildLayerMaskPath(key)
   const [width, height] = legend.size ?? [512, 512]
-  const image = createSolidImageData(width, height, 0)
-  const file = new File([image.buffer], maskPath, { type: 'image/png' })
-  await replaceAssetWithFileHelper(maskPath, file)
-  const newLayer = {
-    label: baseLabel,
-    mask: maskPath,
-    rgb: payload.color
+  let newLayer: Record<string, unknown>
+  if (payload.kind === 'overlay' && payload.overlayMode === 'rgba') {
+    const texturePath = buildLayerTexturePath(key)
+    const image = createTransparentImageData(width, height)
+    const file = new File([image.buffer], texturePath, { type: 'image/png' })
+    await replaceAssetWithFileHelper(texturePath, file)
+    newLayer = {
+      label: baseLabel,
+      rgba: texturePath
+    }
+  } else {
+    const maskPath = buildLayerMaskPath(key)
+    const image = createSolidImageData(width, height, 0)
+    const file = new File([image.buffer], maskPath, { type: 'image/png' })
+    await replaceAssetWithFileHelper(maskPath, file)
+    newLayer = {
+      label: baseLabel,
+      mask: maskPath,
+      rgb: payload.color
+    }
   }
   const nextLegend = {
     ...legend,
@@ -1353,6 +1380,18 @@ async function replaceLayerAssetFromFile(entry: LayerEntry, file: File) {
   })
 }
 
+async function replaceLayerTextureFromFile(entry: LayerEntry, file: File) {
+  if (!entry.rgba) return
+  const data = await file.arrayBuffer()
+  await layerEditorHelpers.replaceLayerAsset({
+    path: entry.rgba,
+    data,
+    type: file.type,
+    lastModified: file.lastModified,
+    sourceFileName: file.name
+  })
+}
+
 async function handleCreateEmptyMask(payload: { id: string }) {
   const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
   const legend = projectSnapshot.value?.legend
@@ -1445,11 +1484,16 @@ function handleModalAssetUpload() {
     const entry = picker.layerId
       ? layerEntriesWithOnion.value.find((layer) => layer.id === picker.layerId)
       : null
-    if (!entry?.mask) {
+    if (!entry?.mask && !entry?.rgba) {
       triggerLibraryUpload()
       return
     }
-    triggerLibraryUpload({ replacePath: entry.mask, originalName: entry.mask })
+    const targetPath = entry.rgba ?? entry.mask
+    if (!targetPath) {
+      triggerLibraryUpload()
+      return
+    }
+    triggerLibraryUpload({ replacePath: targetPath, originalName: targetPath })
     return
   }
   if (picker.mode === 'thumbnail') {
@@ -1461,11 +1505,15 @@ function handleModalAssetUpload() {
 
 function handleLayerFileReplace(payload: { id: string; file: File }) {
   const entry = layerEntriesWithOnion.value.find((layer) => layer.id === payload.id)
-  if (!entry || !entry.mask) return
+  if (!entry || (!entry.mask && !entry.rgba)) return
   requestConfirm(
     `Replace "${entry.label ?? entry.id}" with ${payload.file.name}?`,
     () => {
-      void replaceLayerAssetFromFile(entry, payload.file)
+      if (entry.rgba) {
+        void replaceLayerTextureFromFile(entry, payload.file)
+      } else {
+        void replaceLayerAssetFromFile(entry, payload.file)
+      }
     },
     { confirmLabel: 'Replace layer' }
   )
@@ -1481,11 +1529,15 @@ function handleAssetPanelSelect(path: string) {
     const targetId = picker.layerId
     if (!targetId) return
     const entry = layerEntriesWithOnion.value.find((layer) => layer.id === targetId)
-    if (!entry || !entry.mask) return
+    if (!entry || (!entry.mask && !entry.rgba)) return
     requestConfirm(
       `Replace "${entry.label ?? entry.id}" with ${asset.sourceFileName ?? asset.path}?`,
       () => {
-        void replaceLayerAssetFromFile(entry, file)
+        if (entry.rgba) {
+          void replaceLayerTextureFromFile(entry, file)
+        } else {
+          void replaceLayerAssetFromFile(entry, file)
+        }
         closeModalAssetPicker()
       },
       { confirmLabel: 'Replace layer' }

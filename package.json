@@ -1,7 +1,7 @@
 {
   "name": "terrain-editor-monorepo",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "An interactive terrain editor and viewer designed for web using three.js.",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,8 @@
     "build:editor": "npm --prefix editor run build",
     "build:lib": "npm --prefix packages/terrain run build",
     "build:viewer": "npm --prefix demos/viewer-ts run build",
+    "copy:wyn": "node ./scripts/copy-wyn.mjs",
+    "packmap:british-isles": "node ./scripts/packmap-british-isles.mjs",
     "validate:viewer": "node ./scripts/validate-viewer-package.mjs",
     "dev:editor": "npm --prefix editor run dev -- --host",
     "dev:viewer": "npm --prefix demos/viewer-ts run dev -- --host",

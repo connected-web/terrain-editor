@@ -48,7 +48,8 @@ Schema: `schemas/legend.schema.json`
     "forest": { "mask": "layers/forest_mask.png", "rgb": [48, 92, 54], "label": "Forest" }
   },
   "overlays": {
-    "water": { "mask": "layers/water_mask.png", "rgb": [34, 92, 124], "label": "Water" }
+    "water": { "mask": "layers/water_mask.png", "rgb": [34, 92, 124], "label": "Water" },
+    "texture": { "rgba": "layers/atlas-texture.png", "label": "Texture" }
   }
 }
 ```
@@ -63,10 +64,16 @@ Schema:
 - `biomes`: Record of biome layers. Keys are layer ids used by the editor/viewer.
 - `overlays`: Record of overlay layers. Keys are layer ids used by the editor/viewer.
 
-Each layer entry:
+Each layer entry (biomes + mask-based overlays):
 
 - `mask`: Path to a PNG mask. The viewer converts the max RGB channel into alpha.
 - `rgb`: `[r, g, b]` integers (0-255) used to colorize the legend composite.
+- `label`: Optional display name in the editor UI.
+
+Overlay texture entries (overlays only):
+
+- `rgba`: Path to a full-color PNG/WebP/etc. The viewer draws the image directly using the
+  image alpha channel.
 - `label`: Optional display name in the editor UI.
 
 ## locations.json (optional)
