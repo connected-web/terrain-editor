@@ -13,3 +13,5 @@ test-results
 documentation/renders
 .DS_Store
 tmp/
+scripts/data/
+OPENTOPO_KEY

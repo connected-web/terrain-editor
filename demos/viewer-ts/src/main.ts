@@ -103,7 +103,11 @@ function renderLayerControls(
   })
 }
 
-function renderLocations(locations: TerrainLocation[] = [], navigate: (loc: TerrainLocation) => void) {
+function renderLocations(
+  locations: TerrainLocation[] = [],
+  navigate: (loc: TerrainLocation) => void,
+  clearSelection: () => void
+) {
   locationListEl.innerHTML = ''
   if (!locations.length) {
     const empty = document.createElement('p')
@@ -125,7 +129,13 @@ function renderLocations(locations: TerrainLocation[] = [], navigate: (loc: Terr
     row.appendChild(icon)
     row.appendChild(label)
     button.appendChild(row)
-    button.addEventListener('click', () => navigate(location))
+    button.addEventListener('click', () => {
+      if (locationsWithIcons[activeLocationIndex]?.id === location.id) {
+        clearSelection()
+        return
+      }
+      navigate(location)
+    })
     locationListEl.appendChild(button)
   })
 }
@@ -192,6 +202,7 @@ function updateLocationPopup() {
     locationPopupDescriptionEl.textContent = 'No description provided.'
     locationPopupCounterEl.textContent = '0 / 0'
     terrainHandle?.setCameraOffset(0)
+    terrainHandle?.setFocusedLocation(null)
     return
   }
 
@@ -205,10 +216,20 @@ function updateLocationPopup() {
   terrainHandle?.setCameraOffset(-0.28, location.id)
 }
 
+function clearActiveLocation() {
+  activeLocationIndex = -1
+  popupOpen = false
+  updateLocationPopup()
+}
+
 function setActiveLocationIndex(index: number, shouldNavigate = true) {
   if (!locationsWithIcons.length) {
     activeLocationIndex = -1
     updateLocationPopup()
+    return
+  }
+  if (index < 0) {
+    clearActiveLocation()
     return
   }
   const count = locationsWithIcons.length
@@ -224,8 +245,7 @@ function setActiveLocationIndex(index: number, shouldNavigate = true) {
 locationPrevButton.addEventListener('click', () => setActiveLocationIndex(activeLocationIndex - 1))
 locationNextButton.addEventListener('click', () => setActiveLocationIndex(activeLocationIndex + 1))
 locationCloseButton.addEventListener('click', () => {
-  popupOpen = false
-  updateLocationPopup()
+  clearActiveLocation()
 })
 
 function updateStatus(message: string) {
@@ -280,10 +300,14 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
         terrainHandle.updateLayers(layerState)
       }
     })
-    renderLocations(locationsWithIcons, (location) => {
-      const targetIndex = locationsWithIcons.findIndex((entry) => entry.id === location.id)
-      setActiveLocationIndex(targetIndex, true)
-    })
+    renderLocations(
+      locationsWithIcons,
+      (location) => {
+        const targetIndex = locationsWithIcons.findIndex((entry) => entry.id === location.id)
+        setActiveLocationIndex(targetIndex, true)
+      },
+      clearActiveLocation
+    )
 
     terrainHandle = await initTerrainViewer(viewerEl, archive.dataset, {
       interactive: interactiveEnabled,
@@ -306,11 +330,15 @@ async function loadArchive(source: { kind: 'default' } | { kind: 'file'; file: F
       },
       onLocationClick: (id: any) => {
         const location = locationsWithIcons.find((entry) => entry.id === id)
-        if (location) {
-          const targetIndex = locationsWithIcons.findIndex((entry) => entry.id === location.id)
-          setActiveLocationIndex(targetIndex, true)
-          updateStatus(`Focused location: ${location.name ?? location.id}`)
+        if (!location) return
+        if (locationsWithIcons[activeLocationIndex]?.id === location.id) {
+          clearActiveLocation()
+          updateStatus('Hovering terrain')
+          return
         }
+        const targetIndex = locationsWithIcons.findIndex((entry) => entry.id === location.id)
+        setActiveLocationIndex(targetIndex, true)
+        updateStatus(`Focused location: ${location.name ?? location.id}`)
       }
     })
     popupOpen = locationsWithIcons.length > 0

@@ -13,6 +13,7 @@
         "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
         "icon": { "type": "string" },
+        "iconScale": { "type": "number" },
         "description": { "type": "string" },
         "showBorder": { "type": "boolean" },
         "pixel": { "$ref": "#/definitions/pixel" },

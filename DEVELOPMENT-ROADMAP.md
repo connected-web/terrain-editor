@@ -138,5 +138,5 @@
 - ✅ Additional curated sample terrains for testing editor flows
   - ✅ Fortress Sample Map
   - ✅ British Isles Sample Map
-  - 💡 North America Sample Map
+  - ✅ North America Sample Map
   - 💡 Welsh Moutains Sample Map

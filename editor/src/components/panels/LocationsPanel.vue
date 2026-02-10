@@ -16,20 +16,32 @@
       </button>
     </header>
     <div class="locations-panel__selector">
-      <button
-        class="pill-button locations-panel__selector-button"
-        type="button"
-        :disabled="!locationsList.length"
-        @click="$emit('open-picker')"
-      >
-        <Icon icon="location-crosshairs" />
-        <div class="locations-panel__selector-text">
-          <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
-          <small v-if="activeLocation">
-            {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
-          </small>
-        </div>
-      </button>
+      <div class="locations-panel__selector-row">
+        <button
+          class="pill-button locations-panel__selector-button"
+          type="button"
+          :disabled="!locationsList.length"
+          @click="$emit('open-picker')"
+        >
+          <Icon icon="location-crosshairs" />
+          <div class="locations-panel__selector-text">
+            <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
+            <small v-if="activeLocation">
+              {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
+            </small>
+          </div>
+        </button>
+        <button
+          v-if="activeLocation"
+          class="pill-button pill-button--ghost pill-button--icon"
+          type="button"
+          title="Clear selection"
+          aria-label="Clear selection"
+          @click="clearActiveLocationSelection"
+        >
+          <Icon icon="xmark" />
+        </button>
+      </div>
       <p v-if="!locationsList.length" class="panel-card__placeholder locations-panel__placeholder">
         No locations yet. Import a map with locations or add them manually.
       </p>
@@ -195,6 +207,18 @@
           </label>
         </div>
         <h4>Style</h4>
+        <label class="locations-panel__field">
+          <span>Icon scale</span>
+          <input
+            type="number"
+            min="0.1"
+            max="3"
+            step="0.05"
+            v-model.number="activeLocation.iconScale"
+            @change="commitLocations"
+            placeholder="1"
+          />
+        </label>
         <label class="locations-panel__toggle">
           <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
           <span>Show label border</span>
@@ -246,7 +270,8 @@ const {
   isCameraFocusedOnLocation,
   captureCameraViewForActiveLocation,
   clearActiveLocationView,
-  focusCameraOnActiveLocation
+  focusCameraOnActiveLocation,
+  setActiveLocation
 } = props.locationsApi
 
 const { workspaceForm } = useWorkspaceModel()
@@ -254,6 +279,10 @@ const { workspaceForm } = useWorkspaceModel()
 const isCameraFocusedOnActiveLocation = computed(() => {
   return activeLocation.value ? isCameraFocusedOnLocation(activeLocation.value) : false
 })
+
+function clearActiveLocationSelection() {
+  setActiveLocation(null)
+}
 
 defineEmits<{
   'open-picker': []
@@ -264,3 +293,15 @@ defineEmits<{
   drop: [event: DragEvent]
 }>()
 </script>
+
+<style scoped>
+.locations-panel__selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.locations-panel__selector-row .locations-panel__selector-button {
+  flex: 1;
+}
+</style>
