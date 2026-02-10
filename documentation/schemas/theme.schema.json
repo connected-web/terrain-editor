@@ -59,7 +59,7 @@
           "type": "string",
           "enum": ["cylinder", "triangle", "square", "pentagon", "hexagon"]
         },
-        "radius": { "type": "number" },
+        "radius": { "type": "number", "minimum": 0 },
         "scale": { "type": "number" },
         "states": { "$ref": "#/definitions/stemStates" }
       }

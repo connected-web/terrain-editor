@@ -307,6 +307,17 @@
         </label>
         <div class="theme-form__split">
           <label class="theme-form__field">
+            <span>Thickness (0 = hidden)</span>
+            <input
+              type="number"
+              min="0"
+              max="0.1"
+              step="0.001"
+              v-model.number="themeForm.stemRadius"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
             <span>Color</span>
             <input type="color" v-model="themeForm.stemColor" @input="$emit('schedule-update')" />
           </label>
@@ -389,6 +400,7 @@ type ThemeForm = {
   stemColor: string
   stemOpacity: number
   stemShape: MarkerStemGeometryShape
+  stemRadius: number
   fontFamily: string
   fontWeight: string
   maxFontSize: number

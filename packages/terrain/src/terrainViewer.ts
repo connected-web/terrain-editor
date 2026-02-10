@@ -1132,7 +1132,7 @@ const markerResources: MarkerResource[] = []
       targetOpacity: number
     }
   >()
-  const markerFadeBase = 0.2
+  const markerFadeBase = 0.0
   const markerFadeMax = 1
   const markerFadeRadius = () =>
     terrainSpan * 0.5 * THREE.MathUtils.clamp(markerTheme.fadeRange ?? 1, 0, 1)
@@ -1301,8 +1301,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         : location.name ?? ''
     const raw = (rawSource || '?').trim()
     if (!raw) return '?'
-    const first = raw[0]
-    return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
+    return raw
   }
 
 
