@@ -1,5 +1,7 @@
 {
   "locationMarkers": {
+    "iconScale": 1,
+    "fadeRange": 1,
     "sprite": {
       "fontFamily": "\"DM Sans\", sans-serif",
       "fontWeight": "600",

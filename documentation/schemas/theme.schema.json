@@ -9,6 +9,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "iconScale": { "type": "number", "minimum": 0 },
+        "fadeRange": { "type": "number", "minimum": 0, "maximum": 1 },
         "sprite": { "$ref": "#/definitions/sprite" },
         "stem": { "$ref": "#/definitions/stem" }
       }

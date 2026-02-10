@@ -74,6 +74,7 @@ export type TerrainLocation = {
   id: string
   name?: string
   icon?: string
+  iconScale?: number
   description?: string
   showBorder?: boolean
   pixel: { x: number; y: number }
@@ -1131,10 +1132,11 @@ const markerResources: MarkerResource[] = []
       targetOpacity: number
     }
   >()
-  const markerFadeBase = 0.0
+  const markerFadeBase = 0.2
   const markerFadeMax = 1
-  const markerFadeRadius = () => terrainSpan * 0.35
-  const markerFocusRadius = () => terrainSpan * 0.35
+  const markerFadeRadius = () =>
+    terrainSpan * 0.5 * THREE.MathUtils.clamp(markerTheme.fadeRange ?? 1, 0, 1)
+  const markerFocusRadius = () => markerFadeRadius()
   let pointerWorld: THREE.Vector3 | null = null
   let lastOpacityUpdate = 0
   let lastTelemetryUpdate = 0
@@ -1498,7 +1500,10 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
           container.add(stem)
           container.add(sprite)
           markersGroup.add(container)
-          const iconScale = iconTexture ? ICON_SCALE_MULTIPLIER : 1
+          const iconScale =
+            (iconTexture ? ICON_SCALE_MULTIPLIER : 1) *
+            (markerTheme.iconScale ?? 1) *
+            (location.iconScale ?? 1)
           markerMap.set(location.id, {
             container,
             sprite,

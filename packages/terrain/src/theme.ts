@@ -43,6 +43,8 @@ export type MarkerStemTheme = {
 
 export type TerrainTheme = {
   locationMarkers: {
+    iconScale?: number
+    fadeRange?: number
     sprite: MarkerSpriteTheme
     stem: MarkerStemTheme
   }

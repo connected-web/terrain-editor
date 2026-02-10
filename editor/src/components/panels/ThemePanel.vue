@@ -134,6 +134,30 @@
             />
           </label>
         </div>
+        <div class="theme-form__split">
+          <label class="theme-form__field">
+            <span>Icon scale</span>
+            <input
+              type="number"
+              min="0.1"
+              max="3"
+              step="0.05"
+              v-model.number="themeForm.iconScale"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
+            <span>Fade range</span>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              v-model.number="themeForm.fadeRange"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+        </div>
       </section>
       <section class="theme-form__section">
         <div class="row left">

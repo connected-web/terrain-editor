@@ -195,6 +195,18 @@
           </label>
         </div>
         <h4>Style</h4>
+        <label class="locations-panel__field">
+          <span>Icon scale</span>
+          <input
+            type="number"
+            min="0.1"
+            max="3"
+            step="0.05"
+            v-model.number="activeLocation.iconScale"
+            @change="commitLocations"
+            placeholder="1"
+          />
+        </label>
         <label class="locations-panel__toggle">
           <input type="checkbox" v-model="activeLocation.showBorder" @change="commitLocations" />
           <span>Show label border</span>

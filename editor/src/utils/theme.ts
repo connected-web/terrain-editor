@@ -78,6 +78,8 @@ export function createThemeFormState() {
     paddingX: 12,
     paddingY: 6,
     borderRadius: 12,
+    iconScale: 1,
+    fadeRange: 1,
     hoverEnabled: false,
     focusEnabled: false,
     hover: createThemeStateForm(),

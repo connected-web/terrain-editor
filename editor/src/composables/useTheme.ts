@@ -38,6 +38,8 @@ export function useTheme(options: {
     themeForm.paddingX = sprite.paddingX
     themeForm.paddingY = sprite.paddingY
     themeForm.borderRadius = sprite.borderRadius
+    themeForm.iconScale = resolved.locationMarkers.iconScale ?? 1
+    themeForm.fadeRange = resolved.locationMarkers.fadeRange ?? 1
     const sourceSprite = snapshot.theme?.locationMarkers?.sprite
     const hoverSource = sourceSprite?.states?.hover
     const focusSource = sourceSprite?.states?.focus
@@ -93,6 +95,8 @@ export function useTheme(options: {
   function commitThemeOverrides() {
     const overrides: TerrainThemeOverrides = {
       locationMarkers: {
+        iconScale: themeForm.iconScale,
+        fadeRange: themeForm.fadeRange,
         sprite: {
           fontFamily: themeForm.fontFamily,
           fontWeight: themeForm.fontWeight,
