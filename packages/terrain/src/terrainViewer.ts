@@ -994,6 +994,8 @@ export async function initTerrainViewer(
   const downAxis = new THREE.Vector3(0, -1, 0)
   const surfaceRaycaster = new THREE.Raycaster()
   const surfaceRayOrigin = new THREE.Vector3()
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  const _planeTarget = new THREE.Vector3()
   let interactiveEnabled = options.interactive ?? false
   let heightSampler: HeightSampler | null = null
   let currentLocations: TerrainLocation[] = options.locations ?? []
@@ -1113,24 +1115,41 @@ type MarkerResource = {
   stemGeometry?: THREE.BufferGeometry
 }
 const markerResources: MarkerResource[] = []
-const markerMap = new Map<
-  string,
-  {
-    container: THREE.Group
-    sprite: THREE.Sprite
-    stem: THREE.Mesh
-    spriteVisuals: MarkerSpriteVisualSet
-    stemStates: MarkerStemVisualSet
-    iconScale: number
-    stemBaseHeight: number
-    spriteGap: number
-    currentOpacity: number
-  }
->()
-  const markerFadeBase = 0.18
+  const markerMap = new Map<
+    string,
+    {
+      container: THREE.Group
+      sprite: THREE.Sprite
+      stem: THREE.Mesh
+      spriteVisuals: MarkerSpriteVisualSet
+      stemStates: MarkerStemVisualSet
+      iconScale: number
+      stemBaseHeight: number
+      spriteGap: number
+      currentOpacity: number
+      targetOpacity: number
+    }
+  >()
+  const markerFadeBase = 0.4
   const markerFadeMax = 1
-  const markerFadeRadius = () => terrainSpan * 0.5
+  const markerFadeRadius = () => terrainSpan
+  const markerFocusRadius = () => terrainSpan * 0.35
   let pointerWorld: THREE.Vector3 | null = null
+  let lastOpacityUpdate = 0
+  let lastTelemetryUpdate = 0
+  const telemetrySamples: Array<{
+    time: number
+    frameMs: number
+    markerMs: number
+    markerCount: number
+    hoveredId: string | null
+    focusedId: string | undefined
+  }> = []
+  if (typeof window !== 'undefined') {
+    ;(window as any).__terrainViewerTelemetry = {
+      samples: telemetrySamples
+    }
+  }
   const markerInteractiveTargets: THREE.Object3D[] = []
   let hoveredLocationId: string | null = null
   const cameraOffset = { target: 0, current: 0 }
@@ -1284,6 +1303,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   }
 
 
+  let lastMarkerScaleUpdate = 0
+  let lastMarkerDistance = 0
   function updateMarkerVisuals() {
     const distance = camera.position.distanceTo(controls.target)
     const lerp = THREE.MathUtils.lerp(controls.minDistance, controls.maxDistance, distance)
@@ -1292,36 +1313,33 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     const normalizedZoom =
       zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
     const heightScaleFactor = THREE.MathUtils.lerp(0.55, 1.1, normalizedZoom)
+    const now = performance.now()
+    const shouldUpdateScale =
+      now - lastMarkerScaleUpdate > 100 || Math.abs(distance - lastMarkerDistance) > 0.02
 
-    const fadeRadius = markerFadeRadius()
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap, currentOpacity }, id) => {
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap, currentOpacity, targetOpacity }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
       const scaled = baseScale * (iconScale ?? 1) * emphasis
-      sprite.scale.set(scaled, scaled, scaled)
+      if (shouldUpdateScale) {
+        sprite.scale.set(scaled, scaled, scaled)
+      }
       const visualState: MarkerVisualState = isFocused ? 'focus' : isHovered ? 'hover' : 'default'
       const nextVisual = spriteVisuals[visualState]
       if (sprite.material !== nextVisual.material) {
         sprite.material = nextVisual.material
       }
-      let targetOpacity = markerFadeBase
-      if (pointerWorld) {
-        const markerWorld = locationWorldCache.get(id)
-        if (markerWorld) {
-          const dist = pointerWorld.distanceTo(markerWorld)
-          const t = THREE.MathUtils.clamp(1 - dist / fadeRadius, 0, 1)
-          const smooth = t * t * (3 - 2 * t)
-          targetOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
-        }
-      }
-      if (isHovered || isFocused) targetOpacity = markerFadeMax
-      const nextOpacity = THREE.MathUtils.damp(
-        currentOpacity ?? markerFadeBase,
-        targetOpacity,
-        8,
-        lastDelta
-      )
+      let effectiveTarget = targetOpacity
+      if (isHovered || isFocused) effectiveTarget = markerFadeMax
+      const nextOpacity = isHovered || isFocused
+        ? markerFadeMax
+        : THREE.MathUtils.damp(
+            currentOpacity ?? markerFadeBase,
+            effectiveTarget,
+            8,
+            lastDelta
+          )
       const spriteMat = sprite.material as THREE.SpriteMaterial
       const baseSpriteOpacity =
         (spriteMat.userData?.baseOpacity as number | undefined) ?? spriteMat.opacity
@@ -1330,15 +1348,51 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       const stemState = stemStates[visualState]
       stemMat.opacity = stemState.opacity * nextOpacity
       stemMat.color.set(stemState.color)
-      const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
-      const stemScale = heightScaleFactor
-      stem.scale.set(stemWidth, stemScale, stemWidth)
-      const currentStemHeight = stemBaseHeight * stemScale
-      stem.position.y = currentStemHeight / 2
-      const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
-      const spriteHeight = scaled
-      sprite.position.y = spriteBase + spriteHeight / 2
+      if (shouldUpdateScale) {
+        const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
+        const stemScale = heightScaleFactor
+        stem.scale.set(stemWidth, stemScale, stemWidth)
+        const currentStemHeight = stemBaseHeight * stemScale
+        stem.position.y = currentStemHeight / 2
+        const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
+        const spriteHeight = scaled
+        sprite.position.y = spriteBase + spriteHeight / 2
+      }
       markerMap.get(id)!.currentOpacity = nextOpacity
+    })
+    if (shouldUpdateScale) {
+      lastMarkerScaleUpdate = now
+      lastMarkerDistance = distance
+    }
+  }
+
+  function updateMarkerOpacityTargets(now: number) {
+    if (now - lastOpacityUpdate < 80) return
+    lastOpacityUpdate = now
+    const fadeRadius = markerFadeRadius()
+    const focusRadius = markerFocusRadius()
+    const focusWorld = currentFocusId ? locationWorldCache.get(currentFocusId) : null
+    markerMap.forEach((entry, id) => {
+      const markerWorld = locationWorldCache.get(id)
+      if (!markerWorld) {
+        entry.targetOpacity = markerFadeBase
+        return
+      }
+      let cursorOpacity = markerFadeBase
+      if (pointerWorld) {
+        const dist = pointerWorld.distanceTo(markerWorld)
+        const t = THREE.MathUtils.clamp(1 - dist / fadeRadius, 0, 1)
+        const smooth = t * t * (3 - 2 * t)
+        cursorOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
+      }
+      let focusOpacity = markerFadeBase
+      if (focusWorld) {
+        const dist = focusWorld.distanceTo(markerWorld)
+        const t = THREE.MathUtils.clamp(1 - dist / focusRadius, 0, 1)
+        const smooth = t * t * (3 - 2 * t)
+        focusOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
+      }
+      entry.targetOpacity = Math.max(cursorOpacity, focusOpacity)
     })
   }
 
@@ -1445,7 +1499,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
             iconScale,
             stemBaseHeight: stemHeight,
             spriteGap,
-            currentOpacity: markerFadeBase
+            currentOpacity: markerFadeBase,
+            targetOpacity: markerFadeBase
           })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
@@ -1685,10 +1740,25 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     viewOffsetPixels = THREE.MathUtils.damp(viewOffsetPixels, shiftTarget, 6, delta)
     applyViewOffset()
     controls.update()
+    const markerStart = performance.now()
+    updateMarkerOpacityTargets(now)
     updateMarkerVisuals()
+    const markerDuration = performance.now() - markerStart
     renderer.render(scene, camera)
 
     frameCount++
+    if (now - lastTelemetryUpdate >= 500) {
+      lastTelemetryUpdate = now
+      telemetrySamples.push({
+        time: now,
+        frameMs: frameDuration,
+        markerMs: markerDuration,
+        markerCount: markerMap.size,
+        hoveredId: hoveredLocationId,
+        focusedId: currentFocusId
+      })
+      if (telemetrySamples.length > 10) telemetrySamples.shift()
+    }
 
     // Track lifecycle progression
     if (!firstRenderComplete && frameCount === 1) {
@@ -1784,6 +1854,22 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     return intersections[0] ?? null
   }
 
+  /** Cheap pointer-to-world: intersect a flat plane then sample height from the heightmap. */
+  function pointerToWorldCheap(): THREE.Vector3 | null {
+    if (!heightSampler) return null
+    const ray = raycaster.ray
+    const hit = ray.intersectPlane(groundPlane, _planeTarget)
+    if (!hit) return null
+    const halfW = terrainDimensions.width / 2
+    const halfD = terrainDimensions.depth / 2
+    if (Math.abs(hit.x) > halfW || Math.abs(hit.z) > halfD) return null
+    const u = hit.x / terrainDimensions.width + 0.5
+    const v = hit.z / terrainDimensions.depth + 0.5
+    const heightSample = sampleHeightValue(heightSampler, u, v)
+    const y = (heightSample - seaLevel) * currentHeightScale
+    return _planeTarget.set(hit.x, y, hit.z)
+  }
+
   function pickMarkerId() {
     if (!markerInteractiveTargets.length) return null
     const intersections = raycaster.intersectObjects(markerInteractiveTargets, true)
@@ -1804,28 +1890,33 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     }
   }
 
-  function updatePlacementIndicator() {
+  function updatePlacementIndicator(worldPoint: THREE.Vector3 | null) {
     if (!interactiveEnabled) {
       placementIndicatorGroup.visible = false
       return
     }
-    const hit = intersectTerrain()
-    if (!hit) {
+    if (!worldPoint) {
       placementIndicatorGroup.visible = false
       return
     }
     placementIndicatorGroup.visible = true
-    const target = hit.point.clone()
-    target.y += 0.02
-    placementIndicatorGroup.position.copy(target)
+    placementIndicatorGroup.position.set(worldPoint.x, worldPoint.y + 0.02, worldPoint.z)
   }
 
   function handlePointerMove(event: PointerEvent) {
     setPointerFromEvent(event)
     updateHoverState()
-    updatePlacementIndicator()
-    const hit = intersectTerrain()
-    pointerWorld = hit?.point ? hit.point.clone() : null
+    const worldPoint = pointerToWorldCheap()
+    pointerWorld = worldPoint ? worldPoint.clone() : null
+    updatePlacementIndicator(pointerWorld)
+  }
+
+  function handlePointerLeave() {
+    pointerWorld = null
+    if (hoveredLocationId) {
+      hoveredLocationId = null
+      updateMarkerVisuals()
+    }
   }
 
   function handlePointerDown(event: PointerEvent) {
@@ -1852,6 +1943,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   renderer.domElement.addEventListener('pointermove', handlePointerMove)
   renderer.domElement.addEventListener('pointerdown', handlePointerDown)
+  renderer.domElement.addEventListener('pointerleave', handlePointerLeave)
 
   function handleDoubleClick(event: MouseEvent) {
     event.preventDefault()
@@ -2003,6 +2095,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       const nextId = locationId ?? undefined
       if (currentFocusId === nextId) return
       currentFocusId = nextId
+      updateMarkerOpacityTargets(performance.now())
       updateMarkerVisuals()
     },
     navigateTo: navigateToLocation,
