@@ -30,7 +30,7 @@
     {
       "id": "north-america",
       "title": "North America",
-      "description": "4096x4096 North America terrain with borders, capitals, and high points.",
+      "description": "4096x4096 North America terrain with biomes, mountain ranges, borders, capitals, and high points.",
       "filename": "north-america-terrain.wyn",
       "status": "available",
       "date": "2026-02-09",
