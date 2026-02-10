@@ -32,7 +32,7 @@ export function useTheme(options: {
     themeForm.stemOpacity = stemDefault.opacity
     themeForm.stemShape = resolved.locationMarkers.stem.shape
     themeForm.stemRadius = resolved.locationMarkers.stem.radius
-    themeForm.stemHeightScale = resolved.locationMarkers.stem.heightScale ?? 1
+    themeForm.stemHeight = resolved.locationMarkers.stem.height ?? 0.12
     themeForm.fontFamily = sprite.fontFamily
     themeForm.fontWeight = sprite.fontWeight
     themeForm.maxFontSize = sprite.maxFontSize
@@ -144,7 +144,7 @@ export function useTheme(options: {
         stem: {
           shape: themeForm.stemShape,
           radius: themeForm.stemRadius,
-          heightScale: themeForm.stemHeightScale,
+          height: themeForm.stemHeight,
           states: {
             default: {
               color: themeForm.stemColor,

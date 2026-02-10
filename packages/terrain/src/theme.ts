@@ -34,7 +34,7 @@ export type MarkerStemTheme = {
   shape: MarkerStemGeometryShape
   radius: number
   scale?: number
-  heightScale?: number
+  height?: number
   states: {
     default: MarkerStemStateStyle
     hover?: Partial<MarkerStemStateStyle>

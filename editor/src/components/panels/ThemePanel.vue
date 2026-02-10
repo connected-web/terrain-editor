@@ -318,7 +318,7 @@
         </label>
         <div class="theme-form__split">
           <label class="theme-form__field">
-            <span>Thickness (0-5; 1 = 0.01 units)</span>
+            <span>Thickness (0-5; 1 = 0.01 map units)</span>
             <input
               type="number"
               min="0"
@@ -329,13 +329,13 @@
             />
           </label>
           <label class="theme-form__field">
-            <span>Height scale (1 = 100%)</span>
+            <span>Height (map units)</span>
             <input
               type="number"
               min="0"
-              max="3"
-              step="0.05"
-              v-model.number="themeForm.stemHeightScale"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.stemHeight"
               @change="$emit('schedule-update')"
             />
           </label>
@@ -423,7 +423,7 @@ type ThemeForm = {
   stemOpacity: number
   stemShape: MarkerStemGeometryShape
   stemRadius: number
-  stemHeightScale: number
+  stemHeight: number
   fontFamily: string
   fontWeight: string
   maxFontSize: number

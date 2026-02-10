@@ -16,7 +16,10 @@
           "maximum": 1,
           "description": "Opacity falloff range as a fraction of the shortest map side."
         },
-        "labelOffset": { "type": "number", "description": "Offset applied to labels as a fraction of stem height." },
+        "labelOffset": {
+          "type": "number",
+          "description": "Offset applied to labels as a fraction of stem height."
+        },
         "sprite": { "$ref": "#/definitions/sprite" },
         "stem": { "$ref": "#/definitions/stem" }
       }
@@ -65,9 +68,9 @@
           "type": "string",
           "enum": ["cylinder", "triangle", "square", "pentagon", "hexagon"]
         },
-        "radius": { "type": "number", "minimum": 0, "description": "Thickness value in hundredths of a world unit." },
+        "radius": { "type": "number", "minimum": 0, "description": "Thickness value in hundredths of a map unit." },
         "scale": { "type": "number", "description": "Scalar applied to stem thickness." },
-        "heightScale": { "type": "number", "minimum": 0, "description": "Scalar applied to stem height (1 = 100%)." },
+        "height": { "type": "number", "minimum": 0, "description": "Stem height in map units." },
         "states": { "$ref": "#/definitions/stemStates" }
       }
     },

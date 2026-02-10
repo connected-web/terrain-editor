@@ -911,14 +911,14 @@ export async function initTerrainViewer(
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
   const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
   function computeMarkerStemHeight() {
+    const explicitHeight = markerTheme.stem.height
+    if (typeof explicitHeight === 'number' && Number.isFinite(explicitHeight)) {
+      return Math.max(0, explicitHeight)
+    }
     const scaledMin = MARKER_MIN_HEIGHT * MARKER_HEIGHT_SCALE
     const scaledMax = MARKER_MAX_HEIGHT * MARKER_HEIGHT_SCALE
     const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO * MARKER_HEIGHT_SCALE
-    const stemHeightScale =
-      typeof markerTheme.stem.heightScale === 'number' && Number.isFinite(markerTheme.stem.heightScale)
-        ? Math.max(0, markerTheme.stem.heightScale)
-        : 1
-    return THREE.MathUtils.clamp(rawHeight * stemHeightScale, scaledMin * stemHeightScale, scaledMax * stemHeightScale)
+    return THREE.MathUtils.clamp(rawHeight, scaledMin, scaledMax)
   }
   let markerStemHeight = computeMarkerStemHeight()
   let terrainHeightRange = { min: FLOOR_Y, max: 0 }

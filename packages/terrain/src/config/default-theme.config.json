@@ -37,7 +37,7 @@
       "shape": "cylinder",
       "radius": 1.5,
       "scale": 1,
-      "heightScale": 1,
+      "height": 0.12,
       "states": {
         "default": {
           "color": "#d9c39c",
