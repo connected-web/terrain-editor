@@ -170,6 +170,17 @@
               @change="$emit('schedule-update')"
             />
           </label>
+          <label class="theme-form__field">
+            <span>Label offset</span>
+            <input
+              type="number"
+              min="-1"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.labelOffset"
+              @change="$emit('schedule-update')"
+            />
+          </label>
         </div>
       </section>
       <section class="theme-form__section">
@@ -311,9 +322,20 @@
             <input
               type="number"
               min="0"
-              max="0.1"
+              max="0.05"
               step="0.001"
               v-model.number="themeForm.stemRadius"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
+            <span>Height scale</span>
+            <input
+              type="number"
+              min="0"
+              max="3"
+              step="0.05"
+              v-model.number="themeForm.stemHeightScale"
               @change="$emit('schedule-update')"
             />
           </label>
@@ -401,6 +423,7 @@ type ThemeForm = {
   stemOpacity: number
   stemShape: MarkerStemGeometryShape
   stemRadius: number
+  stemHeightScale: number
   fontFamily: string
   fontWeight: string
   maxFontSize: number
@@ -408,6 +431,7 @@ type ThemeForm = {
   paddingX: number
   paddingY: number
   borderRadius: number
+  labelOffset: number
   hoverEnabled: boolean
   focusEnabled: boolean
   hover: {

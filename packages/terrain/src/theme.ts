@@ -34,6 +34,7 @@ export type MarkerStemTheme = {
   shape: MarkerStemGeometryShape
   radius: number
   scale?: number
+  heightScale?: number
   states: {
     default: MarkerStemStateStyle
     hover?: Partial<MarkerStemStateStyle>
@@ -45,6 +46,7 @@ export type TerrainTheme = {
   locationMarkers: {
     iconScale?: number
     fadeRange?: number
+    labelOffset?: number
     sprite: MarkerSpriteTheme
     stem: MarkerStemTheme
   }

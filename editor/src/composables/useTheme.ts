@@ -32,6 +32,7 @@ export function useTheme(options: {
     themeForm.stemOpacity = stemDefault.opacity
     themeForm.stemShape = resolved.locationMarkers.stem.shape
     themeForm.stemRadius = resolved.locationMarkers.stem.radius
+    themeForm.stemHeightScale = resolved.locationMarkers.stem.heightScale ?? 1
     themeForm.fontFamily = sprite.fontFamily
     themeForm.fontWeight = sprite.fontWeight
     themeForm.maxFontSize = sprite.maxFontSize
@@ -41,6 +42,7 @@ export function useTheme(options: {
     themeForm.borderRadius = sprite.borderRadius
     themeForm.iconScale = resolved.locationMarkers.iconScale ?? 1
     themeForm.fadeRange = resolved.locationMarkers.fadeRange ?? 1
+    themeForm.labelOffset = resolved.locationMarkers.labelOffset ?? 0
     const sourceSprite = snapshot.theme?.locationMarkers?.sprite
     const hoverSource = sourceSprite?.states?.hover
     const focusSource = sourceSprite?.states?.focus
@@ -98,6 +100,7 @@ export function useTheme(options: {
       locationMarkers: {
         iconScale: themeForm.iconScale,
         fadeRange: themeForm.fadeRange,
+        labelOffset: themeForm.labelOffset,
         sprite: {
           fontFamily: themeForm.fontFamily,
           fontWeight: themeForm.fontWeight,
@@ -141,6 +144,7 @@ export function useTheme(options: {
         stem: {
           shape: themeForm.stemShape,
           radius: themeForm.stemRadius,
+          heightScale: themeForm.stemHeightScale,
           states: {
             default: {
               color: themeForm.stemColor,

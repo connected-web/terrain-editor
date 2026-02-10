@@ -11,6 +11,7 @@
       "properties": {
         "iconScale": { "type": "number", "minimum": 0 },
         "fadeRange": { "type": "number", "minimum": 0, "maximum": 1 },
+        "labelOffset": { "type": "number" },
         "sprite": { "$ref": "#/definitions/sprite" },
         "stem": { "$ref": "#/definitions/stem" }
       }
@@ -61,6 +62,7 @@
         },
         "radius": { "type": "number", "minimum": 0 },
         "scale": { "type": "number" },
+        "heightScale": { "type": "number", "minimum": 0 },
         "states": { "$ref": "#/definitions/stemStates" }
       }
     },

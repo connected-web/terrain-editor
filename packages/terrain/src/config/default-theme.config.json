@@ -2,6 +2,7 @@
   "locationMarkers": {
     "iconScale": 1,
     "fadeRange": 1,
+    "labelOffset": 0,
     "sprite": {
       "fontFamily": "\"DM Sans\", sans-serif",
       "fontWeight": "600",
@@ -35,7 +36,8 @@
     "stem": {
       "shape": "cylinder",
       "radius": 0.015,
-      "scale": 0.01,
+      "scale": 1,
+      "heightScale": 1,
       "states": {
         "default": {
           "color": "#d9c39c",
