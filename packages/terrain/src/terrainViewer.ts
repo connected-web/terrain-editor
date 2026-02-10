@@ -1134,7 +1134,7 @@ const markerResources: MarkerResource[] = []
   const markerFadeBase = 0.25
   const markerFadeMax = 1
   const markerFadeRadius = () => terrainSpan
-  const markerFocusRadius = () => terrainSpan * 0.55
+  const markerFocusRadius = () => terrainSpan * 0.35
   let pointerWorld: THREE.Vector3 | null = null
   let lastOpacityUpdate = 0
   let lastTelemetryUpdate = 0
@@ -1906,9 +1906,9 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   function handlePointerMove(event: PointerEvent) {
     setPointerFromEvent(event)
-    updateHoverState()
     const worldPoint = pointerToWorldCheap()
     pointerWorld = worldPoint ? worldPoint.clone() : null
+    updateHoverState()
     updatePlacementIndicator(pointerWorld)
   }
 
