@@ -134,6 +134,11 @@
             />
           </label>
         </div>
+      </section>
+      <section class="theme-form__section">
+        <header>
+          <h4>Interactivity</h4>
+        </header>
         <div class="theme-form__split">
           <label class="theme-form__field">
             <span>Icon scale</span>
@@ -147,7 +152,15 @@
             />
           </label>
           <label class="theme-form__field">
-            <span>Fade range</span>
+            <span>Fade range (% of shortest map side)</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.fadeRange"
+              @input="$emit('schedule-update')"
+            />
             <input
               type="number"
               min="0"
