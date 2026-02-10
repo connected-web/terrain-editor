@@ -1131,9 +1131,9 @@ const markerResources: MarkerResource[] = []
       targetOpacity: number
     }
   >()
-  const markerFadeBase = 0.25
+  const markerFadeBase = 0.0
   const markerFadeMax = 1
-  const markerFadeRadius = () => terrainSpan
+  const markerFadeRadius = () => terrainSpan * 0.35
   const markerFocusRadius = () => terrainSpan * 0.35
   let pointerWorld: THREE.Vector3 | null = null
   let lastOpacityUpdate = 0
