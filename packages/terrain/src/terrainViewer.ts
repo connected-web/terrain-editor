@@ -632,6 +632,7 @@ function createMarkerSpriteResource(
     depthWrite: false,
     opacity: style.opacity
   })
+  material.userData.baseOpacity = style.opacity
   return { material, texture }
 }
 
@@ -1123,8 +1124,13 @@ const markerMap = new Map<
     iconScale: number
     stemBaseHeight: number
     spriteGap: number
+    currentOpacity: number
   }
 >()
+  const markerFadeBase = 0.18
+  const markerFadeMax = 1
+  const markerFadeRadius = () => terrainSpan * 0.5
+  let pointerWorld: THREE.Vector3 | null = null
   const markerInteractiveTargets: THREE.Object3D[] = []
   let hoveredLocationId: string | null = null
   const cameraOffset = { target: 0, current: 0 }
@@ -1287,7 +1293,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       zoomRange > 0 ? THREE.MathUtils.clamp((distance - controls.minDistance) / zoomRange, 0, 1) : 0
     const heightScaleFactor = THREE.MathUtils.lerp(0.55, 1.1, normalizedZoom)
 
-    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap }, id) => {
+    const fadeRadius = markerFadeRadius()
+    markerMap.forEach(({ sprite, stem, spriteVisuals, stemStates, iconScale, stemBaseHeight, spriteGap, currentOpacity }, id) => {
       const isFocused = currentFocusId === id
       const isHovered = hoveredLocationId === id
       const emphasis = isFocused ? 1.2 : isHovered ? 1.05 : 1
@@ -1298,9 +1305,30 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       if (sprite.material !== nextVisual.material) {
         sprite.material = nextVisual.material
       }
+      let targetOpacity = markerFadeBase
+      if (pointerWorld) {
+        const markerWorld = locationWorldCache.get(id)
+        if (markerWorld) {
+          const dist = pointerWorld.distanceTo(markerWorld)
+          const t = THREE.MathUtils.clamp(1 - dist / fadeRadius, 0, 1)
+          const smooth = t * t * (3 - 2 * t)
+          targetOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
+        }
+      }
+      if (isHovered || isFocused) targetOpacity = markerFadeMax
+      const nextOpacity = THREE.MathUtils.damp(
+        currentOpacity ?? markerFadeBase,
+        targetOpacity,
+        8,
+        lastDelta
+      )
+      const spriteMat = sprite.material as THREE.SpriteMaterial
+      const baseSpriteOpacity =
+        (spriteMat.userData?.baseOpacity as number | undefined) ?? spriteMat.opacity
+      spriteMat.opacity = baseSpriteOpacity * nextOpacity
       const stemMat = stem.material as THREE.MeshStandardMaterial
       const stemState = stemStates[visualState]
-      stemMat.opacity = stemState.opacity
+      stemMat.opacity = stemState.opacity * nextOpacity
       stemMat.color.set(stemState.color)
       const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
       const stemScale = heightScaleFactor
@@ -1310,6 +1338,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
       const spriteHeight = scaled
       sprite.position.y = spriteBase + spriteHeight / 2
+      markerMap.get(id)!.currentOpacity = nextOpacity
     })
   }
 
@@ -1415,7 +1444,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
             stemStates,
             iconScale,
             stemBaseHeight: stemHeight,
-            spriteGap
+            spriteGap,
+            currentOpacity: markerFadeBase
           })
           markerInteractiveTargets.push(sprite, stem)
           const spriteMaterials = new Set<THREE.SpriteMaterial>()
@@ -1627,9 +1657,11 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
   let manualFrameTime = 0
   let frameCaptureStartTime = 0
 
+  let lastDelta = 0
   function animate() {
     const now = frameCaptureMode ? manualFrameTime : performance.now()
     const delta = frameCaptureMode ? (1 / captureFps) : Math.min((now - lastTime) / 1000, 0.15)
+    lastDelta = delta
     const frameDuration = now - lastTime
     lastTime = now
     if (cameraTween) {
@@ -1792,6 +1824,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     setPointerFromEvent(event)
     updateHoverState()
     updatePlacementIndicator()
+    const hit = intersectTerrain()
+    pointerWorld = hit?.point ? hit.point.clone() : null
   }
 
   function handlePointerDown(event: PointerEvent) {
