@@ -586,6 +586,7 @@ function createMarkerSpriteResource(
       depthWrite: false,
       opacity: style.opacity
     })
+    material.userData.baseOpacity = style.opacity
     return { material, texture }
   }
   const text = (label || '?').trim().slice(0, 14)
@@ -1130,10 +1131,10 @@ const markerResources: MarkerResource[] = []
       targetOpacity: number
     }
   >()
-  const markerFadeBase = 0.4
+  const markerFadeBase = 0.25
   const markerFadeMax = 1
   const markerFadeRadius = () => terrainSpan
-  const markerFocusRadius = () => terrainSpan * 0.35
+  const markerFocusRadius = () => terrainSpan * 0.55
   let pointerWorld: THREE.Vector3 | null = null
   let lastOpacityUpdate = 0
   let lastTelemetryUpdate = 0
