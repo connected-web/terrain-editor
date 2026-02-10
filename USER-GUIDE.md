@@ -46,6 +46,15 @@ Fine-tune location labels: text/background/border colours, opacity, padding, bor
 
 ![Theme panel label controls](documentation/images/panel-theme.png)
 
+#### Map Units & Marker Scale
+The viewer renders the terrain on a fixed map-unit scale derived from the map’s aspect ratio. Marker stems, offsets, and certain theme values are expressed in **map units**, while label/icon sprites are sized relative to the camera.
+
+- **Map units**: the terrain plane spans a small, fixed coordinate space (width and depth are on the order of a few units).
+- **Stem thickness**: specified in **hundredths of a map unit** (`1 = 0.01 map units`).
+- **Stem height**: specified directly in **map units**.
+- **Label offset**: specified as a **fraction of stem height**.
+- **Icon + label size**: scales with camera distance for readability.
+
 ### Locations Panel
 Manage every marker and its camera framing from one place. Pick on map, drag-and-drop icons, name or reorder, capture the current camera for quick fly-to animations, edit saved distance/polar/azimuth values, toggle label borders, or remove a location entirely. The selector button and dialog make it easy to jump between markers, while the preview area keeps icon uploads and replacements frictionless.
 
