@@ -71,7 +71,7 @@ export function createThemeFormState() {
     stemColor: '#f6e7c3',
     stemOpacity: 0.85,
     stemShape: 'cylinder' as MarkerStemGeometryShape,
-    stemRadius: 0.015,
+    stemRadius: 1.5,
     stemHeightScale: 1,
     fontFamily: 'Inter, sans-serif',
     fontWeight: '600',

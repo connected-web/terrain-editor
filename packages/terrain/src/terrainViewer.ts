@@ -930,7 +930,7 @@ export async function initTerrainViewer(
       typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
         ? Math.max(0, rawStemScale)
         : DEFAULT_STEM_SCALE
-    const rawRadius = stemTheme.radius * stemScale
+    const rawRadius = stemTheme.radius * stemScale * 0.01
     return THREE.MathUtils.clamp(rawRadius, 0, terrainSpan * 0.5)
   }
 
@@ -1358,7 +1358,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         const currentStemHeight = stemBaseHeight * stemScale
         stem.position.y = currentStemHeight / 2
         const labelOffset = markerTheme.labelOffset ?? 0
-        const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET + labelOffset
+        const spriteBase =
+          currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET + currentStemHeight * labelOffset
         const spriteHeight = scaled
         sprite.position.y = spriteBase + spriteHeight / 2
       }

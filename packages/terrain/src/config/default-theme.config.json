@@ -35,7 +35,7 @@
     },
     "stem": {
       "shape": "cylinder",
-      "radius": 0.015,
+      "radius": 1.5,
       "scale": 1,
       "heightScale": 1,
       "states": {

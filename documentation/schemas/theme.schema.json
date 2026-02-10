@@ -9,9 +9,14 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "iconScale": { "type": "number", "minimum": 0 },
-        "fadeRange": { "type": "number", "minimum": 0, "maximum": 1 },
-        "labelOffset": { "type": "number" },
+        "iconScale": { "type": "number", "minimum": 0, "description": "Scalar for location icon size." },
+        "fadeRange": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity falloff range as a fraction of the shortest map side."
+        },
+        "labelOffset": { "type": "number", "description": "Offset applied to labels as a fraction of stem height." },
         "sprite": { "$ref": "#/definitions/sprite" },
         "stem": { "$ref": "#/definitions/stem" }
       }
@@ -60,9 +65,9 @@
           "type": "string",
           "enum": ["cylinder", "triangle", "square", "pentagon", "hexagon"]
         },
-        "radius": { "type": "number", "minimum": 0 },
-        "scale": { "type": "number" },
-        "heightScale": { "type": "number", "minimum": 0 },
+        "radius": { "type": "number", "minimum": 0, "description": "Thickness value in hundredths of a world unit." },
+        "scale": { "type": "number", "description": "Scalar applied to stem thickness." },
+        "heightScale": { "type": "number", "minimum": 0, "description": "Scalar applied to stem height (1 = 100%)." },
         "states": { "$ref": "#/definitions/stemStates" }
       }
     },

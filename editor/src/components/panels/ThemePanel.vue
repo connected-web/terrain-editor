@@ -171,7 +171,7 @@
             />
           </label>
           <label class="theme-form__field">
-            <span>Label offset</span>
+            <span>Label offset (% of stem height)</span>
             <input
               type="number"
               min="-1"
@@ -318,18 +318,18 @@
         </label>
         <div class="theme-form__split">
           <label class="theme-form__field">
-            <span>Thickness (0 = hidden)</span>
+            <span>Thickness (0-5; 1 = 0.01 units)</span>
             <input
               type="number"
               min="0"
-              max="0.05"
-              step="0.001"
+              max="5"
+              step="0.1"
               v-model.number="themeForm.stemRadius"
               @change="$emit('schedule-update')"
             />
           </label>
           <label class="theme-form__field">
-            <span>Height scale</span>
+            <span>Height scale (1 = 100%)</span>
             <input
               type="number"
               min="0"

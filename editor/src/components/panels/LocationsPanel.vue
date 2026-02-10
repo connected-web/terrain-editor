@@ -16,20 +16,32 @@
       </button>
     </header>
     <div class="locations-panel__selector">
-      <button
-        class="pill-button locations-panel__selector-button"
-        type="button"
-        :disabled="!locationsList.length"
-        @click="$emit('open-picker')"
-      >
-        <Icon icon="location-crosshairs" />
-        <div class="locations-panel__selector-text">
-          <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
-          <small v-if="activeLocation">
-            {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
-          </small>
-        </div>
-      </button>
+      <div class="locations-panel__selector-row">
+        <button
+          class="pill-button locations-panel__selector-button"
+          type="button"
+          :disabled="!locationsList.length"
+          @click="$emit('open-picker')"
+        >
+          <Icon icon="location-crosshairs" />
+          <div class="locations-panel__selector-text">
+            <strong>{{ activeLocation?.name || activeLocation?.id || 'Select a location' }}</strong>
+            <small v-if="activeLocation">
+              {{ activeLocation.pixel.x }}, {{ activeLocation.pixel.y }}
+            </small>
+          </div>
+        </button>
+        <button
+          v-if="activeLocation"
+          class="pill-button pill-button--ghost pill-button--icon"
+          type="button"
+          title="Clear selection"
+          aria-label="Clear selection"
+          @click="clearActiveLocationSelection"
+        >
+          <Icon icon="xmark" />
+        </button>
+      </div>
       <p v-if="!locationsList.length" class="panel-card__placeholder locations-panel__placeholder">
         No locations yet. Import a map with locations or add them manually.
       </p>
@@ -258,7 +270,8 @@ const {
   isCameraFocusedOnLocation,
   captureCameraViewForActiveLocation,
   clearActiveLocationView,
-  focusCameraOnActiveLocation
+  focusCameraOnActiveLocation,
+  setActiveLocation
 } = props.locationsApi
 
 const { workspaceForm } = useWorkspaceModel()
@@ -266,6 +279,10 @@ const { workspaceForm } = useWorkspaceModel()
 const isCameraFocusedOnActiveLocation = computed(() => {
   return activeLocation.value ? isCameraFocusedOnLocation(activeLocation.value) : false
 })
+
+function clearActiveLocationSelection() {
+  setActiveLocation(null)
+}
 
 defineEmits<{
   'open-picker': []
@@ -276,3 +293,15 @@ defineEmits<{
   drop: [event: DragEvent]
 }>()
 </script>
+
+<style scoped>
+.locations-panel__selector-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.locations-panel__selector-row .locations-panel__selector-button {
+  flex: 1;
+}
+</style>
