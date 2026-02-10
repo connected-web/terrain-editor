@@ -1373,6 +1373,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     const fadeRadius = markerFadeRadius()
     const focusRadius = markerFocusRadius()
     const focusWorld = currentFocusId ? locationWorldCache.get(currentFocusId) : null
+    const hoverWorld = hoveredLocationId ? locationWorldCache.get(hoveredLocationId) : null
     markerMap.forEach((entry, id) => {
       const markerWorld = locationWorldCache.get(id)
       if (!markerWorld) {
@@ -1393,7 +1394,14 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         const smooth = t * t * (3 - 2 * t)
         focusOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
       }
-      entry.targetOpacity = Math.max(cursorOpacity, focusOpacity)
+      let hoverOpacity = markerFadeBase
+      if (hoverWorld) {
+        const dist = hoverWorld.distanceTo(markerWorld)
+        const t = THREE.MathUtils.clamp(1 - dist / focusRadius, 0, 1)
+        const smooth = t * t * (3 - 2 * t)
+        hoverOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
+      }
+      entry.targetOpacity = Math.max(cursorOpacity, focusOpacity, hoverOpacity)
     })
   }
 
