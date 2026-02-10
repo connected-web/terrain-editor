@@ -42,7 +42,7 @@ const DEFAULT_LAYER_ALPHA: Partial<Record<string, number>> = {
   cities: 1,
   roads: 0.85
 }
-const DEFAULT_STEM_SCALE = 1
+const DEFAULT_STEM_SCALE = 0.01
 const MARKER_HEIGHT_RATIO = 0.11
 const MARKER_HEIGHT_SCALE = 0.25
 const MARKER_MIN_HEIGHT = 0.35
@@ -74,7 +74,6 @@ export type TerrainLocation = {
   id: string
   name?: string
   icon?: string
-  iconScale?: number
   description?: string
   showBorder?: boolean
   pixel: { x: number; y: number }
@@ -587,7 +586,6 @@ function createMarkerSpriteResource(
       depthWrite: false,
       opacity: style.opacity
     })
-    material.userData.baseOpacity = style.opacity
     return { material, texture }
   }
   const text = (label || '?').trim().slice(0, 14)
@@ -911,16 +909,12 @@ export async function initTerrainViewer(
   const terrainDimensions = { width: terrainWidth, depth: terrainDepth }
   const terrainSpan = Math.min(terrainDimensions.width, terrainDimensions.depth)
   function computeMarkerStemHeight() {
-    const explicitHeight = markerTheme.stem.height
-    if (typeof explicitHeight === 'number' && Number.isFinite(explicitHeight)) {
-      return Math.max(0, explicitHeight)
-    }
     const scaledMin = MARKER_MIN_HEIGHT * MARKER_HEIGHT_SCALE
     const scaledMax = MARKER_MAX_HEIGHT * MARKER_HEIGHT_SCALE
     const rawHeight = terrainSpan * MARKER_HEIGHT_RATIO * MARKER_HEIGHT_SCALE
     return THREE.MathUtils.clamp(rawHeight, scaledMin, scaledMax)
   }
-  let markerStemHeight = computeMarkerStemHeight()
+  const markerStemHeight = computeMarkerStemHeight()
   let terrainHeightRange = { min: FLOOR_Y, max: 0 }
   const baseWidth = terrainWidth + EDGE_RIM * 2
   const baseDepth = terrainDepth + EDGE_RIM * 2
@@ -930,8 +924,10 @@ export async function initTerrainViewer(
       typeof rawStemScale === 'number' && Number.isFinite(rawStemScale)
         ? Math.max(0, rawStemScale)
         : DEFAULT_STEM_SCALE
-    const rawRadius = stemTheme.radius * stemScale * 0.01
-    return THREE.MathUtils.clamp(rawRadius, 0, terrainSpan * 0.5)
+    const maxStemRadiusCandidate = Math.min(terrainWidth, terrainDepth) * stemScale
+    return Number.isFinite(maxStemRadiusCandidate)
+      ? Math.min(stemTheme.radius, Math.max(0, maxStemRadiusCandidate))
+      : stemTheme.radius
   }
 
   let stemRadius = computeStemRadius(markerTheme.stem)
@@ -1134,11 +1130,10 @@ const markerResources: MarkerResource[] = []
       targetOpacity: number
     }
   >()
-  const markerFadeBase = 0.0
+  const markerFadeBase = 0.4
   const markerFadeMax = 1
-  const markerFadeRadius = () =>
-    terrainSpan * 0.5 * THREE.MathUtils.clamp(markerTheme.fadeRange ?? 1, 0, 1)
-  const markerFocusRadius = () => markerFadeRadius()
+  const markerFadeRadius = () => terrainSpan
+  const markerFocusRadius = () => terrainSpan * 0.35
   let pointerWorld: THREE.Vector3 | null = null
   let lastOpacityUpdate = 0
   let lastTelemetryUpdate = 0
@@ -1303,7 +1298,8 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         : location.name ?? ''
     const raw = (rawSource || '?').trim()
     if (!raw) return '?'
-    return raw
+    const first = raw[0]
+    return /[a-zA-Z0-9]/.test(first) ? first.toUpperCase() : raw
   }
 
 
@@ -1353,13 +1349,12 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
       stemMat.opacity = stemState.opacity * nextOpacity
       stemMat.color.set(stemState.color)
       if (shouldUpdateScale) {
+        const stemWidth = THREE.MathUtils.clamp(baseScale * 6, 0.12, 0.6)
         const stemScale = heightScaleFactor
-        stem.scale.set(1, stemScale, 1)
+        stem.scale.set(stemWidth, stemScale, stemWidth)
         const currentStemHeight = stemBaseHeight * stemScale
         stem.position.y = currentStemHeight / 2
-        const labelOffset = markerTheme.labelOffset ?? 0
-        const spriteBase =
-          currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET + currentStemHeight * labelOffset
+        const spriteBase = currentStemHeight + spriteGap + MARKER_LABEL_EXTRA_OFFSET
         const spriteHeight = scaled
         sprite.position.y = spriteBase + spriteHeight / 2
       }
@@ -1377,7 +1372,6 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     const fadeRadius = markerFadeRadius()
     const focusRadius = markerFocusRadius()
     const focusWorld = currentFocusId ? locationWorldCache.get(currentFocusId) : null
-    const hoverWorld = hoveredLocationId ? locationWorldCache.get(hoveredLocationId) : null
     markerMap.forEach((entry, id) => {
       const markerWorld = locationWorldCache.get(id)
       if (!markerWorld) {
@@ -1398,14 +1392,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
         const smooth = t * t * (3 - 2 * t)
         focusOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
       }
-      let hoverOpacity = markerFadeBase
-      if (hoverWorld) {
-        const dist = hoverWorld.distanceTo(markerWorld)
-        const t = THREE.MathUtils.clamp(1 - dist / focusRadius, 0, 1)
-        const smooth = t * t * (3 - 2 * t)
-        hoverOpacity = markerFadeBase + (markerFadeMax - markerFadeBase) * smooth
-      }
-      entry.targetOpacity = Math.max(cursorOpacity, focusOpacity, hoverOpacity)
+      entry.targetOpacity = Math.max(cursorOpacity, focusOpacity)
     })
   }
 
@@ -1493,7 +1480,6 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
           const stem = new THREE.Mesh(stemGeometry, stemMaterial)
           stem.renderOrder = 9
           stem.position.set(0, stemHeight / 2, 0)
-          stem.visible = stemRadius > 0
           sprite.position.set(0, spriteBaseOffset, 0)
           stem.userData.locationId = location.id
           const container = new THREE.Group()
@@ -1503,10 +1489,7 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
           container.add(stem)
           container.add(sprite)
           markersGroup.add(container)
-          const iconScale =
-            (iconTexture ? ICON_SCALE_MULTIPLIER : 1) *
-            (markerTheme.iconScale ?? 1) *
-            (location.iconScale ?? 1)
+          const iconScale = iconTexture ? ICON_SCALE_MULTIPLIER : 1
           markerMap.set(location.id, {
             container,
             sprite,
@@ -1544,7 +1527,6 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
     themeOverrides = overrides
     resolvedTheme = resolveTerrainTheme(dataset.theme, themeOverrides)
     markerTheme = resolvedTheme.locationMarkers
-    markerStemHeight = computeMarkerStemHeight()
     stemRadius = computeStemRadius(markerTheme.stem)
     setLocationMarkers(currentLocations, currentFocusId)
   }
@@ -1923,9 +1905,9 @@ function startCameraTween(endPos: THREE.Vector3, endTarget: THREE.Vector3, durat
 
   function handlePointerMove(event: PointerEvent) {
     setPointerFromEvent(event)
+    updateHoverState()
     const worldPoint = pointerToWorldCheap()
     pointerWorld = worldPoint ? worldPoint.clone() : null
-    updateHoverState()
     updatePlacementIndicator(pointerWorld)
   }
 
