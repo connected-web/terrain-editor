@@ -1,6 +1,6 @@
 {
   "name": "@connected-web/terrain-editor",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Reusable viewer/editor utilities for Wyn terrain files.",
   "type": "module",
   "main": "dist/index.cjs",

@@ -135,6 +135,7 @@
 
 - ✅ Sample `.wyn` packaging via `npm run packmap`
 - ✅ Sample `.wyn` unpacking via `npm run unpackmap`
+- ✅ Sample marker stem scales normalized for map-unit rendering
 - ✅ Additional curated sample terrains for testing editor flows
   - ✅ Fortress Sample Map
   - ✅ British Isles Sample Map

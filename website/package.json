@@ -1,6 +1,6 @@
 {
   "name": "@connected-web/terrain-editor-website",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "The website for the Terrain Editor project.",
   "type": "module",
   "scripts": {
