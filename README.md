@@ -196,4 +196,4 @@ Copyright 2025 Connected Web.
 
 ## Development roadmap
 
-See [`DEVELOPMENT-ROADMAP.md`[./DEVELOPMENT_ROADMAP.md] for the current list of completed and planned channges. Use Github Issues if you'd like to raise a feature suggestion, or find a bug. 
+See [`DEVELOPMENT-ROADMAP.md`](./DEVELOPMENT-ROADMAP.md) for the current list of completed and planned changes. Use GitHub Issues if you'd like to raise a feature suggestion or report a bug.
