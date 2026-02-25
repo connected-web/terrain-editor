@@ -31,6 +31,8 @@ export function useTheme(options: {
     themeForm.stemColor = stemDefault.color
     themeForm.stemOpacity = stemDefault.opacity
     themeForm.stemShape = resolved.locationMarkers.stem.shape
+    themeForm.stemRadius = resolved.locationMarkers.stem.radius
+    themeForm.stemHeight = resolved.locationMarkers.stem.height ?? 0.12
     themeForm.fontFamily = sprite.fontFamily
     themeForm.fontWeight = sprite.fontWeight
     themeForm.maxFontSize = sprite.maxFontSize
@@ -38,6 +40,9 @@ export function useTheme(options: {
     themeForm.paddingX = sprite.paddingX
     themeForm.paddingY = sprite.paddingY
     themeForm.borderRadius = sprite.borderRadius
+    themeForm.iconScale = resolved.locationMarkers.iconScale ?? 1
+    themeForm.fadeRange = resolved.locationMarkers.fadeRange ?? 1
+    themeForm.labelOffset = resolved.locationMarkers.labelOffset ?? 0
     const sourceSprite = snapshot.theme?.locationMarkers?.sprite
     const hoverSource = sourceSprite?.states?.hover
     const focusSource = sourceSprite?.states?.focus
@@ -93,6 +98,9 @@ export function useTheme(options: {
   function commitThemeOverrides() {
     const overrides: TerrainThemeOverrides = {
       locationMarkers: {
+        iconScale: themeForm.iconScale,
+        fadeRange: themeForm.fadeRange,
+        labelOffset: themeForm.labelOffset,
         sprite: {
           fontFamily: themeForm.fontFamily,
           fontWeight: themeForm.fontWeight,
@@ -135,6 +143,8 @@ export function useTheme(options: {
         },
         stem: {
           shape: themeForm.stemShape,
+          radius: themeForm.stemRadius,
+          height: themeForm.stemHeight,
           states: {
             default: {
               color: themeForm.stemColor,

@@ -136,6 +136,54 @@
         </div>
       </section>
       <section class="theme-form__section">
+        <header>
+          <h4>Interactivity</h4>
+        </header>
+        <div class="theme-form__split">
+          <label class="theme-form__field">
+            <span>Icon scale</span>
+            <input
+              type="number"
+              min="0.1"
+              max="3"
+              step="0.05"
+              v-model.number="themeForm.iconScale"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
+            <span>Fade range (% of shortest map side)</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.fadeRange"
+              @input="$emit('schedule-update')"
+            />
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              v-model.number="themeForm.fadeRange"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
+            <span>Label offset (% of stem height)</span>
+            <input
+              type="number"
+              min="-1"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.labelOffset"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+        </div>
+      </section>
+      <section class="theme-form__section">
         <div class="row left">
           <h4>Hover state</h4>
           <span class="spacer"></span>
@@ -270,6 +318,28 @@
         </label>
         <div class="theme-form__split">
           <label class="theme-form__field">
+            <span>Thickness (0-5; 1 = 0.01 map units)</span>
+            <input
+              type="number"
+              min="0"
+              max="5"
+              step="0.1"
+              v-model.number="themeForm.stemRadius"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
+            <span>Height (map units)</span>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              v-model.number="themeForm.stemHeight"
+              @change="$emit('schedule-update')"
+            />
+          </label>
+          <label class="theme-form__field">
             <span>Color</span>
             <input type="color" v-model="themeForm.stemColor" @input="$emit('schedule-update')" />
           </label>
@@ -352,6 +422,8 @@ type ThemeForm = {
   stemColor: string
   stemOpacity: number
   stemShape: MarkerStemGeometryShape
+  stemRadius: number
+  stemHeight: number
   fontFamily: string
   fontWeight: string
   maxFontSize: number
@@ -359,6 +431,7 @@ type ThemeForm = {
   paddingX: number
   paddingY: number
   borderRadius: number
+  labelOffset: number
   hoverEnabled: boolean
   focusEnabled: boolean
   hover: {

@@ -30,11 +30,11 @@
     {
       "id": "north-america",
       "title": "North America",
-      "description": "Planned large-scale sample terrain.",
+      "description": "4096x4096 North America terrain with borders, capitals, and high points.",
       "filename": "north-america-terrain.wyn",
-      "status": "planned",
-      "date": "Jan 2026",
-      "thumbnail": null
+      "status": "available",
+      "date": "2026-02-09",
+      "thumbnail": "maps/thumbnails/north-america.png"
     }
   ]
 }
