@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { captureScreenshot } from './utils'
 
-const heroHeading = 'Build, edit, and explore Wyn terrain files directly in the browser.'
+const heroHeading = 'Craft and tune Wyn terrain maps in a full 3D editor — right in the browser.'
 
 test.describe('Main Website', () => {
   test('website home renders hero and demo links', async ({ page }, testInfo) => {

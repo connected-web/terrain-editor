@@ -62,6 +62,10 @@ async function fetchLatestVersion() {
 }
 
 async function run() {
+  if (!process.env.CI) {
+    console.log('[sync-version] Skipping remote version sync outside CI.')
+    return
+  }
   if (process.env.CI && process.env.GITHUB_REF && process.env.GITHUB_REF !== 'refs/heads/main') {
     console.log('[sync-version] Skipping version sync on non-main CI refs.')
     return
